@@ -190,7 +190,7 @@ const EditHeaderCard = ({ editedHeader, handleInputChange }) => {
                 <div className="flex flex-col gap-3">
                   <label className="relative cursor-pointer bg-gradient-to-r from-blue-500 to-indigo-600 text-white px-4 py-2.5 rounded-lg shadow-lg hover:from-blue-600 hover:to-indigo-700 transition w-fit flex items-center gap-2">
                     <Upload className="w-4 h-4" />
-                    Choose File
+                    Choose Logo Image
                     <input
                       type="file"
                       accept="image/*"
@@ -208,19 +208,11 @@ const EditHeaderCard = ({ editedHeader, handleInputChange }) => {
                     />
                   </label>
 
-                  <input
-                    type="text"
-                    placeholder="Or enter image URL"
-                    value={editedHeader[key] || ""}
-                    onChange={(e) => handleInputChange(e, key)}
-                    className="border-2 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 p-2.5 rounded-lg w-full transition outline-none"
-                  />
-
                   {editedHeader[key] && (
                     <div className="flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-200">
                       <img
                         src={editedHeader[key]}
-                        alt="Preview"
+                        alt="Logo Preview"
                         className="w-16 h-16 rounded-lg object-cover border-2 border-gray-300"
                       />
                       <div className="flex-1">
@@ -235,7 +227,7 @@ const EditHeaderCard = ({ editedHeader, handleInputChange }) => {
                   )}
 
                   <p className="text-xs text-gray-500">
-                    Leave empty to use default school initials badge
+                    Upload a logo image file. Leave empty to use default school initials badge.
                   </p>
                 </div>
               </div>

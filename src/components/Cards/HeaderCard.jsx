@@ -9,6 +9,11 @@ const HeaderCard = ({
 }) => {
   const navigate = useNavigate();
 
+  // Safety check for header
+  if (!header) {
+    return null;
+  }
+
   const styles = {
     style1:
       "bg-white p-6 shadow-xl border-4 border-double border-black rounded-lg",
@@ -18,14 +23,21 @@ const HeaderCard = ({
     style4: "bg-white p-6 shadow-xl border-2 border-black rounded-lg",
   };
 
-  const appliedStyle = !disableStyles ? styles[header.styleType] : "";
+  // Set default values if missing
+  const safeHeader = {
+    layoutType: header.layoutType || "primary",
+    styleType: header.styleType || "style1",
+    ...header,
+  };
+
+  const appliedStyle = !disableStyles ? styles[safeHeader.styleType] : "";
 
   // Render logo (either image or initials)
   const renderLogo = () => {
-    if (!header.image) {
+    if (!safeHeader.image) {
       // Generate initials from school name
       const initials =
-        header.schoolName
+        safeHeader.schoolName
           ?.split(" ")
           .map((word) => word[0])
           .join("")
@@ -46,7 +58,7 @@ const HeaderCard = ({
       return (
         <div
           className={`${
-            logoStyles[header.styleType]
+            logoStyles[safeHeader.styleType]
           } flex items-center justify-center text-white font-bold text-lg flex-shrink-0`}
         >
           {initials}
@@ -63,10 +75,10 @@ const HeaderCard = ({
 
     return (
       <img
-        src={header.image}
+        src={safeHeader.image}
         alt="School Logo"
         className={`${
-          sizeClasses[header.styleType]
+          sizeClasses[safeHeader.styleType]
         } object-cover border-2 border-gray-800 shadow-md flex-shrink-0`}
       />
     );
@@ -85,7 +97,7 @@ const HeaderCard = ({
       }
     >
       {/* Style 1: Primary Classes (1-5) */}
-      {header.layoutType === "primary" && (
+      {safeHeader.layoutType === "primary" && (
         <div className="border-4 border-double border-black p-4 text-center">
           <div className="flex items-center justify-center gap-3 mb-2">
             {renderLogo()}
@@ -112,7 +124,7 @@ const HeaderCard = ({
       )}
 
       {/* Style 2: Middle Classes (6-8) */}
-      {header.layoutType === "middle" && (
+      {safeHeader.layoutType === "middle" && (
         <div className="border-2 border-gray-800 rounded-md p-4 bg-gradient-to-r from-gray-50 via-white to-gray-50">
           <div className="flex items-center justify-center gap-3 mb-3">
             {renderLogo()}
@@ -144,7 +156,7 @@ const HeaderCard = ({
       )}
 
       {/* Style 3: High School (9-10) */}
-      {header.layoutType === "high" && (
+      {safeHeader.layoutType === "high" && (
         <div className="border-b-4 border-gray-700 pb-4">
           <div className="flex justify-between items-center mb-3">
             <div className="flex items-center gap-3">
@@ -177,7 +189,7 @@ const HeaderCard = ({
       )}
 
       {/* Style 4: Senior Secondary (11-12) */}
-      {header.layoutType === "senior" && (
+      {safeHeader.layoutType === "senior" && (
         <div className="border-2 border-black p-4">
           <div className="flex items-center gap-4 border-b-2 border-black pb-3 mb-3">
             {renderLogo()}

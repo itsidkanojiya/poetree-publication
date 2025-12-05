@@ -20,6 +20,8 @@ import { useAuth } from "../../context/AuthContext";
 import usePdfContent from "../../hooks/usePdfContent";
 import HeaderCard from "../Cards/HeaderCard";
 import apiClient from "../../services/apiClient";
+import { getPaperById, updatePaper } from "../../services/paperService";
+import Toast from "../Common/Toast";
 
 // Constants
 const PAGE_DIMENSIONS = {
@@ -208,9 +210,25 @@ const CustomPaper = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const { header } = location.state || {};
+  const { header, paperId, editMode, paperData: initialPaperData } = location.state || {};
   const divContents = usePdfContent();
   const pagesRef = useRef(null);
+  
+  // Edit mode state
+  const [isEditMode, setIsEditMode] = useState(editMode || false);
+  const [paperIdState, setPaperIdState] = useState(paperId || null);
+  const [loadingPaper, setLoadingPaper] = useState(isEditMode);
+  const [toast, setToast] = useState(null);
+  
+  // Header state for edit mode
+  const [paperHeader, setPaperHeader] = useState(header || null);
+  
+  // Store paper marks for calculating marks per question
+  const [paperMarks, setPaperMarks] = useState(null);
+  
+  // Prevent duplicate saves
+  const [isSaving, setIsSaving] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
 
   const [approvedSubjectIds, setApprovedSubjectIds] = useState([]);
   const [approvedSubjectsMap, setApprovedSubjectsMap] = useState(new Map()); // Store subject_id -> subject_name mapping
@@ -246,6 +264,171 @@ const CustomPaper = () => {
   useEffect(() => {
     localStorage.setItem("marksPerType", JSON.stringify(marksPerType));
   }, [marksPerType]);
+
+  // Load paper data in edit mode
+  useEffect(() => {
+    const loadPaperData = async () => {
+      if (isEditMode && paperIdState) {
+        try {
+          setLoadingPaper(true);
+          const response = await getPaperById(paperIdState);
+          const paper = response.data || response;
+          
+          // Load header data if available
+          if (paper) {
+            // Set header data from paper
+            if (paper.school_name || paper.subject || paper.board) {
+              setPaperHeader({
+                schoolName: paper.school_name || "",
+                standard: paper.standard || "",
+                timing: paper.timing || "",
+                date: paper.date ? paper.date.split('T')[0] : "", // Format date to YYYY-MM-DD
+                division: paper.division || "",
+                address: paper.address || "",
+                subject: paper.subject || "",
+                board: paper.board || "",
+                logo: paper.logo || null,
+                logoUrl: paper.logo_url || null,
+                subjectTitle: paper.subject_title_id || null,
+              });
+            }
+            
+            // Load marks from paper response first (needed for calculating marks per question)
+            const marksData = {
+              mcq: paper.marks_mcq || 0,
+              short: paper.marks_short || 0,
+              long: paper.marks_long || 0,
+              blank: paper.marks_blank || 0,
+              onetwo: paper.marks_onetwo || 0,
+              true_false: paper.marks_truefalse || 0,
+            };
+            setPaperMarks(marksData);
+            
+            // Parse body to get question IDs
+            if (paper.body) {
+              try {
+                // Parse body - it should be a JSON string like "[1,2,3,4,5]"
+                let questionIds;
+                if (typeof paper.body === 'string') {
+                  if (paper.body.trim().startsWith("[")) {
+                    // It's a JSON array string
+                    questionIds = JSON.parse(paper.body);
+                  } else {
+                    // Try to parse as JSON anyway
+                    questionIds = JSON.parse(paper.body);
+                  }
+                } else if (Array.isArray(paper.body)) {
+                  // Already an array
+                  questionIds = paper.body;
+                } else {
+                  console.warn("Unexpected body format:", paper.body);
+                  return;
+                }
+                
+                // Load questions by IDs with marks data
+                if (Array.isArray(questionIds) && questionIds.length > 0) {
+                  await loadQuestionsByIds(questionIds, marksData);
+                }
+              } catch (e) {
+                console.error("Error parsing body:", e);
+                setToast({
+                  message: "Failed to parse question IDs from paper",
+                  type: "error",
+                });
+              }
+            }
+          }
+        } catch (error) {
+          console.error("Error loading paper:", error);
+          setToast({
+            message: "Failed to load paper data",
+            type: "error",
+          });
+        } finally {
+          setLoadingPaper(false);
+        }
+      }
+    };
+    
+    loadPaperData();
+  }, [isEditMode, paperIdState]);
+
+  // Function to load questions by IDs
+  const loadQuestionsByIds = async (questionIds, marksData = null) => {
+    try {
+      // Fetch all questions and filter by IDs
+      const response = await apiClient.get(`/question`);
+      const allQuestions = response.data?.questions || response.data || [];
+      
+      // Filter questions by IDs and maintain order
+      const fetchedQuestions = questionIds
+        .map((id) => allQuestions.find((q) => q.question_id === id))
+        .filter((q) => q !== undefined); // Remove any undefined (questions not found)
+      
+      // Group questions by type and populate questionSections
+      const groupedQuestions = {
+        mcq: [],
+        blank: [],
+        short: [],
+        long: [],
+        onetwo: [],
+        true_false: [],
+      };
+      
+      fetchedQuestions.forEach((question) => {
+        if (groupedQuestions[question.type]) {
+          groupedQuestions[question.type].push(question);
+        }
+      });
+      
+      // Update questionSections with loaded questions (pre-selected)
+      setQuestionSections((prev) =>
+        prev.map((section) => ({
+          ...section,
+          selectedQuestions: groupedQuestions[section.type] || [],
+        }))
+      );
+      
+      // Calculate marks per question type based on paper marks
+      if (marksData) {
+        const calculatedMarks = { ...marksPerType };
+        
+        Object.keys(groupedQuestions).forEach((type) => {
+          const questionCount = groupedQuestions[type].length;
+          if (questionCount > 0) {
+            switch (type) {
+              case "mcq":
+                calculatedMarks.mcq = marksData.mcq / questionCount || 1;
+                break;
+              case "short":
+                calculatedMarks.short = marksData.short / questionCount || 3;
+                break;
+              case "long":
+                calculatedMarks.long = marksData.long / questionCount || 5;
+                break;
+              case "blank":
+                calculatedMarks.blank = marksData.blank / questionCount || 1;
+                break;
+              case "onetwo":
+                calculatedMarks.onetwo = marksData.onetwo / questionCount || 2;
+                break;
+              case "true_false":
+                calculatedMarks.true_false = marksData.true_false / questionCount || 1;
+                break;
+            }
+          }
+        });
+        
+        setMarksPerType(calculatedMarks);
+      }
+    } catch (error) {
+      console.error("Error loading questions:", error);
+      setToast({
+        message: "Failed to load questions",
+        type: "error",
+      });
+    }
+  };
 
   // Fetch approved subjects on component mount
   useEffect(() => {
@@ -463,47 +646,291 @@ const CustomPaper = () => {
   };
 
   const downloadPDF = async () => {
-    const pdf = new jsPDF("p", "mm", "a4");
-    const pages = pagesRef.current.children;
-    let promises = [];
-
-    Array.from(pages).forEach((page, index) => {
-      let images = Array.from(page.querySelectorAll("img"));
-      let loadPromises = images.map(
-        (img) =>
-          new Promise((resolve) => {
-            if (img.complete) resolve();
-            else img.onload = () => resolve();
-          })
+    // Check if paper needs to be saved first
+    if (!isSaved && !isEditMode) {
+      // Save paper first before downloading
+      const logoFile = document.getElementById("logo-upload");
+      
+      // Check if there are any questions selected
+      const totalQuestions = questionSections.reduce(
+        (total, section) => total + section.selectedQuestions.length,
+        0
       );
-
-      let capturePromise = Promise.all(loadPromises).then(() => {
-        return html2canvas(page, {
-          scale: 1.5,
-          useCORS: true,
-          ignoreElements: (element) => element.classList.contains("no-print"),
-        }).then((canvas) => {
-          const imgData = canvas.toDataURL("image/jpeg", 0.7);
-          const imgWidth = 210;
-          const imgHeight = (canvas.height * imgWidth) / canvas.width;
-          const maxHeight = 297;
-          const finalHeight = imgHeight > maxHeight ? maxHeight : imgHeight;
-
-          if (index > 0) pdf.addPage();
-          pdf.addImage(imgData, "PNG", 0, 0, imgWidth, finalHeight);
+      
+      if (totalQuestions === 0) {
+        setToast({
+          message: "Please select at least one question before downloading",
+          type: "warning",
         });
+        return;
+      }
+      
+      try {
+        setIsSaving(true);
+        // Get all selected question IDs
+        const allQuestionIds = [];
+        questionSections.forEach((section) => {
+          section.selectedQuestions.forEach((question) => {
+            allQuestionIds.push(question.question_id);
+          });
+        });
+        
+        // Save paper with question IDs, header data, marks, and question sections
+        await savePaper(
+          user, 
+          allQuestionIds, 
+          logoFile, 
+          "custom", 
+          header,
+          marksPerType,
+          questionSections
+        );
+        setIsSaved(true);
+        setToast({
+          message: "Paper saved successfully!",
+          type: "success",
+        });
+        
+        // Clear selected questions to prevent duplicate saves
+        setQuestionSections(INITIAL_QUESTION_SECTIONS);
+        localStorage.removeItem("questionSections");
+        localStorage.removeItem("marksPerType");
+      } catch (error) {
+        setIsSaving(false);
+        setToast({
+          message: "Failed to save paper. " + (error.response?.data?.message || error.message),
+          type: "error",
+        });
+        return; // Don't download if save fails
+      } finally {
+        setIsSaving(false);
+      }
+    }
+    
+    // Generate and download PDF
+    try {
+      const pdf = new jsPDF("p", "mm", "a4");
+      const pages = pagesRef.current.children;
+      let promises = [];
+
+      Array.from(pages).forEach((page, index) => {
+        let images = Array.from(page.querySelectorAll("img"));
+        let loadPromises = images.map(
+          (img) =>
+            new Promise((resolve) => {
+              if (img.complete) resolve();
+              else img.onload = () => resolve();
+            })
+        );
+
+        let capturePromise = Promise.all(loadPromises).then(() => {
+          return html2canvas(page, {
+            scale: 1.5,
+            useCORS: true,
+            ignoreElements: (element) => element.classList.contains("no-print"),
+          }).then((canvas) => {
+            const imgData = canvas.toDataURL("image/jpeg", 0.7);
+            const imgWidth = 210;
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+            const maxHeight = 297;
+            const finalHeight = imgHeight > maxHeight ? maxHeight : imgHeight;
+
+            if (index > 0) pdf.addPage();
+            pdf.addImage(imgData, "PNG", 0, 0, imgWidth, finalHeight);
+          });
+        });
+
+        promises.push(capturePromise);
       });
 
-      promises.push(capturePromise);
-    });
-
-    await Promise.all(promises);
-    pdf.save("exam-paper.pdf");
+      await Promise.all(promises);
+      pdf.save("exam-paper.pdf");
+      
+      // Show success message and redirect to history
+      setToast({
+        message: "PDF downloaded successfully!",
+        type: "success",
+      });
+      
+      // Redirect to history after 1.5 seconds
+      setTimeout(() => {
+        navigate("/dashboard/history", { state: { refresh: true } });
+      }, 1500);
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      setToast({
+        message: "Failed to generate PDF",
+        type: "error",
+      });
+    }
   };
 
   const handleSavePaper = async () => {
+    // Prevent duplicate saves
+    if (isSaving || isSaved) {
+      return;
+    }
+    
+    // Check if there are any questions selected
+    const totalQuestions = questionSections.reduce(
+      (total, section) => total + section.selectedQuestions.length,
+      0
+    );
+    
+    if (totalQuestions === 0) {
+      setToast({
+        message: "Please select at least one question before saving",
+        type: "warning",
+      });
+      return;
+    }
+    
+    setIsSaving(true);
     const logoFile = document.getElementById("logo-upload");
-    await savePaper(user, divContents, logoFile, "custom");
+    
+    if (isEditMode && paperIdState) {
+      // Update existing paper
+      try {
+        const formData = new FormData();
+        
+        // Get all selected question IDs
+        const allQuestionIds = [];
+        questionSections.forEach((section) => {
+          section.selectedQuestions.forEach((question) => {
+            allQuestionIds.push(question.question_id);
+          });
+        });
+        
+        // Add body as JSON string of question IDs (required)
+        formData.append("body", JSON.stringify(allQuestionIds));
+        
+        // Add header data if available
+        if (header) {
+          if (header.schoolName) formData.append("school_name", header.schoolName);
+          // Standard should be integer
+          if (header.standard) {
+            const standardValue = typeof header.standard === 'string' 
+              ? parseInt(header.standard) || 0 
+              : header.standard;
+            formData.append("standard", standardValue);
+          }
+          if (header.date) formData.append("date", header.date);
+          if (header.subject) formData.append("subject", header.subject);
+          if (header.board) formData.append("board", header.board);
+          if (header.timing) formData.append("timing", header.timing);
+          if (header.division) formData.append("division", header.division);
+          if (header.address) formData.append("address", header.address);
+          if (header.subjectTitle) formData.append("subject_title_id", header.subjectTitle);
+        }
+        
+        // Calculate and add marks for each question type
+        let marksMcq = 0;
+        let marksShort = 0;
+        let marksLong = 0;
+        let marksBlank = 0;
+        let marksOnetwo = 0;
+        let marksTruefalse = 0;
+
+        questionSections.forEach((section) => {
+          const count = section.selectedQuestions.length;
+          const marks = marksPerType[section.type] || 0;
+          const totalMarks = count * marks;
+
+          switch (section.type) {
+            case "mcq":
+              marksMcq = totalMarks;
+              break;
+            case "short":
+              marksShort = totalMarks;
+              break;
+            case "long":
+              marksLong = totalMarks;
+              break;
+            case "blank":
+              marksBlank = totalMarks;
+              break;
+            case "onetwo":
+              marksOnetwo = totalMarks;
+              break;
+            case "true_false":
+              marksTruefalse = totalMarks;
+              break;
+          }
+        });
+
+        formData.append("marks_mcq", marksMcq);
+        formData.append("marks_short", marksShort);
+        formData.append("marks_long", marksLong);
+        formData.append("marks_blank", marksBlank);
+        formData.append("marks_onetwo", marksOnetwo);
+        formData.append("marks_truefalse", marksTruefalse);
+        
+        // Logo handling: only send file if uploaded
+        if (logoFile && logoFile.files && logoFile.files[0]) {
+          formData.append("logo", logoFile.files[0]);
+        }
+        
+        await updatePaper(paperIdState, formData);
+        setIsSaved(true);
+        setToast({
+          message: "Paper updated successfully!",
+          type: "success",
+        });
+        setTimeout(() => {
+          navigate("/dashboard/history", { state: { refresh: true } });
+        }, 1500);
+      } catch (error) {
+        console.error("Error updating paper:", error);
+        setIsSaving(false);
+        setToast({
+          message: "Failed to update paper. " + (error.response?.data?.message || error.message),
+          type: "error",
+        });
+      }
+    } else {
+      // Create new paper
+      try {
+        // Get all selected question IDs
+        const allQuestionIds = [];
+        questionSections.forEach((section) => {
+          section.selectedQuestions.forEach((question) => {
+            allQuestionIds.push(question.question_id);
+          });
+        });
+        
+        // Save paper with question IDs, header data, marks, and question sections
+        await savePaper(
+          user, 
+          allQuestionIds, 
+          logoFile, 
+          "custom", 
+          header,
+          marksPerType,
+          questionSections
+        );
+        setIsSaved(true);
+        setToast({
+          message: "Paper saved successfully!",
+          type: "success",
+        });
+        
+        // Clear selected questions to prevent duplicate saves
+        setQuestionSections(INITIAL_QUESTION_SECTIONS);
+        localStorage.removeItem("questionSections");
+        localStorage.removeItem("marksPerType");
+        
+        // Redirect to history after 1.5 seconds with refresh flag
+        setTimeout(() => {
+          navigate("/dashboard/history", { state: { refresh: true } });
+        }, 1500);
+      } catch (error) {
+        setIsSaving(false);
+        setToast({
+          message: "Failed to save paper. " + (error.response?.data?.message || error.message),
+          type: "error",
+        });
+      }
+    }
   };
 
   const renderPages = () => {
@@ -620,6 +1047,18 @@ const CustomPaper = () => {
 
   const printedTypes = new Set();
 
+  // Show loading state while loading paper data
+  if (loadingPaper) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600 font-semibold">Loading paper data...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40">
       {/* Top Navigation Bar - Modern Glassmorphism */}
@@ -636,6 +1075,11 @@ const CustomPaper = () => {
               />
               <span>Back to Dashboard</span>
             </button>
+            {isEditMode && (
+              <div className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-lg font-semibold text-sm">
+                ✏️ Edit Mode
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-3">
@@ -656,20 +1100,30 @@ const CustomPaper = () => {
             </div>
             <button
               onClick={downloadPDF}
-              className="group flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-xl font-semibold hover:from-emerald-600 hover:to-teal-700 transition-all duration-200 shadow-lg shadow-emerald-500/30 hover:shadow-xl hover:shadow-emerald-500/40 hover:scale-105 active:scale-95"
+              disabled={isSaving}
+              className="group flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-xl font-semibold hover:from-emerald-600 hover:to-teal-700 transition-all duration-200 shadow-lg shadow-emerald-500/30 hover:shadow-xl hover:shadow-emerald-500/40 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <FileDown size={18} className="group-hover:animate-bounce" />
-              <span>Download PDF</span>
+              <span>{isSaving ? "Saving..." : "Download PDF"}</span>
             </button>
             <button
               onClick={handleSavePaper}
-              className="group flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-violet-500 to-purple-600 text-white rounded-xl font-semibold hover:from-violet-600 hover:to-purple-700 transition-all duration-200 shadow-lg shadow-violet-500/30 hover:shadow-xl hover:shadow-violet-500/40 hover:scale-105 active:scale-95"
+              disabled={loadingPaper || isSaving || isSaved}
+              className="group flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-violet-500 to-purple-600 text-white rounded-xl font-semibold hover:from-violet-600 hover:to-purple-700 transition-all duration-200 shadow-lg shadow-violet-500/30 hover:shadow-xl hover:shadow-violet-500/40 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <FileText
                 size={18}
                 className="group-hover:rotate-12 transition-transform"
               />
-              <span>Save Paper</span>
+              <span>
+                {isSaving 
+                  ? "Saving..." 
+                  : isSaved 
+                    ? "Saved!" 
+                    : isEditMode 
+                      ? "Update Paper" 
+                      : "Save Paper"}
+              </span>
             </button>
             <button
               onClick={handleReset}
@@ -684,6 +1138,20 @@ const CustomPaper = () => {
           </div>
         </div>
       </div>
+
+      {/* Hidden Logo Upload Input */}
+      <input 
+        type="file" 
+        id="logo-upload" 
+        accept="image/*" 
+        className="hidden"
+        onChange={(e) => {
+          // Handle logo file change if needed
+          if (e.target.files && e.target.files[0]) {
+            // File is available for upload
+          }
+        }}
+      />
 
       {/* Split Screen Layout */}
       <div className="flex h-[calc(100vh-73px)] overflow-hidden">
@@ -1159,7 +1627,7 @@ const CustomPaper = () => {
                   {pageIndex === 0 && (
                     <div className="mb-6 pb-6">
                       <HeaderCard
-                        header={header}
+                        header={paperHeader || header}
                         disableHover={true}
                         disableStyles
                       />
@@ -1330,6 +1798,16 @@ const CustomPaper = () => {
           </div>
         </div>
       </div>
+      
+      {/* Toast Notification */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+          duration={3000}
+        />
+      )}
     </div>
   );
 };

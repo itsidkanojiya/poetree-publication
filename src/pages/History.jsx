@@ -4,15 +4,18 @@ import { usePaper } from "../context/PaperContext";
 import PaperCard from "../components/Cards/PaperCard";
 import { useAuth } from "../context/AuthContext";
 import { Filter, Calendar, FileText, Clock, Search } from "lucide-react";
+import { useLocation } from "react-router-dom";
 
 const History = () => {
-  const { papers } = usePaper();
+  const { papers, refreshPapers, loading } = usePaper();
+  const location = useLocation();
   const [filters, setFilters] = useState({
     type: "all",
     dateFrom: "",
     dateTo: "",
     searchQuery: "",
   });
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   let allPapers = Array.isArray(papers) ? papers : papers?.papers || [];
 
@@ -59,10 +62,34 @@ const History = () => {
     setFilters({ ...filters, [key]: value });
   };
 
+  // Refresh papers when component mounts or location changes
   useEffect(() => {
-    // getAllPapers().then((data) => console.log(data));
-    // getPapersByUserId(3).then((data) => console.log(data));
-  }, []);
+    const refreshData = async () => {
+      if (refreshPapers) {
+        setIsRefreshing(true);
+        await refreshPapers();
+        setIsRefreshing(false);
+      }
+    };
+    
+    refreshData();
+  }, [location.pathname]);
+  
+  // Also refresh when location state indicates a refresh is needed
+  useEffect(() => {
+    if (location.state?.refresh) {
+      const refreshData = async () => {
+        if (refreshPapers) {
+          setIsRefreshing(true);
+          await refreshPapers();
+          setIsRefreshing(false);
+        }
+      };
+      refreshData();
+      // Clear the refresh flag
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state, refreshPapers]);
 
   return (
     <div className="min-h-screen p-8">
@@ -218,14 +245,22 @@ const History = () => {
           )}
         </div>
 
+        {/* Loading Indicator */}
+        {(loading || isRefreshing) && (
+          <div className="text-center py-12">
+            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+            <p className="text-gray-600 font-semibold">Loading papers...</p>
+          </div>
+        )}
+
         {/* Papers Grid */}
-        {filteredPapers.length > 0 ? (
+        {!loading && !isRefreshing && filteredPapers.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredPapers.map((paper, index) => (
               <PaperCard key={paper.id || index} {...paper} />
             ))}
           </div>
-        ) : (
+        ) : !loading && !isRefreshing ? (
           <div className="text-center py-20">
             <FileText className="w-20 h-20 text-gray-300 mx-auto mb-4" />
             <p className="text-xl font-semibold text-gray-600 mb-2">
@@ -245,7 +280,7 @@ const History = () => {
               </button>
             )}
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   );

@@ -12,21 +12,29 @@ const PaperContext = createContext();
 export const PaperProvider = ({ children }) => {
   const { user } = useAuth();
   const [papers, setPapers] = useState({papers:[]});
+  const [loading, setLoading] = useState(false);
+
+  const fetchPapers = async () => {
+    if (user && user.id) {
+      try {
+        setLoading(true);
+        const data = await getPapersByUserId(user.id);
+        setPapers(data);
+      } catch (error) {
+        console.error("Error fetching papers:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
 
   useEffect(() => {
-    if (user && user.id) {
-      const fetchPapers = async () => {
-        try {
-          const data = await getPapersByUserId(user.id);
-          setPapers(data);
-        } catch (error) {
-          console.error("Error fetching papers:", error);
-        }
-      };
-
-      fetchPapers();
-    }
+    fetchPapers();
   }, [user]);
+
+  const refreshPapers = async () => {
+    await fetchPapers();
+  };
 
   const deletePaper = async (id) => {
     try {
@@ -49,7 +57,7 @@ export const PaperProvider = ({ children }) => {
   
 
   return (
-    <PaperContext.Provider value={{ papers, deletePaper }}>
+    <PaperContext.Provider value={{ papers, deletePaper, refreshPapers, loading }}>
       {children}
     </PaperContext.Provider>
   );

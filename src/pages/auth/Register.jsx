@@ -35,9 +35,21 @@ const Register = () => {
     subjects: [], // Changed to array for multiple subjects
   });
 
-  const [states, setStates] = useState([]);
+  // Indian States List (static - all users are Indian)
+  const INDIAN_STATES = [
+    "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh",
+    "Goa", "Gujarat", "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka",
+    "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya", "Mizoram",
+    "Nagaland", "Odisha", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana",
+    "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal",
+    "Andaman and Nicobar Islands", "Chandigarh", "Dadra and Nagar Haveli and Daman and Diu",
+    "Delhi", "Jammu and Kashmir", "Ladakh", "Lakshadweep", "Puducherry"
+  ];
+
+  const [states] = useState(INDIAN_STATES);
   const [cities, setCities] = useState([]);
   const [subjects, setSubjects] = useState([]);
+  const [loadingPincode, setLoadingPincode] = useState(false);
 
   // State for managing multiple subject selections
   const [selectedSubjects, setSelectedSubjects] = useState([]);
@@ -51,25 +63,7 @@ const Register = () => {
     type: "success",
   });
 
-  // Fetch states on component mount
-  useEffect(() => {
-    const fetchStates = async () => {
-      try {
-        const response = await axios.get(
-          "https://countriesnow.space/api/v0.1/countries/states",
-          { country: "India" }
-        );
-        const countryData = response.data.data.find((c) => c.name === "India");
-        if (countryData && countryData.states) {
-          const statesArray = countryData.states.map((state) => state.name);
-          setStates(statesArray);
-        }
-      } catch (error) {
-        console.error("Error fetching states:", error);
-      }
-    };
-    fetchStates();
-  }, []);
+  // States are now static - no need to fetch
 
   // Fetch subjects on component mount
   useEffect(() => {
@@ -90,54 +84,82 @@ const Register = () => {
     fetchSubjects();
   }, []);
 
-  const fetchCities = async (stateName) => {
-    try {
-      const response = await axios.post(
-        "https://countriesnow.space/api/v0.1/countries/state/cities",
-        { country: "India", state: stateName }
-      );
-      if (response.data.data) {
-        setCities(response.data.data);
-      }
-    } catch (error) {
-      console.error("Error fetching cities:", error);
-    }
+  // Fetch cities from pincode API when state is selected
+  // Note: Cities will be populated when pincode is entered or can be manually selected
+  const fetchCitiesForState = async (stateName) => {
+    // For now, we'll let users select city manually or from pincode
+    // The pincode API will provide the city automatically
+    setCities([]); // Clear cities when state changes
   };
 
   const handleStateChange = (event) => {
-    const stateId = event.target.value;
-    setPersonalInfo({ ...personalInfo, school_address_state: stateId });
-    fetchCities(stateId);
+    const stateName = event.target.value;
+    setPersonalInfo({ 
+      ...personalInfo, 
+      school_address_state: stateName,
+      school_address_city: "" // Clear city when state changes
+    });
+    setCities([]); // Clear cities when state changes
   };
 
   const handlePincodeChange = async (event) => {
-    const pincode = event.target.value;
+    const pincode = event.target.value.replace(/\D/g, ''); // Only allow digits
     setPersonalInfo({ ...personalInfo, school_address_pincode: pincode });
 
     if (pincode.length === 6) {
+      setLoadingPincode(true);
       try {
-        const response = await axios.get(
+        const response = await fetch(
           `https://api.postalpincode.in/pincode/${pincode}`
         );
-        if (response.data[0].Status === "Success") {
-          const postOfficeData = response.data[0].PostOffice[0];
+        const data = await response.json();
+        
+        if (data && data[0] && data[0].Status === "Success" && data[0].PostOffice && data[0].PostOffice.length > 0) {
+          const postOfficeData = data[0].PostOffice[0];
+          
+          // Get unique cities from all post offices in this pincode
+          const uniqueCities = [...new Set(data[0].PostOffice.map(po => po.District))];
+          
           setPersonalInfo({
             ...personalInfo,
             school_address_pincode: pincode,
             school_address_city: postOfficeData.District,
             school_address_state: postOfficeData.State,
           });
-          fetchCities(postOfficeData.State);
+          
+          // Set cities list for dropdown
+          setCities(uniqueCities);
+          
+          setToast({
+            show: true,
+            message: "City and State auto-filled from pincode!",
+            type: "success",
+          });
         } else {
           setToast({
             show: true,
-            message: "Invalid pincode. Please enter a valid one.",
+            message: "Invalid pincode. Please enter a valid Indian pincode.",
             type: "error",
           });
         }
       } catch (error) {
         console.error("Error fetching city and state for pincode:", error);
+        setToast({
+          show: true,
+          message: "Failed to fetch location details. Please try again or enter manually.",
+          type: "error",
+        });
+      } finally {
+        setLoadingPincode(false);
       }
+    } else if (pincode.length > 0 && pincode.length < 6) {
+      // Clear city and state if pincode is incomplete
+      setPersonalInfo({
+        ...personalInfo,
+        school_address_city: "",
+        school_address_state: "",
+      });
+      setCities([]);
     }
   };
 
@@ -485,7 +507,7 @@ const Register = () => {
 
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Pincode
+                    Pincode <span className="text-blue-600 text-xs">(Auto-fills City & State)</span>
                   </label>
                   <div className="relative">
                     <MapPin className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
@@ -497,8 +519,19 @@ const Register = () => {
                       className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition outline-none"
                       placeholder="Enter 6-digit pincode"
                       maxLength="6"
+                      pattern="[0-9]{6}"
                     />
+                    {loadingPincode && (
+                      <div className="absolute right-3 top-3.5">
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                      </div>
+                    )}
                   </div>
+                  {personalInfo.school_address_pincode.length === 6 && !loadingPincode && personalInfo.school_address_city && (
+                    <p className="text-xs text-green-600 mt-1">
+                      ✓ City and State auto-filled!
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -522,21 +555,32 @@ const Register = () => {
 
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    City
+                    City {cities.length > 0 && <span className="text-green-600 text-xs">(From Pincode)</span>}
                   </label>
-                  <select
-                    name="school_address_city"
-                    value={personalInfo.school_address_city}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition outline-none"
-                  >
-                    <option value="">Select City</option>
-                    {cities.map((city, index) => (
-                      <option key={index} value={city}>
-                        {city}
-                      </option>
-                    ))}
-                  </select>
+                  {cities.length > 0 ? (
+                    <select
+                      name="school_address_city"
+                      value={personalInfo.school_address_city}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-3 border-2 border-green-200 bg-green-50 rounded-lg focus:border-green-500 focus:ring-2 focus:ring-green-200 transition outline-none"
+                    >
+                      <option value="">Select City</option>
+                      {cities.map((city, index) => (
+                        <option key={index} value={city}>
+                          {city}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      name="school_address_city"
+                      value={personalInfo.school_address_city}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition outline-none"
+                      placeholder="Enter city name or enter pincode first"
+                    />
+                  )}
                 </div>
               </div>
             </div>

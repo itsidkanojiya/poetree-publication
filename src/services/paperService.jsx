@@ -40,3 +40,25 @@ export const deletePaperById = async (id) => {
     throw new Error(error.response?.data?.message || 'Error deleting paper');
   }
 };
+
+export const getPaperById = async (id) => {
+  try {
+    const response = await apiClient.get(`/papers/${id}`);
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching paper by ID:", error);
+    throw error;
+  }
+};
+
+export const updatePaper = async (id, paperData) => {
+  try {
+    const response = await apiClient.put(`/papers/update/${id}`, paperData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error updating paper:", error);
+    throw error;
+  }
+};

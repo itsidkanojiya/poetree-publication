@@ -4,30 +4,71 @@ import { XCircle, FileText } from "lucide-react";
 import { useHeader } from "../../context/HeaderContext";
 import HeaderCard from "../Cards/HeaderCard";
 import EditHeaderCard from "../Cards/EditHeaderCard";
+import { getPaperById } from "../../services/paperService";
 
 const EditHeader = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { id } = useParams();
   const fromWhere = location.state?.from;
+  const { paperId, paperData, headerData, fromPaper } = location.state || {};
 
   const { headers } = useHeader();
-  const header = headers.find((h) => h.id == id);
+  const header = id && id !== "new" ? headers.find((h) => h.id == id) : null;
 
   // State to store editable values - Initialize with empty object first
   const [editedHeader, setEditedHeader] = useState(null);
+  const [loading, setLoading] = useState(false);
 
-  // Set the edited header once we have the data
+  // Load paper data if editing from paper
   useEffect(() => {
-    if (header) {
-      // Initialize board and subjectTitle fields if they don't exist
-      setEditedHeader({ 
-        ...header,
-        board: header.board || "",
-        subjectTitle: header.subjectTitle || "",
-      });
-    }
-  }, [header]);
+    const loadPaperHeader = async () => {
+      if (fromPaper && paperId) {
+        setLoading(true);
+        try {
+          const response = await getPaperById(paperId);
+          const paper = response.data || response;
+          
+          if (paper) {
+            const headerFromPaper = {
+              schoolName: paper.school_name || "",
+              standard: paper.standard || "",
+              timing: paper.timing || "",
+              date: paper.date ? paper.date.split('T')[0] : "",
+              division: paper.division || "",
+              address: paper.address || "",
+              subject: paper.subject || "",
+              board: paper.board || "",
+              logo: paper.logo || null,
+              logoUrl: paper.logo_url || null,
+              subjectTitle: paper.subject_title_id || null,
+            };
+            setEditedHeader(headerFromPaper);
+          }
+        } catch (error) {
+          console.error("Error loading paper:", error);
+        } finally {
+          setLoading(false);
+        }
+      } else if (headerData) {
+        // Use header data from location state
+        setEditedHeader({
+          ...headerData,
+          board: headerData.board || "",
+          subjectTitle: headerData.subjectTitle || null,
+        });
+      } else if (header) {
+        // Use header from context
+        setEditedHeader({ 
+          ...header,
+          board: header.board || "",
+          subjectTitle: header.subjectTitle || "",
+        });
+      }
+    };
+    
+    loadPaperHeader();
+  }, [header, fromPaper, paperId, headerData]);
 
   // Handle input changes
   const handleInputChange = (e, field) => {
@@ -39,7 +80,7 @@ const EditHeader = () => {
   };
 
   // Show loading state while header is being loaded
-  if (!header || !editedHeader) {
+  if (loading || (!header && !headerData && !fromPaper && id !== "new") || !editedHeader) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center">
         <div className="text-center">
@@ -55,10 +96,12 @@ const EditHeader = () => {
       {/* Header Title */}
       <div className="text-center mb-12">
         <h1 className="text-6xl font-extrabold bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent mb-2">
-          Edit Header
+          {fromPaper ? "Edit Paper Header" : "Edit Header"}
         </h1>
         <p className="text-gray-600 text-lg">
-          Customize your school paper header
+          {fromPaper 
+            ? "Update your paper header details, then continue to edit questions"
+            : "Customize your school paper header"}
         </p>
       </div>
 
@@ -112,15 +155,29 @@ const EditHeader = () => {
               </button>
               <button
                 onClick={() => {
-                  // Always navigate to custom paper creation page
-                  navigate("/dashboard/generate/custompaper", {
-                    state: { header: editedHeader, headerId: id },
-                  });
+                  // Navigate to custom paper page
+                  if (fromPaper && paperId) {
+                    // Editing existing paper - go to CustomPaper with edit mode
+                    navigate("/dashboard/generate/custompaper", {
+                      state: { 
+                        header: editedHeader, 
+                        headerId: id,
+                        paperId: paperId,
+                        editMode: true,
+                        paperData: paperData,
+                      },
+                    });
+                  } else {
+                    // Creating new paper or editing header only
+                    navigate("/dashboard/generate/custompaper", {
+                      state: { header: editedHeader, headerId: id },
+                    });
+                  }
                 }}
                 className="flex-1 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white px-6 py-3 rounded-lg font-semibold shadow-lg hover:shadow-xl transition flex items-center justify-center gap-2"
               >
                 <FileText className="w-5 h-5" />
-                Add Questions
+                {fromPaper ? "Continue to Edit Questions" : "Add Questions"}
               </button>
             </div>
           </div>

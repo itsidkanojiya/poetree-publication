@@ -9,6 +9,13 @@ const PaperCard = ({
   subject,
   created_at,
   date,
+  school_name,
+  logo,
+  logo_url,
+  subject_title,
+  subject_title_id,
+  subject_title_name,
+  total_marks,
   ...paper
 }) => {
   const navigate = useNavigate();
@@ -23,19 +30,57 @@ const PaperCard = ({
       })
     : "N/A";
 
+  // Get logo URL (prioritize logo_url, then logo)
+  const logoUrl = logo_url || logo || null;
+
+  // Get API base URL for logo
+  const getLogoUrl = () => {
+    if (!logoUrl) return null;
+    if (logoUrl.startsWith("http://") || logoUrl.startsWith("https://")) {
+      return logoUrl;
+    }
+    // If relative path, prepend API base URL
+    const apiBaseUrl =
+      import.meta.env.VITE_API_URL || "http://localhost:4000/api";
+    const baseUrl = apiBaseUrl.replace("/api", "");
+    // Handle both absolute and relative paths
+    if (logoUrl.startsWith("/")) {
+      return `${baseUrl}${logoUrl}`;
+    }
+    return `${baseUrl}/${logoUrl}`;
+  };
+
   const handleView = () => {
     // Navigate to view paper
     console.log("View paper:", id);
   };
 
   const handleEdit = () => {
-    // Navigate to edit paper based on type
+    // Navigate to edit header first, then to paper editing
     if (type === "custom") {
-      navigate("/dashboard/generate/custompaper", {
+      // Navigate to edit header with paper data
+      // We'll create a header from paper data or use existing header
+      const headerData = {
+        schoolName: school_name || "",
+        standard: paper.standard || "",
+        timing: paper.timing || "",
+        date: paper.date || "",
+        division: paper.division || "",
+        address: paper.address || "",
+        subject: subject || "",
+        board: paper.board || "",
+        logo: logo || null,
+        logoUrl: logo_url || null,
+        subjectTitle: paper.subject_title_id || null,
+      };
+
+      navigate("/dashboard/generate/edit-header/new", {
         state: {
           paperId: id,
           editMode: true,
           paperData: { id, title, type, subject, ...paper },
+          headerData: headerData,
+          fromPaper: true,
         },
       });
     } else {
@@ -82,16 +127,65 @@ const PaperCard = ({
 
         {/* Content */}
         <div className="p-6">
-          {/* Title */}
-          <h3 className="text-lg font-bold text-gray-800 mb-2 line-clamp-2 min-h-[3.5rem]">
-            {title || "Untitled Paper"}
-          </h3>
+          {/* School Logo and Name */}
+          <div className="flex items-center gap-3 mb-4">
+            {getLogoUrl() && (
+              <div className="flex-shrink-0">
+                <img
+                  src={getLogoUrl()}
+                  alt="School Logo"
+                  className="w-12 h-12 object-contain rounded-lg border border-gray-200"
+                  onError={(e) => {
+                    e.target.style.display = "none";
+                  }}
+                />
+              </div>
+            )}
+            <div className="flex-1 min-w-0">
+              <h3 className="text-lg font-bold text-gray-800 line-clamp-2">
+                {school_name || "School Name"}
+              </h3>
+            </div>
+          </div>
 
-          {/* Subject Badge */}
-          {subject && (
-            <span className="inline-block px-3 py-1 bg-purple-100 text-purple-700 text-sm font-semibold rounded-full mb-4">
-              {subject}
-            </span>
+          {/* Subject and Subject Title */}
+          <div className="space-y-2 mb-4">
+            {subject && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-gray-600">
+                  Subject:
+                </span>
+                <span className="px-3 py-1 bg-purple-100 text-purple-700 text-sm font-semibold rounded-full">
+                  {subject}
+                </span>
+              </div>
+            )}
+            {(subject_title_name || subject_title || subject_title_id) && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-gray-600">
+                  Title:
+                </span>
+                <span className="px-3 py-1 bg-blue-100 text-blue-700 text-sm font-semibold rounded-full">
+                  {subject_title_name ||
+                    subject_title ||
+                    `Title ${subject_title_id}`}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Total Marks */}
+          {total_marks !== undefined && total_marks !== null && (
+            <div className="mb-4 p-3 bg-gradient-to-r from-emerald-50 to-teal-50 rounded-lg border border-emerald-200">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold text-gray-700">
+                  Total Marks:
+                </span>
+                <span className="text-lg font-bold text-emerald-600">
+                  {total_marks}
+                </span>
+              </div>
+            </div>
           )}
 
           {/* Action Buttons */}
@@ -130,8 +224,9 @@ const PaperCard = ({
               Delete Paper?
             </h3>
             <p className="text-gray-600 mb-6">
-              Are you sure you want to delete "{title || "this paper"}"? This
-              action cannot be undone.
+              Are you sure you want to delete "
+              {school_name || title || "this paper"}"? This action cannot be
+              undone.
             </p>
             <div className="flex gap-3">
               <button

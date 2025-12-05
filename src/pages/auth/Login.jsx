@@ -1,123 +1,265 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import { Lock, User } from "lucide-react";
 import MinNavbar from "../../components/MinNavbar";
+import VerificationPending from "../../components/Common/VerificationPending";
+import { Mail, Lock, Eye, EyeOff, LogIn, UserPlus } from "lucide-react";
 
 const Login = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
-  const [username, setUsername] = useState(
-    localStorage.getItem("rememberedUsername") || ""
-  );
-  const [password, setPassword] = useState("");
-  const [rememberMe, setRememberMe] = useState(
-    localStorage.getItem("rememberMe") === "true"
-  );
+  const location = useLocation();
+  
+  const [credentials, setCredentials] = useState({
+    username: localStorage.getItem("rememberedUsername") || "",
+    password: "",
+    rememberMe: localStorage.getItem("rememberMe") === "true",
+  });
+  
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [showVerificationPending, setShowVerificationPending] = useState(false);
 
- const handleLogin = async (e) => {
-  e.preventDefault();
-  setLoading(true);
-  setError("");
+  // Get the message from navigation state (if redirected from protected route)
+  const redirectMessage = location.state?.message;
 
-  try {
-    const res = await login(username, password);
-    const user = res.user;
+  const handleInputChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setCredentials({
+      ...credentials,
+      [name]: type === "checkbox" ? checked : value,
+    });
+  };
 
-    if (rememberMe) {
-      localStorage.setItem("rememberedUsername", username);
-      localStorage.setItem("rememberMe", "true");
-    } else {
-      localStorage.removeItem("rememberedUsername");
-      localStorage.removeItem("rememberMe");
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (loading) return;
+
+    setLoading(true);
+    setError("");
+
+    try {
+      const res = await login(credentials.username, credentials.password);
+      const user = res.user;
+
+      // Handle remember me
+      if (credentials.rememberMe) {
+        localStorage.setItem("rememberedUsername", credentials.username);
+        localStorage.setItem("rememberMe", "true");
+      } else {
+        localStorage.removeItem("rememberedUsername");
+        localStorage.removeItem("rememberMe");
+      }
+
+      // Token and user are already stored by AuthContext.login()
+      // No need to store again
+
+      // Check if user is verified
+      const isVerified = user.is_verified === true || user.is_verified === 1;
+
+      if (!isVerified) {
+        // Show verification pending screen
+        setShowVerificationPending(true);
+        setLoading(false);
+        return;
+      }
+
+      // If verified, proceed with normal flow
+      if (user.is_number_verified === 1) {
+        navigate("/dashboard");
+      } else {
+        navigate("/auth/verify-otp", { 
+          state: { 
+            userId: user.id,
+            email: user.email
+          } 
+        });
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || "Login failed! Please check your credentials.");
+    } finally {
+      setLoading(false);
     }
+  };
 
-    // Token and user are already stored by AuthContext.login()
-    // No need to store again
-
-    if (user.is_number_verified === 1) {
-      navigate("/dashboard");
-    } else {
-      navigate("/auth/verify-otp", { state: {  userId: user.id,
-      email: user.email} });
-    }
-  } catch (err) {
-    setError(err.message || "Invalid username or password");
-  } finally {
-    setLoading(false);
+  // If verification pending, show full screen component instead of login form
+  if (showVerificationPending) {
+    return (
+      <VerificationPending
+        showCloseButton={false}
+        onClose={() => {
+          setShowVerificationPending(false);
+          localStorage.removeItem("authToken");
+          localStorage.removeItem("user");
+          window.location.reload();
+        }}
+      />
+    );
   }
-};
-
-
 
   return (
     <>
       <MinNavbar />
-      <div className="relative flex items-center justify-center min-h-screen bg-[#4DBEFF50] p-4">
-        <div className="absolute inset-0 bg-[url('/pattern.png')] opacity-50 bg-fixed bg-repeat"></div>
-        <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-8 absolute z-100">
-          <h2 className="text-2xl font-bold text-center text-black mb-6">
-            Welcome Back
-          </h2>
 
-          {error && <p className="text-red-500 text-center">{error}</p>}
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 py-12 px-4">
+        <div className="max-w-md mx-auto">
+          {/* Header */}
+          <div className="text-center mb-8">
+            <h1 className="text-5xl md:text-6xl font-extrabold bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent mb-4">
+              Welcome Back
+            </h1>
+            <p className="text-xl text-gray-600">
+              Sign in to continue to Poetree
+            </p>
+          </div>
 
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div className="relative">
-              <User className="absolute left-3 top-3 text-gray-400" size={20} />
-              <input
-                type="text"
-                placeholder="Username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="w-full p-3 pl-10 border rounded-lg focus:ring-[#5D87FF] focus:border-[#5D87FF] transition-all"
-                required
-              />
+          {/* Redirect Message */}
+          {redirectMessage && (
+            <div className="mb-6 p-4 bg-amber-50 border-2 border-amber-200 rounded-xl">
+              <p className="text-amber-800 text-sm text-center font-medium">
+                {redirectMessage}
+              </p>
             </div>
+          )}
 
-            <div className="relative">
-              <Lock className="absolute left-3 top-3 text-gray-400" size={20} />
-              <input
-                type="password"
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full p-3 pl-10 border rounded-lg focus:ring-[#5D87FF] focus:border-[#5D87FF] transition-all"
-                required
-              />
+          {/* Error Message */}
+          {error && (
+            <div className="mb-6 p-4 bg-red-50 border-2 border-red-200 rounded-xl">
+              <p className="text-red-800 text-sm text-center font-medium">
+                {error}
+              </p>
             </div>
+          )}
 
-            {/* Remember Me & Login Button */}
-            <div className="flex items-center justify-between">
-              <label className="flex items-center space-x-2 text-gray-600">
-                <input
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={() => setRememberMe(!rememberMe)}
-                  className="rounded text-[#5D87FF] focus:ring-[#5D87FF]"
-                />
-                <span>Remember Me</span>
-              </label>
+          {/* Login Form Card */}
+          <div className="bg-white rounded-2xl shadow-xl p-8">
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Username/Email Field */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Username or Email
+                </label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-3.5 w-5 h-5 text-gray-400" />
+                  <input
+                    type="text"
+                    name="username"
+                    value={credentials.username}
+                    onChange={handleInputChange}
+                    className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition outline-none"
+                    placeholder="Enter your username or email"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Password Field */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Password
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-3.5 w-5 h-5 text-gray-400" />
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    name="password"
+                    value={credentials.password}
+                    onChange={handleInputChange}
+                    className="w-full pl-10 pr-12 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition outline-none"
+                    placeholder="Enter your password"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-3.5 text-gray-400 hover:text-gray-600"
+                  >
+                    {showPassword ? (
+                      <EyeOff className="w-5 h-5" />
+                    ) : (
+                      <Eye className="w-5 h-5" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Remember Me & Forgot Password */}
+              <div className="flex items-center justify-between">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    name="rememberMe"
+                    checked={credentials.rememberMe}
+                    onChange={handleInputChange}
+                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-700 font-medium">
+                    Remember Me
+                  </span>
+                </label>
+                <Link
+                  to="/auth/forgot-password"
+                  className="text-sm font-semibold text-blue-600 hover:text-blue-700 transition"
+                >
+                  Forgot Password?
+                </Link>
+              </div>
+
+              {/* Login Button */}
               <button
                 type="submit"
-                className="bg-[#5D87FF] text-white px-5 py-2 rounded-lg shadow-md hover:bg-[#4DBEFF] transition-all disabled:opacity-50"
                 disabled={loading}
+                className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-bold rounded-lg shadow-lg hover:shadow-xl transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loading ? "Logging in..." : "Login"}
+                {loading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                    <span>Signing In...</span>
+                  </>
+                ) : (
+                  <>
+                    <LogIn className="w-5 h-5" />
+                    <span>Sign In</span>
+                  </>
+                )}
               </button>
+            </form>
+
+            {/* Divider */}
+            <div className="relative my-6">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-300"></div>
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-4 bg-white text-gray-500 font-medium">
+                  Don't have an account?
+                </span>
+              </div>
             </div>
-          </form>
-          <div className="text-center text-sm text-gray-500 mt-6">
-            <span className="mr-2">New to</span>
-            <span className="font-bold text-[#378F7E]">POETREE?</span>
-            <a
-              href="/auth/register"
-              className="ml-2 text-[#378F7E] font-semibold hover:underline transition-all duration-300"
+
+            {/* Register Link */}
+            <Link
+              to="/auth/register"
+              className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold rounded-lg shadow-lg hover:shadow-xl transition"
             >
-              Register Yourself
-            </a>
+              <UserPlus className="w-5 h-5" />
+              <span>Create New Account</span>
+            </Link>
+          </div>
+
+          {/* Footer Note */}
+          <div className="mt-6 text-center">
+            <p className="text-sm text-gray-600">
+              By signing in, you agree to our{" "}
+              <Link to="/terms" className="text-blue-600 hover:text-blue-700 font-semibold">
+                Terms of Service
+              </Link>{" "}
+              and{" "}
+              <Link to="/privacy" className="text-blue-600 hover:text-blue-700 font-semibold">
+                Privacy Policy
+              </Link>
+            </p>
           </div>
         </div>
       </div>

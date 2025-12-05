@@ -166,16 +166,16 @@ const Header = () => {
             </div>
             <div>
               <h1 className="text-4xl font-extrabold bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent">
-                Choose Your Header Style
+                Paper Header
               </h1>
               <p className="text-gray-600 mt-1">
-                Select a professional header template for your paper
+                Customize your paper header below
               </p>
             </div>
           </div>
 
-          {/* Info Card */}
-          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-200 flex items-start gap-3">
+          {/* Info Card - COMMENTED OUT: No longer showing multiple styles */}
+          {/* <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-200 flex items-start gap-3">
             <Sparkles className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
             <div>
               <p className="text-sm text-gray-700">
@@ -184,17 +184,17 @@ const Header = () => {
                 that best matches your students' standards.
               </p>
             </div>
-          </div>
+          </div> */}
         </div>
 
-        {/* Headers Grid */}
+        {/* Headers Grid - COMMENTED OUT: Only showing one header design */}
+        {/* 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {headers.map((header, index) => (
             <div
               key={header.id}
               className="transform transition-all duration-300 hover:scale-105"
             >
-              {/* Header Label */}
               <div className="mb-3 flex items-center gap-2">
                 <div className="px-3 py-1 bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-sm font-semibold rounded-full">
                   Style {index + 1}
@@ -215,11 +215,21 @@ const Header = () => {
             </div>
           ))}
         </div>
+        */}
+
+        {/* Single Header Design */}
+        <div className="max-w-2xl mx-auto">
+          <HeaderCard
+            header={headers[0]}
+            typeOfPaper={typeOfPaper}
+            width="full"
+          />
+        </div>
 
         {/* Bottom Info */}
         <div className="mt-12 text-center">
           <p className="text-gray-600 text-sm">
-            Click on any header to customize and use it in your paper
+            Click on the header to customize and use it in your paper
           </p>
         </div>
       </div>
