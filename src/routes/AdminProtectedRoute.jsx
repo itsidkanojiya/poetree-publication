@@ -1,0 +1,58 @@
+import { Navigate, useLocation } from "react-router-dom";
+import { isTokenExpired } from "../utils/tokenUtils";
+import { useAuth } from "../context/AuthContext";
+
+const AdminProtectedRoute = ({ children }) => {
+  const location = useLocation();
+  const { user } = useAuth();
+  const token = localStorage.getItem("authToken");
+  const storedUser = localStorage.getItem("user");
+
+  // Parse stored user if available
+  let parsedUser = null;
+  try {
+    parsedUser = storedUser ? JSON.parse(storedUser) : null;
+  } catch (e) {
+    console.error("Error parsing user from localStorage:", e);
+  }
+
+  // Use user from context if available, otherwise use parsed user from localStorage
+  const currentUser = user || parsedUser;
+
+  // Check if user is authenticated (has valid token and user data)
+  const isAuthenticated = token && currentUser && !isTokenExpired(token);
+
+  // If not authenticated, redirect to admin login
+  if (!isAuthenticated) {
+    return (
+      <Navigate
+        to="/admin/login"
+        state={{
+          from: location,
+          message: "Please login to access the admin panel.",
+        }}
+        replace
+      />
+    );
+  }
+
+  // Check if user is admin
+  if (currentUser?.user_type !== "admin") {
+    return (
+      <Navigate
+        to="/admin/login"
+        state={{
+          from: location,
+          message: "Access denied. Only administrators can access this panel.",
+        }}
+        replace
+      />
+    );
+  }
+
+  // User is authenticated and is admin, allow access
+  return children;
+};
+
+export default AdminProtectedRoute;
+

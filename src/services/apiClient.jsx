@@ -19,9 +19,12 @@ apiClient.interceptors.request.use((config) => {
     localStorage.removeItem("user");
     localStorage.removeItem("rememberedUsername");
     localStorage.removeItem("rememberMe");
+    localStorage.removeItem("rememberedAdminUsername");
+    localStorage.removeItem("rememberAdminMe");
 
-    // Redirect to login
-    window.location.href = "/auth/login";
+    // Redirect to appropriate login page based on current path
+    const isAdminRoute = window.location.pathname.startsWith("/admin");
+    window.location.href = isAdminRoute ? "/admin/login" : "/auth/login";
     return Promise.reject(new Error("Token expired"));
   }
 
@@ -41,9 +44,12 @@ apiClient.interceptors.response.use(
       localStorage.removeItem("user");
       localStorage.removeItem("rememberedUsername");
       localStorage.removeItem("rememberMe");
+      localStorage.removeItem("rememberedAdminUsername");
+      localStorage.removeItem("rememberAdminMe");
 
-      // Redirect to login page
-      window.location.href = "/auth/login";
+      // Redirect to appropriate login page based on current path
+      const isAdminRoute = window.location.pathname.startsWith("/admin");
+      window.location.href = isAdminRoute ? "/admin/login" : "/auth/login";
     }
     return Promise.reject(error);
   }

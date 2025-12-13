@@ -1,5 +1,5 @@
 import React from "react";
-import { Routes, Route, Link } from "react-router-dom";
+import { Routes, Route, Link, Navigate } from "react-router-dom";
 import Home from "./pages/Home";
 import About from "./pages/About";
 import Login from "./pages/auth/Login";
@@ -20,6 +20,15 @@ import Profile from "./pages/Profile";
 import VerifyOtp from "./pages/auth/VerifyOtp";
 import SubjectRequests from "./pages/SubjectRequests";
 import Animations from "./pages/Animations";
+import AdminLogin from "./pages/admin/AdminLogin";
+import AdminPanel from "./pages/admin/AdminPanel";
+import AdminProtectedRoute from "./routes/AdminProtectedRoute";
+import AdminOverview from "./components/Admin/AdminOverview";
+import TeachersManagement from "./components/Admin/Teachers/TeachersManagement";
+import SubjectTitleManagement from "./components/Admin/SubjectTitles/SubjectTitleManagement";
+import QuestionManagement from "./components/Admin/Questions/QuestionManagement";
+import AnswerSheetManagement from "./components/Admin/AnswerSheets/AnswerSheetManagement";
+import WorksheetManagement from "./components/Admin/Worksheets/WorksheetManagement";
 
 function App() {
   return (
@@ -55,6 +64,30 @@ function App() {
         <Route path="profile" element={<Profile />} />
         <Route path="subject-requests" element={<SubjectRequests />} />
         <Route path="animations" element={<Animations />} />
+      </Route>
+
+      {/* Admin Routes */}
+      <Route path="/admin">
+        <Route path="login" element={<AdminLogin />} />
+        <Route
+          path=""
+          element={
+            <AdminProtectedRoute>
+              <AdminPanel />
+            </AdminProtectedRoute>
+          }
+        >
+          <Route index="true" element={<AdminOverview />} />
+          <Route path="teachers" element={<TeachersManagement />} />
+          <Route path="teachers/pending" element={<TeachersManagement />} />
+          <Route path="teachers/active" element={<TeachersManagement />} />
+          <Route path="teachers/subject-requests" element={<TeachersManagement />} />
+          <Route path="subject-titles" element={<SubjectTitleManagement />} />
+          <Route path="questions" element={<QuestionManagement />} />
+          <Route path="questions/:type" element={<QuestionManagement />} />
+          <Route path="answer-sheets" element={<AnswerSheetManagement />} />
+          <Route path="worksheets" element={<WorksheetManagement />} />
+        </Route>
       </Route>
     </Routes>
   );

@@ -1,0 +1,149 @@
+import { useState } from "react";
+import { X } from "lucide-react";
+
+const AddSubjectTitleModal = ({ subjects, onClose, onSave }) => {
+  const [formData, setFormData] = useState({
+    title_name: "",
+    subject_id: "",
+    standard: "",
+  });
+  const [errors, setErrors] = useState({});
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+    // Clear error when user starts typing
+    if (errors[name]) {
+      setErrors((prev) => ({ ...prev, [name]: "" }));
+    }
+  };
+
+  const validate = () => {
+    const newErrors = {};
+    if (!formData.title_name.trim()) {
+      newErrors.title_name = "Title name is required";
+    }
+    if (!formData.subject_id) {
+      newErrors.subject_id = "Subject is required";
+    }
+    if (!formData.standard.trim()) {
+      newErrors.standard = "Standard is required";
+    }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (validate()) {
+      onSave({
+        title_name: formData.title_name,
+        subject_id: parseInt(formData.subject_id),
+        standard: formData.standard,
+      });
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-2xl font-bold text-gray-800">Add Subject Title</h3>
+          <button
+            onClick={onClose}
+            className="p-2 text-gray-400 hover:text-gray-600 transition"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Title Name */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Title Name <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              name="title_name"
+              value={formData.title_name}
+              onChange={handleChange}
+              className={`w-full px-4 py-3 border-2 rounded-lg focus:ring-2 focus:ring-blue-200 transition outline-none ${
+                errors.title_name ? "border-red-300" : "border-gray-200 focus:border-blue-500"
+              }`}
+              placeholder="Enter title name (e.g., Algebra, Geometry)"
+            />
+            {errors.title_name && (
+              <p className="mt-1 text-sm text-red-600">{errors.title_name}</p>
+            )}
+          </div>
+
+          {/* Subject */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Subject <span className="text-red-500">*</span>
+            </label>
+            <select
+              name="subject_id"
+              value={formData.subject_id}
+              onChange={handleChange}
+              className={`w-full px-4 py-3 border-2 rounded-lg focus:ring-2 focus:ring-blue-200 transition outline-none ${
+                errors.subject_id ? "border-red-300" : "border-gray-200 focus:border-blue-500"
+              }`}
+            >
+              <option value="">Select a subject</option>
+              {subjects.map((subject) => (
+                <option key={subject.subject_id} value={subject.subject_id}>
+                  {subject.subject_name}
+                </option>
+              ))}
+            </select>
+            {errors.subject_id && (
+              <p className="mt-1 text-sm text-red-600">{errors.subject_id}</p>
+            )}
+          </div>
+
+          {/* Standard */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Standard <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              name="standard"
+              value={formData.standard}
+              onChange={handleChange}
+              className={`w-full px-4 py-3 border-2 rounded-lg focus:ring-2 focus:ring-blue-200 transition outline-none ${
+                errors.standard ? "border-red-300" : "border-gray-200 focus:border-blue-500"
+              }`}
+              placeholder="Enter standard (e.g., 10, 11-12)"
+            />
+            {errors.standard && (
+              <p className="mt-1 text-sm text-red-600">{errors.standard}</p>
+            )}
+          </div>
+
+          {/* Buttons */}
+          <div className="flex gap-4 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition font-semibold"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-lg hover:from-blue-600 hover:to-indigo-700 transition font-semibold"
+            >
+              Add Subject Title
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+export default AddSubjectTitleModal;
+
