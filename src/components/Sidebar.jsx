@@ -14,6 +14,8 @@ import {
   ChevronRight,
   BookOpen,
   Sparkles,
+  LayoutTemplate,
+  FileEdit,
 } from "lucide-react";
 
 const LogoutModal = ({ isOpen, onClose, onConfirm }) => {
@@ -87,6 +89,16 @@ const Sidebar = () => {
       state: { from: "prebuild" },
     },
     {
+      name: "Templates",
+      href: "/dashboard/templates",
+      icon: LayoutTemplate,
+    },
+    {
+      name: "My Customized",
+      href: "/dashboard/my-customized",
+      icon: FileEdit,
+    },
+    {
       name: "Worksheets",
       href: "/dashboard/generate/worksheets",
       icon: FilePlus,
@@ -109,6 +121,15 @@ const Sidebar = () => {
   ];
 
   const isActive = (path) => {
+    // Special handling for Dashboard - only active on exact match
+    if (path === "/dashboard") {
+      return location.pathname === "/dashboard" || location.pathname === "/dashboard/";
+    }
+    // For templates and customize routes, check if pathname starts with the route path
+    if (path === "/dashboard/templates" || path === "/dashboard/my-customized") {
+      return location.pathname.startsWith(path);
+    }
+    // For other routes, check exact match
     return location.pathname === path;
   };
 

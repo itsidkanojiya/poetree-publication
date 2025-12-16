@@ -3,9 +3,10 @@ import {
   getQuestionsByType,
   deleteQuestion,
 } from "../../../services/adminService";
-import { Plus, Trash2, Search, Edit, Eye } from "lucide-react";
+import { Plus, Trash2, Search, Edit, Eye, Upload } from "lucide-react";
 import Toast from "../../Common/Toast";
 import AddQuestionModal from "./AddQuestionModal";
+import BulkUploadModal from "./BulkUploadModal";
 
 const QuestionsList = ({ questionType }) => {
   const [questions, setQuestions] = useState([]);
@@ -13,6 +14,7 @@ const QuestionsList = ({ questionType }) => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
   const [selectedQuestion, setSelectedQuestion] = useState(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [toast, setToast] = useState({ show: false, message: "", type: "success" });
@@ -41,6 +43,14 @@ const QuestionsList = ({ questionType }) => {
     }
   };
 
+  // Helper function to safely get subject name (handles both string and object)
+  const getSubjectName = (subject) => {
+    if (!subject) return "";
+    if (typeof subject === "string") return subject;
+    if (typeof subject === "object" && subject.subject_name) return subject.subject_name;
+    return "";
+  };
+
   const filterQuestions = () => {
     if (!searchTerm) {
       setFilteredQuestions(questions);
@@ -50,8 +60,8 @@ const QuestionsList = ({ questionType }) => {
     const filtered = questions.filter(
       (q) =>
         q.question?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        q.answer?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        q.subject?.toLowerCase().includes(searchTerm.toLowerCase())
+        (typeof q.answer === "string" && q.answer?.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        getSubjectName(q.subject)?.toLowerCase().includes(searchTerm.toLowerCase())
     );
     setFilteredQuestions(filtered);
   };
@@ -119,16 +129,25 @@ const QuestionsList = ({ questionType }) => {
             />
           </div>
         </div>
-        <button
-          onClick={() => {
-            setSelectedQuestion(null);
-            setShowAddModal(true);
-          }}
-          className="ml-4 flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-lg hover:from-blue-600 hover:to-indigo-700 transition shadow-lg"
-        >
-          <Plus className="w-5 h-5" />
-          <span>Add Question</span>
-        </button>
+        <div className="ml-4 flex items-center gap-2">
+          <button
+            onClick={() => setShowBulkUploadModal(true)}
+            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg hover:from-green-600 hover:to-emerald-700 transition shadow-lg"
+          >
+            <Upload className="w-5 h-5" />
+            <span>Bulk Upload</span>
+          </button>
+          <button
+            onClick={() => {
+              setSelectedQuestion(null);
+              setShowAddModal(true);
+            }}
+            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-lg hover:from-blue-600 hover:to-indigo-700 transition shadow-lg"
+          >
+            <Plus className="w-5 h-5" />
+            <span>Add Question</span>
+          </button>
+        </div>
       </div>
 
       {/* Questions Table */}
@@ -168,7 +187,7 @@ const QuestionsList = ({ questionType }) => {
                       </div>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">
-                      {question.subject || "N/A"}
+                      {getSubjectName(question.subject) || "N/A"}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">
                       {question.standard || "N/A"}
@@ -218,6 +237,18 @@ const QuestionsList = ({ questionType }) => {
             setSelectedQuestion(null);
           }}
           onSuccess={selectedQuestion ? handleEditSuccess : handleAddSuccess}
+        />
+      )}
+
+      {/* Bulk Upload Modal */}
+      {showBulkUploadModal && (
+        <BulkUploadModal
+          questionType={questionType}
+          onClose={() => setShowBulkUploadModal(false)}
+          onSuccess={() => {
+            setShowBulkUploadModal(false);
+            fetchQuestions();
+          }}
         />
       )}
 

@@ -29,6 +29,13 @@ import SubjectTitleManagement from "./components/Admin/SubjectTitles/SubjectTitl
 import QuestionManagement from "./components/Admin/Questions/QuestionManagement";
 import AnswerSheetManagement from "./components/Admin/AnswerSheets/AnswerSheetManagement";
 import WorksheetManagement from "./components/Admin/Worksheets/WorksheetManagement";
+import TemplateList from "./components/Admin/Templates/TemplateList";
+import CreateTemplate from "./components/Admin/Templates/CreateTemplate";
+import TemplateDetails from "./components/Admin/Templates/TemplateDetails";
+import BrowseTemplates from "./components/Dashboard/BrowseTemplates";
+import ViewTemplate from "./components/Dashboard/ViewTemplate";
+import CustomizePaper from "./components/Dashboard/CustomizePaper";
+import MyCustomizedPapers from "./components/Dashboard/MyCustomizedPapers";
 
 function App() {
   return (
@@ -64,6 +71,10 @@ function App() {
         <Route path="profile" element={<Profile />} />
         <Route path="subject-requests" element={<SubjectRequests />} />
         <Route path="animations" element={<Animations />} />
+        <Route path="templates" element={<BrowseTemplates />} />
+        <Route path="templates/:id" element={<ViewTemplate />} />
+        <Route path="papers/:id/customize" element={<CustomizePaper />} />
+        <Route path="my-customized" element={<MyCustomizedPapers />} />
       </Route>
 
       {/* Admin Routes */}
@@ -87,6 +98,9 @@ function App() {
           <Route path="questions/:type" element={<QuestionManagement />} />
           <Route path="answer-sheets" element={<AnswerSheetManagement />} />
           <Route path="worksheets" element={<WorksheetManagement />} />
+          <Route path="templates" element={<TemplateList />} />
+          <Route path="templates/create" element={<CreateTemplate />} />
+          <Route path="templates/:id" element={<TemplateDetails />} />
         </Route>
       </Route>
     </Routes>

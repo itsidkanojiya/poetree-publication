@@ -13,6 +13,7 @@ import {
   Menu,
   X,
   ChevronRight,
+  LayoutTemplate,
 } from "lucide-react";
 
 const LogoutModal = ({ isOpen, onClose, onConfirm }) => {
@@ -78,6 +79,7 @@ const AdminSidebar = () => {
     { name: "Answer Sheets", href: "/admin/answer-sheets", icon: ClipboardCheck },
     { name: "Worksheets", href: "/admin/worksheets", icon: FilePlus },
     { name: "Questions", href: "/admin/questions", icon: FileText },
+    { name: "Templates", href: "/admin/templates", icon: LayoutTemplate },
   ];
 
   const isActive = (path) => {

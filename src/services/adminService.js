@@ -436,3 +436,89 @@ export const deleteWorksheet = async (id) => {
   }
 };
 
+// ==================== DEFAULT PAPER TEMPLATES ====================
+
+/**
+ * Create default paper template
+ * POST /api/papers/add
+ */
+export const createTemplate = async (templateData) => {
+  try {
+    const formData = new FormData();
+    
+    // Required fields
+    formData.append("user_id", templateData.user_id);
+    formData.append("type", templateData.type || "default");
+    formData.append("is_template", templateData.is_template ? "true" : "false");
+    formData.append("title", templateData.title || "");
+    formData.append("school_name", templateData.school_name || "NA");
+    formData.append("standard", String(templateData.standard || 0));
+    formData.append("subject_id", String(templateData.subject_id || ""));
+    formData.append("subject_title_id", String(templateData.subject_title_id || ""));
+    formData.append("board_id", String(templateData.board_id || ""));
+    formData.append("subject", templateData.subject || "NA");
+    formData.append("board", templateData.board || "NA");
+    formData.append("date", templateData.date || new Date().toISOString().split("T")[0]);
+    formData.append("body", templateData.body || "[]");
+    formData.append("total_marks", String(templateData.total_marks || 0));
+    
+    // Marks breakdown
+    formData.append("marks_mcq", String(templateData.marks_mcq || 0));
+    formData.append("marks_short", String(templateData.marks_short || 0));
+    formData.append("marks_long", String(templateData.marks_long || 0));
+    formData.append("marks_blank", String(templateData.marks_blank || 0));
+    formData.append("marks_onetwo", String(templateData.marks_onetwo || 0));
+    formData.append("marks_truefalse", String(templateData.marks_truefalse || 0));
+    formData.append("marks_passage", String(templateData.marks_passage || 0));
+    formData.append("marks_match", String(templateData.marks_match || 0));
+    
+    // Optional fields
+    if (templateData.timing) formData.append("timing", String(templateData.timing));
+    
+    const response = await apiClient.post("/papers/add", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error creating template:", error);
+    throw error;
+  }
+};
+
+/**
+ * Get all templates (Admin)
+ * GET /api/papers/templates
+ */
+export const getAllTemplates = async (filters = {}) => {
+  try {
+    const params = new URLSearchParams();
+    if (filters.subject) params.append("subject", filters.subject);
+    if (filters.standard) params.append("standard", filters.standard);
+    if (filters.board) params.append("board", filters.board);
+    
+    const queryString = params.toString();
+    const url = `/papers/templates${queryString ? `?${queryString}` : ""}`;
+    const response = await apiClient.get(url);
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching templates:", error);
+    throw error;
+  }
+};
+
+/**
+ * Get single template details (Admin)
+ * GET /api/papers/templates/:id
+ */
+export const getTemplateById = async (id) => {
+  try {
+    const response = await apiClient.get(`/papers/templates/${id}`);
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching template:", error);
+    throw error;
+  }
+};
+
