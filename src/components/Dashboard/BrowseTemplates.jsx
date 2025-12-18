@@ -200,3 +200,4 @@ const BrowseTemplates = () => {
 
 export default BrowseTemplates;
 
+
