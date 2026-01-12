@@ -466,7 +466,14 @@ const BulkUploadModal = ({ questionType, onClose, onSuccess }) => {
 
     return parsedQuestions.map((q) => {
       if (q.imageFileName) {
-        const imageName = q.imageFileName
+        // Extract filename from full path (handle both Windows and Unix paths)
+        let imageFileName = q.imageFileName;
+        // Extract just the filename from path (e.g., "C:\Users\...\file.png" -> "file.png")
+        const pathParts = imageFileName.split(/[/\\]/);
+        const fileNameOnly = pathParts[pathParts.length - 1];
+        
+        // Remove extension for matching
+        const imageName = fileNameOnly
           .toLowerCase()
           .replace(/\.[^/.]+$/, "");
         const matchedImage = imageMap.get(imageName);
@@ -843,54 +850,58 @@ const BulkUploadModal = ({ questionType, onClose, onSuccess }) => {
           )}
 
           {/* Preview */}
-          {parsedQuestions.length > 0 && (
-            <div className="mb-6">
-              <h4 className="font-semibold text-gray-700 mb-2">
-                Preview ({parsedQuestions.length} questions)
-              </h4>
-              <div className="border rounded-lg max-h-64 overflow-y-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-100 sticky top-0">
-                    <tr>
-                      <th className="px-4 py-2 text-left">#</th>
-                      <th className="px-4 py-2 text-left">Question</th>
-                      <th className="px-4 py-2 text-left">Answer</th>
-                      <th className="px-4 py-2 text-left">Image</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {parsedQuestions.slice(0, 10).map((q, index) => (
-                      <tr key={index} className="border-t">
-                        <td className="px-4 py-2">{index + 1}</td>
-                        <td className="px-4 py-2 max-w-xs truncate">
-                          {q.question}
-                        </td>
-                        <td className="px-4 py-2 max-w-xs truncate">
-                          {typeof q.answer === "object"
-                            ? JSON.stringify(q.answer)
-                            : q.answer}
-                        </td>
-                        <td className="px-4 py-2">
-                          {q.image ? (
-                            <CheckCircle2 className="w-4 h-4 text-green-600" />
-                          ) : q.imageFileName ? (
-                            <XCircle className="w-4 h-4 text-amber-600" />
-                          ) : (
-                            "-"
-                          )}
-                        </td>
+          {parsedQuestions.length > 0 && (() => {
+            // Map images to questions for preview
+            const questionsWithImages = mapImagesToQuestions();
+            return (
+              <div className="mb-6">
+                <h4 className="font-semibold text-gray-700 mb-2">
+                  Preview ({parsedQuestions.length} questions)
+                </h4>
+                <div className="border rounded-lg max-h-64 overflow-y-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-100 sticky top-0">
+                      <tr>
+                        <th className="px-4 py-2 text-left">#</th>
+                        <th className="px-4 py-2 text-left">Question</th>
+                        <th className="px-4 py-2 text-left">Answer</th>
+                        <th className="px-4 py-2 text-left">Image</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {parsedQuestions.length > 10 && (
-                  <div className="p-2 text-center text-sm text-gray-500">
-                    ... and {parsedQuestions.length - 10} more
-                  </div>
-                )}
+                    </thead>
+                    <tbody>
+                      {questionsWithImages.slice(0, 10).map((q, index) => (
+                        <tr key={index} className="border-t">
+                          <td className="px-4 py-2">{index + 1}</td>
+                          <td className="px-4 py-2 max-w-xs truncate">
+                            {q.question}
+                          </td>
+                          <td className="px-4 py-2 max-w-xs truncate">
+                            {typeof q.answer === "object"
+                              ? JSON.stringify(q.answer)
+                              : q.answer}
+                          </td>
+                          <td className="px-4 py-2">
+                            {q.image ? (
+                              <CheckCircle2 className="w-4 h-4 text-green-600" />
+                            ) : q.imageFileName ? (
+                              <XCircle className="w-4 h-4 text-amber-600" />
+                            ) : (
+                              "-"
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {parsedQuestions.length > 10 && (
+                    <div className="p-2 text-center text-sm text-gray-500">
+                      ... and {parsedQuestions.length - 10} more
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* Upload Progress */}
           {uploading && (

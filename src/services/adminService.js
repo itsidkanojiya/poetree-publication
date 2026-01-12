@@ -440,7 +440,7 @@ export const deleteWorksheet = async (id) => {
 
 /**
  * Create default paper template
- * POST /api/papers/add
+ * POST /api/papers/templates/create
  */
 export const createTemplate = async (templateData) => {
   try {
@@ -449,9 +449,29 @@ export const createTemplate = async (templateData) => {
     // Required fields
     formData.append("user_id", templateData.user_id);
     formData.append("type", templateData.type || "default");
-    formData.append("is_template", templateData.is_template ? "true" : "false");
+    // Always set is_template to true for template creation endpoint
+    formData.append("is_template", "true");
     formData.append("title", templateData.title || "");
-    formData.append("school_name", templateData.school_name || "NA");
+    // Add paper_title if provided (optional)
+    if (templateData.paper_title) {
+      formData.append("paper_title", templateData.paper_title);
+    }
+    // Add school_name (required by API, comes from user profile)
+    const schoolName = templateData.school_name ? String(templateData.school_name).trim() : "NA";
+    const finalSchoolName = schoolName && schoolName !== "" ? schoolName : "NA";
+    formData.append("school_name", finalSchoolName);
+    // Add address if provided
+    if (templateData.address) {
+      formData.append("address", templateData.address);
+    }
+    // Add logo if provided (optional)
+    if (templateData.logo) {
+      if (typeof templateData.logo === "string") {
+        formData.append("logo_url", templateData.logo);
+      } else if (templateData.logo instanceof File) {
+        formData.append("logo", templateData.logo);
+      }
+    }
     formData.append("standard", String(templateData.standard || 0));
     formData.append("subject_id", String(templateData.subject_id || ""));
     formData.append("subject_title_id", String(templateData.subject_title_id || ""));
@@ -475,10 +495,26 @@ export const createTemplate = async (templateData) => {
     // Optional fields
     if (templateData.timing) formData.append("timing", String(templateData.timing));
     
-    const response = await apiClient.post("/papers/add", formData, {
+    // Template metadata (includes header_id and question_types)
+    // Always send template_metadata - never null
+    if (templateData.template_metadata) {
+      formData.append("template_metadata", templateData.template_metadata);
+    } else {
+      // Fallback: create minimal template_metadata if not provided
+      // This should not happen if CreateTemplate is working correctly, but adding as safety
+      console.warn("template_metadata not provided, creating minimal metadata");
+      const minimalMetadata = JSON.stringify({
+        question_types: {},
+        header_id: null,
+      });
+      formData.append("template_metadata", minimalMetadata);
+    }
+    
+    const response = await apiClient.post("/papers/templates/create", formData, {
       headers: {
         "Content-Type": "multipart/form-data",
       },
+      timeout: 60000, // 60 seconds timeout for large requests
     });
     return response.data;
   } catch (error) {

@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, FileText, Edit, CheckCircle2 } from "lucide-react";
-import { viewTemplate, customizeTemplate } from "../../services/paperService";
+import { viewTemplate, cloneTemplate } from "../../services/paperService";
 import Toast from "../Common/Toast";
+import apiClient from "../../services/apiClient";
 
 const ViewTemplate = () => {
   const { id } = useParams();
@@ -17,6 +18,52 @@ const ViewTemplate = () => {
     fetchTemplateDetails();
   }, [id]);
 
+  // Fetch questions by IDs
+  const fetchQuestionsByIds = async (questionIds) => {
+    try {
+      if (!questionIds || questionIds.length === 0) {
+        setQuestions([]);
+        return;
+      }
+
+      console.log("Fetching questions for IDs:", questionIds);
+
+      // Fetch all questions
+      const response = await apiClient.get(`/question`);
+      const allQuestions = response.data?.questions || response.data || [];
+      
+      console.log("Total questions fetched:", allQuestions.length);
+      
+      // Filter questions by IDs and maintain order
+      // Try both question_id and id fields for matching
+      const fetchedQuestions = questionIds
+        .map((id) => {
+          const question = allQuestions.find((q) => 
+            q.question_id === id || q.id === id || q.question_id === parseInt(id) || q.id === parseInt(id)
+          );
+          if (!question) {
+            console.warn(`Question with ID ${id} not found`);
+          }
+          return question;
+        })
+        .filter((q) => q !== undefined);
+      
+      console.log("Questions found:", fetchedQuestions.length, "out of", questionIds.length);
+      
+      // Add number property for proper numbering
+      const numberedQuestions = fetchedQuestions.map((q, index) => ({
+        ...q,
+        number: index + 1,
+        position: index + 1
+      }));
+      
+      setQuestions(numberedQuestions);
+    } catch (error) {
+      console.error("Error fetching questions by IDs:", error);
+      setQuestions([]);
+    }
+  };
+
   const fetchTemplateDetails = async () => {
     try {
       setLoading(true);
@@ -24,8 +71,46 @@ const ViewTemplate = () => {
       const templateData = response?.template || response?.data || response;
       setTemplate(templateData);
       
-      const questionsData = templateData?.questions || [];
-      setQuestions(Array.isArray(questionsData) ? questionsData : []);
+      console.log("Template data received:", templateData);
+      
+      // Check if questions array is already populated
+      if (templateData?.questions && Array.isArray(templateData.questions) && templateData.questions.length > 0) {
+        console.log("Using questions from API response:", templateData.questions.length);
+        const numberedQuestions = templateData.questions.map((q, index) => ({
+          ...q,
+          number: index + 1,
+          position: index + 1
+        }));
+        setQuestions(numberedQuestions);
+      } else {
+        // Parse question IDs from body
+        let questionIds = [];
+        if (templateData?.body) {
+          try {
+            if (typeof templateData.body === 'string') {
+              if (templateData.body.trim().startsWith('[')) {
+                questionIds = JSON.parse(templateData.body);
+              } else {
+                questionIds = JSON.parse(templateData.body);
+              }
+            } else if (Array.isArray(templateData.body)) {
+              questionIds = templateData.body;
+            }
+            console.log("Parsed question IDs from body:", questionIds, "Count:", questionIds.length);
+          } catch (error) {
+            console.error("Error parsing question IDs from body:", error);
+            console.error("Body content:", templateData.body);
+          }
+        }
+        
+        if (questionIds.length > 0) {
+          console.log("Fetching questions by IDs, count:", questionIds.length);
+          await fetchQuestionsByIds(questionIds);
+        } else {
+          console.log("No question IDs found in body");
+          setQuestions([]);
+        }
+      }
     } catch (error) {
       console.error("Error fetching template:", error);
       setToast({
@@ -41,22 +126,31 @@ const ViewTemplate = () => {
   const handleCustomize = async () => {
     try {
       setCustomizing(true);
-      const response = await customizeTemplate(id, []);
+      // Step 1: Clone the template (creates a new editable paper)
+      const response = await cloneTemplate(id);
       const paper = response?.paper || response?.data || response;
+      
+      if (!paper || !paper.id) {
+        throw new Error("Failed to clone template: No paper ID returned");
+      }
+      
+      console.log("Template cloned successfully. New paper ID:", paper.id);
       
       setToast({
         show: true,
-        message: "Template customized successfully!",
+        message: "Template cloned successfully! Redirecting to customize...",
         type: "success",
       });
 
+      // Navigate to customize page with the new paper ID
       setTimeout(() => {
         navigate(`/dashboard/papers/${paper.id}/customize`);
       }, 1500);
     } catch (error) {
+      console.error("Error cloning template:", error);
       setToast({
         show: true,
-        message: error.response?.data?.message || "Failed to customize template",
+        message: error.response?.data?.message || error.message || "Failed to clone template",
         type: "error",
       });
     } finally {
@@ -210,5 +304,7 @@ const ViewTemplate = () => {
 };
 
 export default ViewTemplate;
+
+
 
 

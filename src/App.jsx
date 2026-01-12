@@ -17,6 +17,7 @@ import History from "./pages/History";
 import ViewPaperPage from "./components/Dashboard/ViewPaperPage";
 import ProtectedRoute from "./routes/ProtectedRoute";
 import Profile from "./pages/Profile";
+import EditProfile from "./pages/EditProfile";
 import VerifyOtp from "./pages/auth/VerifyOtp";
 import SubjectRequests from "./pages/SubjectRequests";
 import Animations from "./pages/Animations";
@@ -69,6 +70,7 @@ function App() {
         <Route path="history" element={<History />} />
         <Route path="view/:id" element={<ViewPaperPage />} />
         <Route path="profile" element={<Profile />} />
+        <Route path="edit-profile" element={<EditProfile />} />
         <Route path="subject-requests" element={<SubjectRequests />} />
         <Route path="animations" element={<Animations />} />
         <Route path="templates" element={<BrowseTemplates />} />
@@ -101,6 +103,8 @@ function App() {
           <Route path="templates" element={<TemplateList />} />
           <Route path="templates/create" element={<CreateTemplate />} />
           <Route path="templates/:id" element={<TemplateDetails />} />
+          <Route path="profile" element={<Profile />} />
+          <Route path="edit-profile" element={<EditProfile />} />
         </Route>
       </Route>
     </Routes>

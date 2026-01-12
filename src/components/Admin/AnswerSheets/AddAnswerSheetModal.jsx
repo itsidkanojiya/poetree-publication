@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { X } from "lucide-react";
-import { addAnswerSheet, getAllSubjects, getAllBoards } from "../../../services/adminService";
+import { addAnswerSheet, getAllSubjects, getAllBoards, getSubjectTitlesBySubject } from "../../../services/adminService";
 import Toast from "../../Common/Toast";
 
 const AddAnswerSheetModal = ({ onClose, onSuccess }) => {
@@ -14,6 +14,7 @@ const AddAnswerSheetModal = ({ onClose, onSuccess }) => {
   });
   const [subjects, setSubjects] = useState([]);
   const [boards, setBoards] = useState([]);
+  const [subjectTitles, setSubjectTitles] = useState([]);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [toast, setToast] = useState({ show: false, message: "", type: "error" });
@@ -35,10 +36,28 @@ const AddAnswerSheetModal = ({ onClose, onSuccess }) => {
     }
   };
 
+  const fetchSubjectTitles = async (subjectId) => {
+    if (!subjectId) {
+      setSubjectTitles([]);
+      return;
+    }
+    try {
+      const subjectTitlesData = await getSubjectTitlesBySubject(subjectId);
+      setSubjectTitles(Array.isArray(subjectTitlesData) ? subjectTitlesData : []);
+    } catch (error) {
+      console.error("Error fetching subject titles:", error);
+      setSubjectTitles([]);
+    }
+  };
+
   const handleChange = (e) => {
     const { name, value, files } = e.target;
     if (name === "answersheet_url" || name === "answersheet_coverlink") {
       setFormData((prev) => ({ ...prev, [name]: files[0] || null }));
+    } else if (name === "subject_id") {
+      // When subject changes, fetch subject titles and clear subject_title_id
+      setFormData((prev) => ({ ...prev, subject_id: value, subject_title_id: "" }));
+      fetchSubjectTitles(value);
     } else {
       setFormData((prev) => ({ ...prev, [name]: value }));
     }
@@ -53,14 +72,31 @@ const AddAnswerSheetModal = ({ onClose, onSuccess }) => {
 
     try {
       setLoading(true);
+      
+      // Get user_id from localStorage if available
+      const user = JSON.parse(localStorage.getItem("user") || "null");
+      const userId = user?.id;
+
       const formDataToSend = new FormData();
 
+      // Required fields
+      formDataToSend.append("subject_id", formData.subject_id);
+      formDataToSend.append("board_id", formData.board_id);
+      formDataToSend.append("subject_title_id", formData.subject_title_id);
       formDataToSend.append("standard", formData.standard);
-      if (formData.subject_id) formDataToSend.append("subject_id", formData.subject_id);
-      if (formData.subject_title_id) formDataToSend.append("subject_title_id", formData.subject_title_id);
-      if (formData.board_id) formDataToSend.append("board_id", formData.board_id);
-      if (formData.answersheet_url) formDataToSend.append("answersheet_url", formData.answersheet_url);
-      if (formData.answersheet_coverlink) formDataToSend.append("answersheet_coverlink", formData.answersheet_coverlink);
+      
+      // Optional user_id
+      if (userId) {
+        formDataToSend.append("user_id", userId);
+      }
+      
+      // File uploads
+      if (formData.answersheet_url) {
+        formDataToSend.append("answersheet_url", formData.answersheet_url);
+      }
+      if (formData.answersheet_coverlink) {
+        formDataToSend.append("answersheet_coverlink", formData.answersheet_coverlink);
+      }
 
       await addAnswerSheet(formDataToSend);
       setToast({ show: true, message: "Answer sheet added successfully", type: "success" });
@@ -81,6 +117,9 @@ const AddAnswerSheetModal = ({ onClose, onSuccess }) => {
   const validate = () => {
     const newErrors = {};
     if (!formData.standard) newErrors.standard = "Standard is required";
+    if (!formData.subject_id) newErrors.subject_id = "Subject is required";
+    if (!formData.subject_title_id) newErrors.subject_title_id = "Subject Title is required";
+    if (!formData.board_id) newErrors.board_id = "Board is required";
     if (!formData.answersheet_url) newErrors.answersheet_url = "PDF file is required";
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -112,26 +151,35 @@ const AddAnswerSheetModal = ({ onClose, onSuccess }) => {
               <label className="block text-sm font-semibold text-gray-700 mb-2">
                 Standard <span className="text-red-500">*</span>
               </label>
-              <input
-                type="text"
+               <select
                 name="standard"
                 value={formData.standard}
                 onChange={handleChange}
                 className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition outline-none"
-                placeholder="e.g., 10"
                 required
-              />
+               >
+                 <option value="">Select Standard</option>
+                 {Array.from({ length: 12 }, (_, i) => i + 1).map((num) => (
+                   <option key={num} value={num}>
+                     {num}
+                   </option>
+                 ))}
+               </select>
+               {errors.standard && (
+                 <p className="mt-1 text-sm text-red-600">{errors.standard}</p>
+               )}
             </div>
 
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Subject
+                Subject <span className="text-red-500">*</span>
               </label>
               <select
                 name="subject_id"
                 value={formData.subject_id}
                 onChange={handleChange}
                 className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition outline-none"
+                required
               >
                 <option value="">Select Subject</option>
                 {subjects.map((subject) => (
@@ -140,17 +188,45 @@ const AddAnswerSheetModal = ({ onClose, onSuccess }) => {
                   </option>
                 ))}
               </select>
+              {errors.subject_id && (
+                <p className="mt-1 text-sm text-red-600">{errors.subject_id}</p>
+              )}
             </div>
 
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Board
+                Subject Title <span className="text-red-500">*</span>
+              </label>
+              <select
+                name="subject_title_id"
+                value={formData.subject_title_id}
+                onChange={handleChange}
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition outline-none"
+                required
+                disabled={!formData.subject_id}
+              >
+                <option value="">{formData.subject_id ? "Select Subject Title" : "Select Subject first"}</option>
+                {subjectTitles.map((title) => (
+                  <option key={title.subject_title_id} value={title.subject_title_id}>
+                    {title.title_name}
+                  </option>
+                ))}
+              </select>
+              {errors.subject_title_id && (
+                <p className="mt-1 text-sm text-red-600">{errors.subject_title_id}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Board <span className="text-red-500">*</span>
               </label>
               <select
                 name="board_id"
                 value={formData.board_id}
                 onChange={handleChange}
                 className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition outline-none"
+                required
               >
                 <option value="">Select Board</option>
                 {boards.map((board) => (
@@ -159,6 +235,9 @@ const AddAnswerSheetModal = ({ onClose, onSuccess }) => {
                   </option>
                 ))}
               </select>
+              {errors.board_id && (
+                <p className="mt-1 text-sm text-red-600">{errors.board_id}</p>
+              )}
             </div>
 
             <div>

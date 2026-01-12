@@ -6,12 +6,20 @@ const downloadPDF = async (pdfPages) => {
   const pdfWidth = 210;
   const pdfHeight = 297;
 
+  // Compression settings
+  const JPEG_QUALITY = 0.85; // 0.85 = 85% quality (good balance between size and quality)
+  const SCALE = 1.5; // Reduced from 2 to reduce file size (still good quality)
+
   for (let i = 0; i < pdfPages.length; i++) {
     const canvas = await html2canvas(pdfPages[i], {
-      scale: 2,
+      scale: SCALE,
       useCORS: true,
+      logging: false, // Disable logging for better performance
+      backgroundColor: "#ffffff", // Ensure white background
     });
-    const imgData = canvas.toDataURL("image/png");
+
+    // Convert to JPEG instead of PNG for better compression
+    const imgData = canvas.toDataURL("image/jpeg", JPEG_QUALITY);
 
     const img = new Image();
     img.src = imgData;
@@ -35,7 +43,8 @@ const downloadPDF = async (pdfPages) => {
           yPos = -(imgHeight - pdfHeight) / 2;
         }
 
-        pdf.addImage(imgData, "PNG", xPos, yPos, imgWidth, imgHeight);
+        // Add image with compression (JPEG format is already compressed)
+        pdf.addImage(imgData, "JPEG", xPos, yPos, imgWidth, imgHeight);
 
         if (i < pdfPages.length - 1) {
           pdf.addPage();
@@ -45,6 +54,11 @@ const downloadPDF = async (pdfPages) => {
       };
     });
   }
+
+  // Enable compression in jsPDF
+  pdf.setProperties({
+    compress: true,
+  });
 
   pdf.save("paper.pdf");
 };

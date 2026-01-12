@@ -23,6 +23,15 @@ const EditHeader = () => {
   // Load paper data if editing from paper
   useEffect(() => {
     const loadPaperHeader = async () => {
+      // Always get user data from localStorage for school info
+      const user = JSON.parse(localStorage.getItem("user") || "null");
+      // Always use user profile values for school info (not editable in paper form)
+      const userSchoolName = user?.school_name || "";
+      const userAddress = user?.address || (user?.school_address_city && user?.school_address_state
+        ? `${user.school_address_city}, ${user.school_address_state}`
+        : user?.school_address || "");
+      const userLogo = user?.logo || user?.logo_url || null;
+
       if (fromPaper && paperId) {
         setLoading(true);
         try {
@@ -31,17 +40,20 @@ const EditHeader = () => {
           
           if (paper) {
             const headerFromPaper = {
-              schoolName: paper.school_name || "",
+              // Always use user profile values for school info
+              schoolName: userSchoolName,
+              address: userAddress,
+              image: userLogo,
+              // Paper-specific fields
               standard: paper.standard || "",
               timing: paper.timing || "",
               date: paper.date ? paper.date.split('T')[0] : "",
               division: paper.division || "",
-              address: paper.address || "",
               subject: paper.subject || "",
               board: paper.board || "",
-              logo: paper.logo || null,
-              logoUrl: paper.logo_url || null,
               subjectTitle: paper.subject_title_id || null,
+              documentTitle: paper.paper_title || "",
+              class: paper.standard ? `Standard ${paper.standard}` : "",
             };
             setEditedHeader(headerFromPaper);
           }
@@ -51,18 +63,43 @@ const EditHeader = () => {
           setLoading(false);
         }
       } else if (headerData) {
-        // Use header data from location state
+        // Use header data from location state, but always use user profile for school info
         setEditedHeader({
           ...headerData,
+          schoolName: userSchoolName,
+          address: userAddress,
+          image: userLogo,
           board: headerData.board || "",
           subjectTitle: headerData.subjectTitle || null,
         });
       } else if (header) {
-        // Use header from context
+        // Use header from context, but always use user profile for school info
         setEditedHeader({ 
           ...header,
+          schoolName: userSchoolName,
+          address: userAddress,
+          image: userLogo,
           board: header.board || "",
           subjectTitle: header.subjectTitle || "",
+        });
+      } else {
+        // New header - always initialize with user profile data
+        setEditedHeader({
+          image: userLogo,
+          schoolName: userSchoolName,
+          address: userAddress,
+          subject: "",
+          subjectTitle: null,
+          board: "",
+          class: "",
+          documentTitle: "",
+          studentName: "",
+          rollNo: "",
+          section: "",
+          date: "",
+          timing: "",
+          standard: "",
+          division: "",
         });
       }
     };
@@ -71,7 +108,12 @@ const EditHeader = () => {
   }, [header, fromPaper, paperId, headerData]);
 
   // Handle input changes
+  // Note: schoolName, address, and image (logo) cannot be changed here - they come from user profile
   const handleInputChange = (e, field) => {
+    // Prevent editing school info fields
+    if (["schoolName", "address", "image"].includes(field)) {
+      return;
+    }
     setEditedHeader({ ...editedHeader, [field]: e.target.value });
   };
 
@@ -124,9 +166,8 @@ const EditHeader = () => {
             {/* Info Card */}
             <div className="mt-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-200">
               <p className="text-sm text-gray-700">
-                <strong className="text-blue-700">💡 Tip:</strong> Changes are
-                reflected in real-time. Leave the logo field empty to use
-                default initials badge.
+                <strong className="text-blue-700">💡 Tip:</strong> School name, address, and logo are automatically taken from your profile. 
+                Update them in <a href="/dashboard/profile" className="underline font-semibold text-blue-600">Profile Settings</a>.
               </p>
             </div>
           </div>

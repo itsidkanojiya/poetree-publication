@@ -290,6 +290,8 @@ const CustomPaper = () => {
                 logo: paper.logo || null,
                 logoUrl: paper.logo_url || null,
                 subjectTitle: paper.subject_title_id || null,
+                documentTitle: paper.paper_title || "",
+                class: paper.standard ? `Standard ${paper.standard}` : "",
               });
             }
             
@@ -683,7 +685,8 @@ const CustomPaper = () => {
           "custom", 
           header,
           marksPerType,
-          questionSections
+          questionSections,
+          header?.documentTitle || null
         );
         setIsSaved(true);
         setToast({
@@ -805,8 +808,8 @@ const CustomPaper = () => {
         formData.append("body", JSON.stringify(allQuestionIds));
         
         // Add header data if available
+        // Note: school_name, address, logo are now fetched from user table via user_id
         if (header) {
-          if (header.schoolName) formData.append("school_name", header.schoolName);
           // Standard should be integer
           if (header.standard) {
             const standardValue = typeof header.standard === 'string' 
@@ -819,8 +822,9 @@ const CustomPaper = () => {
           if (header.board) formData.append("board", header.board);
           if (header.timing) formData.append("timing", header.timing);
           if (header.division) formData.append("division", header.division);
-          if (header.address) formData.append("address", header.address);
           if (header.subjectTitle) formData.append("subject_title_id", header.subjectTitle);
+          // Add paper_title (documentTitle) if provided (optional)
+          if (header.documentTitle) formData.append("paper_title", header.documentTitle);
         }
         
         // Calculate and add marks for each question type
@@ -865,10 +869,7 @@ const CustomPaper = () => {
         formData.append("marks_onetwo", marksOnetwo);
         formData.append("marks_truefalse", marksTruefalse);
         
-        // Logo handling: only send file if uploaded
-        if (logoFile && logoFile.files && logoFile.files[0]) {
-          formData.append("logo", logoFile.files[0]);
-        }
+        // Note: logo is now fetched from user table via user_id, no need to send it here
         
         await updatePaper(paperIdState, formData);
         setIsSaved(true);
@@ -906,7 +907,8 @@ const CustomPaper = () => {
           "custom", 
           header,
           marksPerType,
-          questionSections
+          questionSections,
+          header?.documentTitle || null
         );
         setIsSaved(true);
         setToast({

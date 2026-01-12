@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { FileText, Eye, Search, Filter } from "lucide-react";
-import { getAvailableTemplates } from "../../services/paperService";
 import Toast from "../Common/Toast";
+import apiClient from "../../services/apiClient";
 
 const BrowseTemplates = () => {
   const navigate = useNavigate();
@@ -11,9 +11,9 @@ const BrowseTemplates = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filters, setFilters] = useState({
-    subject_id: "",
+    subject: "",
     standard: "",
-    board_id: "",
+    board: "",
   });
   const [toast, setToast] = useState({ show: false, message: "", type: "success" });
 
@@ -22,23 +22,63 @@ const BrowseTemplates = () => {
   }, []);
 
   useEffect(() => {
+    // Refetch templates when filters change (subject, standard, board)
+    if (filters.subject || filters.standard || filters.board) {
+      fetchTemplates();
+    }
+  }, [filters.subject, filters.standard, filters.board]);
+
+  useEffect(() => {
     filterTemplates();
-  }, [searchTerm, filters, templates]);
+  }, [searchTerm, templates]);
 
   const fetchTemplates = async () => {
     try {
       setLoading(true);
-      const response = await getAvailableTemplates(filters);
-      const templatesData = response?.templates || response?.data || response || [];
-      setTemplates(Array.isArray(templatesData) ? templatesData : []);
-      setFilteredTemplates(Array.isArray(templatesData) ? templatesData : []);
+      const params = new URLSearchParams();
+      if (filters.subject) params.append("subject", filters.subject);
+      if (filters.standard) params.append("standard", filters.standard);
+      if (filters.board) params.append("board", filters.board);
+      
+      const queryString = params.toString();
+      const url = `/papers/templates${queryString ? `?${queryString}` : ""}`;
+      const response = await apiClient.get(url);
+      
+      // Handle different response structures
+      let templatesData = [];
+      if (response?.data) {
+        // Check various possible response structures
+        if (Array.isArray(response.data)) {
+          templatesData = response.data;
+        } else if (Array.isArray(response.data.templates)) {
+          templatesData = response.data.templates;
+        } else if (Array.isArray(response.data.data)) {
+          templatesData = response.data.data;
+        } else if (response.data.success && Array.isArray(response.data.data)) {
+          templatesData = response.data.data;
+        } else if (response.data.success && Array.isArray(response.data.templates)) {
+          templatesData = response.data.templates;
+        }
+      }
+      
+      // Filter to only show templates (is_template: true)
+      const filteredTemplatesData = Array.isArray(templatesData) 
+        ? templatesData.filter(t => t.is_template === true || t.is_template === "true" || t.is_template === 1)
+        : [];
+      
+      console.log("Templates fetched:", filteredTemplatesData);
+      setTemplates(filteredTemplatesData);
+      setFilteredTemplates(filteredTemplatesData);
     } catch (error) {
       console.error("Error fetching templates:", error);
+      console.error("Error response:", error.response?.data);
       setToast({
         show: true,
-        message: "Failed to load templates",
+        message: error.response?.data?.message || "Failed to load templates",
         type: "error",
       });
+      setTemplates([]);
+      setFilteredTemplates([]);
     } finally {
       setLoading(false);
     }
@@ -47,24 +87,16 @@ const BrowseTemplates = () => {
   const filterTemplates = () => {
     let filtered = [...templates];
 
+    // Only do client-side filtering for search term
+    // Subject, standard, and board are filtered server-side via API
     if (searchTerm) {
       filtered = filtered.filter(
         (t) =>
           t.subject?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          t.title?.toLowerCase().includes(searchTerm.toLowerCase())
+          t.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          t.paper_title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          t.board?.toLowerCase().includes(searchTerm.toLowerCase())
       );
-    }
-
-    if (filters.subject_id) {
-      filtered = filtered.filter((t) => String(t.subject_id) === String(filters.subject_id));
-    }
-
-    if (filters.standard) {
-      filtered = filtered.filter((t) => String(t.standard) === String(filters.standard));
-    }
-
-    if (filters.board_id) {
-      filtered = filtered.filter((t) => String(t.board_id) === String(filters.board_id));
     }
 
     setFilteredTemplates(filtered);
@@ -116,8 +148,8 @@ const BrowseTemplates = () => {
                 value={filters.standard}
                 onChange={(e) => {
                   setFilters({ ...filters, standard: e.target.value });
-                  fetchTemplates();
                 }}
+                onBlur={fetchTemplates}
                 className="px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
               >
                 <option value="">All Standards</option>
@@ -148,7 +180,7 @@ const BrowseTemplates = () => {
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex-1">
                     <h3 className="text-lg font-bold text-gray-800 mb-1">
-                      {template.title || "Untitled Template"}
+                      {template.paper_title || template.title || "Untitled Template"}
                     </h3>
                     <p className="text-sm text-gray-600">{template.subject}</p>
                   </div>
@@ -199,5 +231,7 @@ const BrowseTemplates = () => {
 };
 
 export default BrowseTemplates;
+
+
 
 

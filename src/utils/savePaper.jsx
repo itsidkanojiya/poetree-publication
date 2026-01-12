@@ -7,7 +7,8 @@ export const savePaper = async (
   type, 
   headerData = null,
   marksPerType = null,
-  questionSections = null
+  questionSections = null,
+  paperTitle = null
 ) => {
   try {
     if (!user || !user.id) {
@@ -25,9 +26,14 @@ export const savePaper = async (
     formData.append("user_id", user.id);
     formData.append("type", type);
     
+    // Add paper_title if provided (optional)
+    if (paperTitle) {
+      formData.append("paper_title", paperTitle);
+    }
+    
     // Add header data if provided, otherwise use defaults
+    // Note: school_name, address, logo are now fetched from user table via user_id
     if (headerData) {
-      formData.append("school_name", headerData.schoolName || "NA");
       // Standard should be integer, convert if string
       const standardValue = headerData.standard 
         ? (typeof headerData.standard === 'string' && headerData.standard !== 'NA' 
@@ -42,10 +48,10 @@ export const savePaper = async (
       // Optional header fields
       if (headerData.timing) formData.append("timing", headerData.timing);
       if (headerData.division) formData.append("division", headerData.division);
-      if (headerData.address) formData.append("address", headerData.address);
       if (headerData.subjectTitle) formData.append("subject_title_id", headerData.subjectTitle);
+      // Add paper_title (documentTitle) if provided (optional)
+      if (headerData.documentTitle) formData.append("paper_title", headerData.documentTitle);
     } else {
-      formData.append("school_name", "NA");
       formData.append("standard", 0);
       formData.append("date", formattedDate);
       formData.append("subject", "NA");
@@ -111,10 +117,7 @@ export const savePaper = async (
       formData.append("marks_truefalse", 0);
     }
 
-    // Logo handling: only send file if uploaded
-    if (logoFile && logoFile.files && logoFile.files[0]) {
-      formData.append("logo", logoFile.files[0]);
-    }
+    // Note: logo is now fetched from user table via user_id, no need to send it here
 
     await addNewPaper(formData);
     return { success: true };

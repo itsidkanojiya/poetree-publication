@@ -151,6 +151,7 @@ const EditHeaderCard = ({ editedHeader, handleInputChange }) => {
   // Field labels mapping for better readability
   const fieldLabels = {
     schoolName: "School Name",
+    address: "School Address",
     schoolAddress: "School Address",
     affiliation: "Board Affiliation",
     studentName: "Student Name",
@@ -165,17 +166,75 @@ const EditHeaderCard = ({ editedHeader, handleInputChange }) => {
     image: "School Logo",
     board: "Board",
     subjectTitle: "Subject Title",
+    documentTitle: "Paper Title",
   };
 
-  // Always include board and subjectTitle fields even if they don't exist in header
+  // Always include essential fields even if they don't exist in header
   const allFields = new Set(editedHeader ? Object.keys(editedHeader) : []);
-  if (!allFields.has("board")) allFields.add("board");
-  if (!allFields.has("subjectTitle")) allFields.add("subjectTitle");
+
+  // Essential fields that should always be present
+  // Note: image, schoolName, address are now fetched from user profile, not editable in paper form
+  const essentialFields = ["board", "subjectTitle"];
+  essentialFields.forEach((field) => {
+    if (!allFields.has(field)) allFields.add(field);
+  });
+
+  // Define field order for better UX
+  // Note: image, schoolName, address, studentName, rollNo are excluded - they come from user profile or are not needed
+  const fieldOrder = [
+    "subject",
+    "subjectTitle",
+    "board",
+    "class",
+    "documentTitle",
+    "section",
+    "date",
+    "timing",
+    "standard",
+    "division",
+  ];
+
+  // Sort fields: essential first, then others
+  const sortedFields = Array.from(allFields).sort((a, b) => {
+    const aIndex = fieldOrder.indexOf(a);
+    const bIndex = fieldOrder.indexOf(b);
+    if (aIndex === -1 && bIndex === -1) return 0;
+    if (aIndex === -1) return 1;
+    if (bIndex === -1) return -1;
+    return aIndex - bIndex;
+  });
 
   return (
     <div className="space-y-4">
-      {Array.from(allFields).map((key) => {
-        if (["id", "styleType", "layoutType"].includes(key)) return null;
+      {/* Info message about school info from profile */}
+      <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+        <p className="text-sm text-blue-700">
+          <strong>Note:</strong> School name, address, and logo are
+          automatically taken from your profile. You can update them in{" "}
+          <a href="/dashboard/profile" className="underline font-semibold">
+            Profile Settings
+          </a>
+          .
+        </p>
+      </div>
+
+      {sortedFields.map((key) => {
+        // Exclude fields that come from user profile or are not needed
+        if (
+          [
+            "id",
+            "styleType",
+            "layoutType",
+            "name",
+            "description",
+            "image",
+            "schoolName",
+            "address",
+            "studentName",
+            "rollNo",
+          ].includes(key)
+        )
+          return null;
 
         return (
           <div key={key}>
@@ -184,7 +243,7 @@ const EditHeaderCard = ({ editedHeader, handleInputChange }) => {
               <div className="p-4 bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl border border-purple-200">
                 <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
                   <Image className="w-4 h-4" />
-                  School Logo
+                  School Logo <span className="text-red-500">*</span>
                 </label>
 
                 <div className="flex flex-col gap-3">
@@ -197,9 +256,15 @@ const EditHeaderCard = ({ editedHeader, handleInputChange }) => {
                       onChange={(e) => {
                         if (e.target.files.length > 0) {
                           const file = e.target.files[0];
+                          // Create preview URL for display
                           const imageUrl = URL.createObjectURL(file);
+                          // Store the file object and preview URL
+                          const newValue = {
+                            file: file,
+                            preview: imageUrl,
+                          };
                           handleInputChange(
-                            { target: { value: imageUrl } },
+                            { target: { value: newValue } },
                             key
                           );
                         }
@@ -208,26 +273,43 @@ const EditHeaderCard = ({ editedHeader, handleInputChange }) => {
                     />
                   </label>
 
-                  {editedHeader[key] && (
-                    <div className="flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-200">
-                      <img
-                        src={editedHeader[key]}
-                        alt="Logo Preview"
-                        className="w-16 h-16 rounded-lg object-cover border-2 border-gray-300"
-                      />
-                      <div className="flex-1">
-                        <p className="text-xs font-semibold text-green-600">
-                          ✓ Logo uploaded
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          Preview shown on left
-                        </p>
+                  {(() => {
+                    let logoPreview = null;
+                    if (editedHeader[key]) {
+                      if (
+                        typeof editedHeader[key] === "object" &&
+                        editedHeader[key].preview
+                      ) {
+                        logoPreview = editedHeader[key].preview;
+                      } else if (typeof editedHeader[key] === "string") {
+                        logoPreview = editedHeader[key];
+                      } else if (editedHeader[key] instanceof File) {
+                        logoPreview = URL.createObjectURL(editedHeader[key]);
+                      }
+                    }
+
+                    return logoPreview ? (
+                      <div className="flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-200">
+                        <img
+                          src={logoPreview}
+                          alt="Logo Preview"
+                          className="w-16 h-16 rounded-lg object-cover border-2 border-gray-300"
+                        />
+                        <div className="flex-1">
+                          <p className="text-xs font-semibold text-green-600">
+                            ✓ Logo uploaded
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            Preview shown above
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    ) : null;
+                  })()}
 
                   <p className="text-xs text-gray-500">
-                    Upload a logo image file. Leave empty to use default school initials badge.
+                    Upload a logo image file. If not provided, default school
+                    initials badge will be used.
                   </p>
                 </div>
               </div>

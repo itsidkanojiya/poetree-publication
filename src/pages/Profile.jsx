@@ -15,6 +15,7 @@ import {
   XCircle,
   Edit,
   GraduationCap,
+  Image,
 } from "lucide-react";
 
 const Profile = () => {
@@ -104,7 +105,7 @@ const Profile = () => {
                 </p>
               </div>
               <button
-                onClick={() => navigate("/dashboard/edit-profile")}
+                onClick={() => navigate(user.user_type === "admin" ? "/admin/edit-profile" : "/dashboard/edit-profile")}
                 className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-semibold rounded-lg hover:from-blue-600 hover:to-indigo-700 transition shadow-lg"
               >
                 <Edit className="w-5 h-5" />
@@ -199,14 +200,27 @@ const Profile = () => {
                   <div className="flex items-start gap-3">
                     <MapPin className="w-5 h-5 text-gray-500 mt-0.5" />
                     <div>
-                      <p className="text-sm text-gray-600">Location</p>
+                      <p className="text-sm text-gray-600">Address</p>
                       <p className="font-semibold text-gray-800">
-                        {user.school_address_city
+                        {user.address || (user.school_address_city
                           ? `${user.school_address_city}, ${user.school_address_state}`
-                          : "Not provided"}
+                          : "Not provided")}
                       </p>
                     </div>
                   </div>
+                  {user.logo && (
+                    <div className="flex items-start gap-3">
+                      <Image className="w-5 h-5 text-gray-500 mt-0.5" />
+                      <div>
+                        <p className="text-sm text-gray-600">School Logo</p>
+                        <img
+                          src={user.logo || user.logo_url}
+                          alt="School Logo"
+                          className="w-16 h-16 rounded-lg object-cover border-2 border-gray-300 mt-1"
+                        />
+                      </div>
+                    </div>
+                  )}
                   <div className="flex items-start gap-3">
                     <MapPin className="w-5 h-5 text-gray-500 mt-0.5" />
                     <div>
@@ -219,94 +233,98 @@ const Profile = () => {
                 </div>
               </div>
 
-              {/* Academic Information */}
-              <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-6 border border-purple-200">
-                <div className="flex items-center gap-2 mb-4">
-                  <BookOpen className="w-5 h-5 text-purple-600" />
-                  <h3 className="text-lg font-bold text-gray-800">
-                    Academic Information
-                  </h3>
+              {/* Academic Information - Only show for non-admin users */}
+              {user.user_type !== "admin" && (
+                <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-6 border border-purple-200">
+                  <div className="flex items-center gap-2 mb-4">
+                    <BookOpen className="w-5 h-5 text-purple-600" />
+                    <h3 className="text-lg font-bold text-gray-800">
+                      Academic Information
+                    </h3>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex items-start gap-3">
+                      <BookOpen className="w-5 h-5 text-gray-500 mt-0.5" />
+                      <div>
+                        <p className="text-sm text-gray-600">Subject</p>
+                        <p className="font-semibold text-gray-800">
+                          {user.subject || "Not provided"}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <BookOpen className="w-5 h-5 text-gray-500 mt-0.5" />
+                      <div>
+                        <p className="text-sm text-gray-600">Subject Title</p>
+                        <p className="font-semibold text-gray-800">
+                          {user.subject_title || "Not provided"}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <GraduationCap className="w-5 h-5 text-gray-500 mt-0.5" />
+                      <div>
+                        <p className="text-sm text-gray-600">Standard</p>
+                        <p className="font-semibold text-gray-800">
+                          {user.standard || "Not provided"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-3">
-                  <div className="flex items-start gap-3">
-                    <BookOpen className="w-5 h-5 text-gray-500 mt-0.5" />
-                    <div>
-                      <p className="text-sm text-gray-600">Subject</p>
-                      <p className="font-semibold text-gray-800">
-                        {user.subject || "Not provided"}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <BookOpen className="w-5 h-5 text-gray-500 mt-0.5" />
-                    <div>
-                      <p className="text-sm text-gray-600">Subject Title</p>
-                      <p className="font-semibold text-gray-800">
-                        {user.subject_title || "Not provided"}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <GraduationCap className="w-5 h-5 text-gray-500 mt-0.5" />
-                    <div>
-                      <p className="text-sm text-gray-600">Standard</p>
-                      <p className="font-semibold text-gray-800">
-                        {user.standard || "Not provided"}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              )}
 
-              {/* Verification Status */}
-              <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-xl p-6 border border-orange-200">
-                <div className="flex items-center gap-2 mb-4">
-                  <Shield className="w-5 h-5 text-orange-600" />
-                  <h3 className="text-lg font-bold text-gray-800">
-                    Verification Status
-                  </h3>
-                </div>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between p-3 bg-white rounded-lg">
-                    <div className="flex items-center gap-2">
-                      <Mail className="w-5 h-5 text-gray-500" />
-                      <span className="font-medium text-gray-700">
-                        Email Verified
-                      </span>
-                    </div>
-                    {user.is_verified ? (
-                      <div className="flex items-center gap-1 text-green-600">
-                        <CheckCircle className="w-5 h-5" />
-                        <span className="font-semibold">Yes</span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-1 text-red-600">
-                        <XCircle className="w-5 h-5" />
-                        <span className="font-semibold">No</span>
-                      </div>
-                    )}
+              {/* Verification Status - Only show for non-admin users */}
+              {user.user_type !== "admin" && (
+                <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-xl p-6 border border-orange-200">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Shield className="w-5 h-5 text-orange-600" />
+                    <h3 className="text-lg font-bold text-gray-800">
+                      Verification Status
+                    </h3>
                   </div>
-                  <div className="flex items-center justify-between p-3 bg-white rounded-lg">
-                    <div className="flex items-center gap-2">
-                      <Phone className="w-5 h-5 text-gray-500" />
-                      <span className="font-medium text-gray-700">
-                        Phone Verified
-                      </span>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between p-3 bg-white rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <Mail className="w-5 h-5 text-gray-500" />
+                        <span className="font-medium text-gray-700">
+                          Email Verified
+                        </span>
+                      </div>
+                      {user.is_verified ? (
+                        <div className="flex items-center gap-1 text-green-600">
+                          <CheckCircle className="w-5 h-5" />
+                          <span className="font-semibold">Yes</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1 text-red-600">
+                          <XCircle className="w-5 h-5" />
+                          <span className="font-semibold">No</span>
+                        </div>
+                      )}
                     </div>
-                    {user.is_number_verified ? (
-                      <div className="flex items-center gap-1 text-green-600">
-                        <CheckCircle className="w-5 h-5" />
-                        <span className="font-semibold">Yes</span>
+                    <div className="flex items-center justify-between p-3 bg-white rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <Phone className="w-5 h-5 text-gray-500" />
+                        <span className="font-medium text-gray-700">
+                          Phone Verified
+                        </span>
                       </div>
-                    ) : (
-                      <div className="flex items-center gap-1 text-red-600">
-                        <XCircle className="w-5 h-5" />
-                        <span className="font-semibold">No</span>
-                      </div>
-                    )}
+                      {user.is_number_verified ? (
+                        <div className="flex items-center gap-1 text-green-600">
+                          <CheckCircle className="w-5 h-5" />
+                          <span className="font-semibold">Yes</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1 text-red-600">
+                          <XCircle className="w-5 h-5" />
+                          <span className="font-semibold">No</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
         </div>
@@ -318,19 +336,22 @@ const Profile = () => {
           </h3>
           <div className="flex flex-wrap gap-4">
             <button
-              onClick={() => navigate("/dashboard/change-password")}
+              onClick={() => navigate(user.user_type === "admin" ? "/admin/change-password" : "/dashboard/change-password")}
               className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-semibold rounded-lg hover:from-blue-600 hover:to-indigo-700 transition shadow-lg"
             >
               <Key className="w-5 h-5" />
               Change Password
             </button>
-            <button
-              onClick={() => setShowDeleteModal(true)}
-              className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-red-500 to-red-600 text-white font-semibold rounded-lg hover:from-red-600 hover:to-red-700 transition shadow-lg"
-            >
-              <Trash2 className="w-5 h-5" />
-              Delete Account
-            </button>
+            {/* Delete Account - Only show for non-admin users */}
+            {user.user_type !== "admin" && (
+              <button
+                onClick={() => setShowDeleteModal(true)}
+                className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-red-500 to-red-600 text-white font-semibold rounded-lg hover:from-red-600 hover:to-red-700 transition shadow-lg"
+              >
+                <Trash2 className="w-5 h-5" />
+                Delete Account
+              </button>
+            )}
           </div>
         </div>
       </div>
