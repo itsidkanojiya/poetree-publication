@@ -41,7 +41,7 @@ const PaperCard = ({
     }
     // If relative path, prepend API base URL
     const apiBaseUrl =
-      import.meta.env.VITE_API_URL || "http://localhost:4000/api";
+      import.meta.env.VITE_API_URL || "https://poetreebackend.netlify.app/api";
     const baseUrl = apiBaseUrl.replace("/api", "");
     // Handle both absolute and relative paths
     if (logoUrl.startsWith("/")) {

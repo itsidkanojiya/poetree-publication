@@ -19,6 +19,7 @@ import ViewPaperPage from "./components/Dashboard/ViewPaperPage";
 import ProtectedRoute from "./routes/ProtectedRoute";
 import Profile from "./pages/Profile";
 import EditProfile from "./pages/EditProfile";
+import ChangePassword from "./pages/ChangePassword";
 import VerifyOtp from "./pages/auth/VerifyOtp";
 import SubjectRequests from "./pages/SubjectRequests";
 import Animations from "./pages/Animations";
@@ -73,6 +74,7 @@ function App() {
         <Route path="view/:id" element={<ViewPaperPage />} />
         <Route path="profile" element={<Profile />} />
         <Route path="edit-profile" element={<EditProfile />} />
+        <Route path="change-password" element={<ChangePassword />} />
         <Route path="subject-requests" element={<SubjectRequests />} />
         <Route path="animations" element={<Animations />} />
         <Route path="templates" element={<BrowseTemplates />} />
@@ -107,6 +109,7 @@ function App() {
           <Route path="templates/:id" element={<TemplateDetails />} />
           <Route path="profile" element={<Profile />} />
           <Route path="edit-profile" element={<EditProfile />} />
+          <Route path="change-password" element={<ChangePassword />} />
         </Route>
       </Route>
     </Routes>
