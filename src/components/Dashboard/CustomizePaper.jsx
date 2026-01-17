@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Edit, Save, X, Plus, Eye } from "lucide-react";
+import { ArrowLeft, Save, X, Plus, Eye } from "lucide-react";
 import { getPaperById, updatePaper } from "../../services/paperService";
 import { getQuestionsByType } from "../../services/adminService";
 import Toast from "../Common/Toast";
@@ -238,7 +238,7 @@ const CustomizePaper = () => {
 
     // Default titles
     const defaultTitles = {
-      mcq: "A) Multiple Choice Questions",
+      mcq: "A) Multiple Choice Questions (MCQs). Tick the correct options.",
       short: "B) Short Answer Questions",
       long: "C) Long Answer Questions",
       blank: "D) Fill in the Blanks",
@@ -397,57 +397,152 @@ const CustomizePaper = () => {
     onetwo: 2,
     short: 3,
     long: 5,
-    passage: 5, // Default marks for passage questions
-    match: 5, // Default marks for match questions
+    passage: 5,
+    match: 5,
     default: 0,
   };
 
-  // Use CustomPaper's pagination logic with reduced margin for better space utilization
+  // ✅ USE ADMIN'S EXACT PAGINATION LOGIC
   const PAGE_DIMENSIONS = {
     HEIGHT: 1123,
     WIDTH: 748,
-    MARGIN: 15, // Reduced from 70px to allow multiple question types on same page
+    MARGIN: 20, // Bottom margin
   };
+
+  const PAGE_MARGINS = 30; // Total margins (top + bottom)
 
   const COMPONENT_HEIGHTS = {
-    HEADER: Math.floor(1123 * 0.21),
-    QUESTION: 24,
-    OPTION: 30,
-    IMAGE: 200, // Fixed height for images (matches display height)
-    SECTION: 28,
-    SPACING: 16,
+    HEADER: 240, // HeaderCard real height
+    SECTION_TITLE: 40, // Section heading (A), B), C) + marks)
+    QUESTION_TEXT: 28, // Single question line height
+    OPTION_ROW: 32, // MCQ option row height
+    IMAGE: 200, // Image height
+    SPACING: 14, // Spacing between questions
+    PASSAGE_NESTED: 22, // Height per nested question in passage
+    MATCH_TABLE_HEADER: 42, // Match table header
+    MATCH_TABLE_ROW: 48, // Match table row height
   };
 
-  const getMcqOptionsHeight = (options) => {
-    if (!options || options.length === 0) return 0;
+  // Calculate MCQ options height based on layout
+  const getMcqOptionsHeight = (options = []) => {
+    if (!Array.isArray(options) || options.length === 0) return 0;
+
+    // Parse options if string
+    let opts = options;
+    if (typeof options === "string") {
+      try {
+        opts = JSON.parse(options);
+      } catch {
+        opts = options.split(",").map((o) => o.trim());
+      }
+    }
+
+    if (!Array.isArray(opts) || opts.length === 0) return 0;
+
+    // Calculate average option length
     const avgLength =
-      options.reduce((sum, opt) => sum + (opt?.length || 0), 0) /
-      options.length;
+      opts.reduce((sum, opt) => sum + (String(opt)?.length || 0), 0) /
+      opts.length;
+
+    // Determine rows based on option length
     let rows;
     if (avgLength < 20) {
-      rows = Math.ceil(options.length / 4);
+      rows = Math.ceil(opts.length / 4); // 4 columns
     } else if (avgLength < 50) {
-      rows = Math.ceil(options.length / 2);
+      rows = Math.ceil(opts.length / 2); // 2 columns
     } else {
-      rows = options.length;
+      rows = opts.length; // 1 column
     }
-    return rows * COMPONENT_HEIGHTS.OPTION;
+
+    return rows * COMPONENT_HEIGHTS.OPTION_ROW + 4; // Add small padding
+  };
+
+  // Calculate passage question height
+  const getPassageQuestionHeight = (question) => {
+    let height = COMPONENT_HEIGHTS.QUESTION_TEXT;
+    height += 8; // Question margin bottom
+
+    if (question.options) {
+      try {
+        const passageQuestions =
+          typeof question.options === "string"
+            ? JSON.parse(question.options)
+            : question.options;
+        if (Array.isArray(passageQuestions) && passageQuestions.length > 0) {
+          height += passageQuestions.length * COMPONENT_HEIGHTS.PASSAGE_NESTED;
+          height += 12; // Container padding
+        }
+      } catch (e) {
+        // Ignore parsing errors
+      }
+    }
+
+    return height;
+  };
+
+  // Calculate match question height
+  const getMatchQuestionHeight = (question) => {
+    let height = COMPONENT_HEIGHTS.QUESTION_TEXT;
+    height += 8; // Question margin bottom
+
+    if (question.options) {
+      try {
+        const matchData =
+          typeof question.options === "string"
+            ? JSON.parse(question.options)
+            : question.options;
+        const leftItems = matchData.left || [];
+        const rightItems = matchData.right || [];
+        const maxLength = Math.max(leftItems.length, rightItems.length);
+
+        if (maxLength > 0) {
+          height += COMPONENT_HEIGHTS.MATCH_TABLE_HEADER;
+          height += maxLength * COMPONENT_HEIGHTS.MATCH_TABLE_ROW;
+          height += 16; // Container padding (pl-4 mt-2)
+          height += 12; // Table margin
+        }
+      } catch (e) {
+        // Ignore parsing errors
+      }
+    }
+
+    return height;
   };
 
   const renderPages = () => {
-    let pages = [];
-    let currentHeight = PAGE_DIMENSIONS.HEIGHT - COMPONENT_HEIGHTS.HEADER;
-    let currentPage = [];
-    let isFirstPage = true;
+    let availableHeight =
+      PAGE_DIMENSIONS.HEIGHT - COMPONENT_HEIGHTS.HEADER - PAGE_MARGINS;
 
-    questions.forEach((question) => {
-      const isFirstQuestionOfType = !currentPage.some(
-        (q) => q.type === question.type
-      );
-      let questionHeight = COMPONENT_HEIGHTS.QUESTION;
-      if (isFirstQuestionOfType) {
-        questionHeight += COMPONENT_HEIGHTS.SECTION;
+    let lastQuestionType = null;
+    let pages = [];
+    let currentPage = [];
+
+    questions.forEach((question, index) => {
+      const isNewSection = question.type !== lastQuestionType;
+
+      // Handle section markers
+      if (isNewSection) {
+        // Push section marker
+        currentPage.push({
+          __type: "SECTION",
+          sectionType: question.type,
+        });
+
+        availableHeight -= COMPONENT_HEIGHTS.SECTION_TITLE;
       }
+
+      /* ----------------------------------
+       QUESTION HEIGHT - More accurate calculation
+    ---------------------------------- */
+      // Base question height (single line, not doubled)
+      let questionHeight = COMPONENT_HEIGHTS.QUESTION_TEXT;
+
+      // Add spacing only if there are already questions on the page
+      if (currentPage.length > 0) {
+        questionHeight += COMPONENT_HEIGHTS.SPACING;
+      }
+
+      // Add MCQ options height
       if (question.type === "mcq" && question.options) {
         try {
           const options =
@@ -461,7 +556,26 @@ const CustomizePaper = () => {
           // Ignore parsing errors
         }
       }
-      // Check for images in all question types (both image_url and image fields)
+
+      // Add passage question height (replaces base height)
+      if (question.type === "passage") {
+        questionHeight = getPassageQuestionHeight(question);
+        // Add spacing after calculating full height
+        if (currentPage.length > 0) {
+          questionHeight += COMPONENT_HEIGHTS.SPACING;
+        }
+      }
+
+      // Add match question height (replaces base height)
+      if (question.type === "match") {
+        questionHeight = getMatchQuestionHeight(question);
+        // Add spacing after calculating full height
+        if (currentPage.length > 0) {
+          questionHeight += COMPONENT_HEIGHTS.SPACING;
+        }
+      }
+
+      // Add image height
       if (
         (question.image_url !== null &&
           question.image_url !== undefined &&
@@ -470,38 +584,46 @@ const CustomizePaper = () => {
           question.image !== undefined &&
           question.image !== "")
       ) {
-        questionHeight += COMPONENT_HEIGHTS.IMAGE;
-      }
-      const hasQuestionsOnPage = currentPage.length > 0;
-      if (hasQuestionsOnPage) {
-        questionHeight += COMPONENT_HEIGHTS.SPACING;
+        questionHeight += COMPONENT_HEIGHTS.IMAGE + 12;
       }
 
-      const availableHeight = currentHeight - PAGE_DIMENSIONS.MARGIN;
-
-      if (questionHeight > availableHeight) {
-        if (currentPage.length > 0) {
-          pages.push([...currentPage]);
-        }
-        isFirstPage = false;
+      // If it doesn't fit, start new page
+      if (questionHeight > availableHeight && currentPage.length > 0) {
+        pages.push([...currentPage]);
         currentPage = [];
-        currentHeight = PAGE_DIMENSIONS.HEIGHT;
-        let newQuestionHeight =
-          COMPONENT_HEIGHTS.QUESTION + COMPONENT_HEIGHTS.SECTION;
-        if (question.type === "mcq" && question.options) {
-          try {
-            const options =
-              typeof question.options === "string"
-                ? JSON.parse(question.options)
-                : question.options;
-            if (Array.isArray(options) && options.length > 0) {
-              newQuestionHeight += getMcqOptionsHeight(options);
+        availableHeight = PAGE_DIMENSIONS.HEIGHT - PAGE_MARGINS;
+
+        // If this is a new section, add section marker to new page
+        if (isNewSection) {
+          currentPage.push({
+            __type: "SECTION",
+            sectionType: question.type,
+          });
+          availableHeight -= COMPONENT_HEIGHTS.SECTION_TITLE;
+        }
+
+        // Recalculate question height for new page (no spacing needed on first question)
+        if (question.type === "passage") {
+          questionHeight = getPassageQuestionHeight(question);
+        } else if (question.type === "match") {
+          questionHeight = getMatchQuestionHeight(question);
+        } else {
+          questionHeight = COMPONENT_HEIGHTS.QUESTION_TEXT;
+          if (question.type === "mcq" && question.options) {
+            try {
+              const options =
+                typeof question.options === "string"
+                  ? JSON.parse(question.options)
+                  : question.options;
+              if (Array.isArray(options) && options.length > 0) {
+                questionHeight += getMcqOptionsHeight(options);
+              }
+            } catch (e) {
+              // Ignore parsing errors
             }
-          } catch (e) {
-            // Ignore parsing errors
           }
         }
-        // Check for images in all question types (both image_url and image fields)
+
         if (
           (question.image_url !== null &&
             question.image_url !== undefined &&
@@ -510,17 +632,22 @@ const CustomizePaper = () => {
             question.image !== undefined &&
             question.image !== "")
         ) {
-          newQuestionHeight += COMPONENT_HEIGHTS.IMAGE;
+          questionHeight += COMPONENT_HEIGHTS.IMAGE + 12;
         }
-        currentPage.push(question);
-        currentHeight = PAGE_DIMENSIONS.HEIGHT - newQuestionHeight;
-        if (currentHeight < 0) {
-          currentHeight = 0;
+
+        // Check if question still doesn't fit even on new page (should be rare)
+        if (questionHeight > availableHeight) {
+          console.warn(
+            `Question ${
+              question.number || question.question_id
+            } is taller than available page height`
+          );
         }
-      } else {
-        currentPage.push(question);
-        currentHeight -= questionHeight;
       }
+
+      currentPage.push(question);
+      availableHeight -= questionHeight;
+      lastQuestionType = question.type;
     });
 
     if (currentPage.length > 0) {
@@ -530,7 +657,7 @@ const CustomizePaper = () => {
     return pages.length > 0 ? pages : [[]];
   };
 
-  const questionPages = renderPages();
+  const questionPages = renderPages(); // ✅ Use this instead of splitQuestionsIntoPages
 
   if (loading && !paper) {
     return (
@@ -568,7 +695,7 @@ const CustomizePaper = () => {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button
-              onClick={() => navigate("/dashboard/papers")}
+              onClick={() => navigate("/dashboard/my-customized")}
               className="p-2 hover:bg-gray-100 rounded-lg transition"
             >
               <ArrowLeft className="w-5 h-5" />
@@ -673,12 +800,17 @@ const CustomizePaper = () => {
                   <div className="px-2 md:px-2 py-1">
                     <div className="rounded-lg px-2 md:px-2">
                       {(() => {
-                        const previousPageLastQuestion =
-                          pageIndex > 0
-                            ? questionPages[pageIndex - 1][
-                                questionPages[pageIndex - 1].length - 1
-                              ]
-                            : null;
+                        // Find last actual question (not section marker) from previous page
+                        let previousPageLastQuestion = null;
+                        if (pageIndex > 0) {
+                          const prevPage = questionPages[pageIndex - 1];
+                          for (let i = prevPage.length - 1; i >= 0; i--) {
+                            if (prevPage[i].__type !== "SECTION") {
+                              previousPageLastQuestion = prevPage[i];
+                              break;
+                            }
+                          }
+                        }
 
                         // Track question numbers per type (restart from 1 for each type)
                         const questionNumbersByType = {};
@@ -705,14 +837,60 @@ const CustomizePaper = () => {
                         }
 
                         return pageQuestions.reduce((acc, q, index) => {
+                          // Handle section markers
+                          if (q.__type === "SECTION") {
+                            const allQuestionsOfType = questions.filter(
+                              (qq) => qq.type === q.sectionType
+                            );
+                            const count = allQuestionsOfType.length;
+                            const marksPerQuestion =
+                              marksMap[q.sectionType] ?? marksMap.default;
+                            const totalMarks = count * marksPerQuestion;
+
+                            // Reset counter for this new section type
+                            questionNumbersByType[q.sectionType] = 0;
+                            lastQuestionType = null;
+
+                            acc.push(
+                              <div
+                                key={`heading-${q.sectionType}-${pageIndex}-${index}`}
+                                className="flex justify-between items-center mt-2 mb-2"
+                              >
+                                <h3 className="text-lg font-bold text-black">
+                                  {getQuestionTypeTitle(q.sectionType)}
+                                </h3>
+                                <span className="text-sm font-medium text-gray-700">
+                                  {totalMarks} marks
+                                </span>
+                              </div>
+                            );
+                            return acc;
+                          }
+
+                          // Find previous actual question (not section marker) in current page
+                          let prevQuestionInPage = null;
+                          let prevItemWasSection = false;
+                          for (let i = index - 1; i >= 0; i--) {
+                            if (pageQuestions[i].__type === "SECTION") {
+                              prevItemWasSection = true;
+                              break;
+                            } else {
+                              prevQuestionInPage = pageQuestions[i];
+                              break;
+                            }
+                          }
+
+                          // Don't render section header if previous item was a section marker
                           const isTypeChanged =
-                            index === 0
+                            !prevItemWasSection &&
+                            (index === 0
                               ? previousPageLastQuestion
                                 ? q.type !== previousPageLastQuestion.type
                                 : true
-                              : q.type !== pageQuestions[index - 1].type;
+                              : !prevQuestionInPage ||
+                                q.type !== prevQuestionInPage.type);
 
-                          if (isTypeChanged) {
+                          if (isTypeChanged && !q.__type) {
                             // Reset counter for this new section type
                             questionNumbersByType[q.type] = 0;
                             lastQuestionType = null;
@@ -750,7 +928,7 @@ const CustomizePaper = () => {
                           acc.push(
                             <div
                               key={q.question_id || `${q.type}-${index}`}
-                              className="cursor-pointer hover:bg-blue-50 hover:border-blue-300 border-2 border-transparent rounded-lg p-2 transition-all group mb-3"
+                              className="mb-3 group cursor-pointer focus:outline-none"
                               onClick={() =>
                                 handleReplaceQuestion(
                                   q.position || q.number || index + 1
@@ -760,7 +938,7 @@ const CustomizePaper = () => {
                               {/* Passage Questions: Show passage text + nested questions */}
                               {q.type === "passage" ? (
                                 <>
-                                  <div className="py-0.5 px-1 text-gray-800 mb-2 group-hover:text-blue-700">
+                                  <div className="py-0.5 px-1 text-gray-800 mb-2">
                                     <p className="font-medium mb-1">
                                       {questionNumber}. {q.question}
                                     </p>
@@ -828,7 +1006,7 @@ const CustomizePaper = () => {
                                 </>
                               ) : q.type === "match" ? (
                                 <>
-                                  <p className="cursor-default py-0.5 px-1 text-gray-800 mb-2 group-hover:text-blue-700">
+                                  <p className="cursor-default py-0.5 px-1 text-gray-800 mb-2">
                                     {questionNumber}. {q.question}
                                   </p>
                                   {/* Image for match questions */}
@@ -929,7 +1107,7 @@ const CustomizePaper = () => {
                               ) : (
                                 <>
                                   {/* Question Text for non-passage questions */}
-                                  <p className="cursor-default py-0.5 px-1 text-gray-800 group-hover:text-blue-700">
+                                  <p className="cursor-default py-0.5 px-1 text-gray-800">
                                     {questionNumber}. {q.question}
                                   </p>
 
@@ -1053,10 +1231,6 @@ const CustomizePaper = () => {
                                     })()}
                                 </>
                               )}
-                              <div className="mt-2 flex items-center gap-2 text-xs text-gray-500 opacity-0 group-hover:opacity-100 transition">
-                                <Edit className="w-3 h-3" />
-                                <span>Click to replace this question</span>
-                              </div>
                             </div>
                           );
 

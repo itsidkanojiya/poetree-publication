@@ -5,6 +5,7 @@ import About from "./pages/About";
 import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
 import ResetPassword from "./pages/auth/ResetPassword";
+import ForgotPassword from "./pages/auth/ForgotPassword";
 import Dashboard from "./pages/Dashboard";
 import Overview from "./components/Dashboard/Overview";
 import Header from "./components/Dashboard/Header";
@@ -46,6 +47,7 @@ function App() {
       <Route path="/auth">
         <Route path="login" element={<Login />} />
         <Route path="register" element={<Register />} />
+        <Route path="forgot-password" element={<ForgotPassword />} />
         <Route path="reset-password" element={<ResetPassword />} />
         <Route path="verify-otp" element={<VerifyOtp />} />
       </Route>
