@@ -105,12 +105,18 @@ export const getUserSelections = async (userId) => {
 /**
  * Approve user selections and activate user
  * POST /api/admin/approve-selections/{userId}
+ * Body: { subject_ids: number[], subject_title_ids: number[], reject_others: boolean }
  */
-export const approveUserSelections = async (userId, data) => {
+export const approveUserSelections = async (userId, { subject_ids, subject_title_ids, reject_others = false }) => {
   try {
+    const body = {
+      subject_ids: Array.isArray(subject_ids) ? subject_ids.map((id) => Number(id)) : [],
+      subject_title_ids: Array.isArray(subject_title_ids) ? subject_title_ids.map((id) => Number(id)) : [],
+      reject_others: Boolean(reject_others),
+    };
     const response = await apiClient.post(
       `/admin/approve-selections/${userId}`,
-      data
+      body
     );
     return response.data;
   } catch (error) {
@@ -123,7 +129,7 @@ export const approveUserSelections = async (userId, data) => {
 
 /**
  * Get all subject requests
- * GET /api/admin/subject-requests or /api/api/admin/subject-requests
+ * GET /api/admin/subject-requests
  */
 export const getSubjectRequests = async () => {
   try {
@@ -132,7 +138,7 @@ export const getSubjectRequests = async () => {
   } catch (error) {
     // Try alternative endpoint if first fails
     try {
-      const response = await apiClient.get("/api/admin/subject-requests");
+      const response = await apiClient.get("/admin/subject-requests");
       return response.data;
     } catch (err) {
       console.error("Error fetching subject requests:", err);
@@ -143,12 +149,12 @@ export const getSubjectRequests = async () => {
 
 /**
  * Approve a subject request
- * PUT /api/api/admin/subject-requests/{requestId}/approve?type={subject|subject_title}
+ * PUT /api/admin/subject-requests/{requestId}/approve?type={subject|subject_title}
  */
 export const approveSubjectRequest = async (requestId, type) => {
   try {
     const response = await apiClient.put(
-      `/api/admin/subject-requests/${requestId}/approve?type=${type}`
+      `/admin/subject-requests/${requestId}/approve?type=${type}`
     );
     return response.data;
   } catch (error) {
@@ -159,12 +165,12 @@ export const approveSubjectRequest = async (requestId, type) => {
 
 /**
  * Reject a subject request
- * PUT /api/api/admin/subject-requests/{requestId}/reject?type={subject|subject_title}
+ * POST /api/admin/subject-requests/{requestId}/reject?type={subject|subject_title}
  */
 export const rejectSubjectRequest = async (requestId, type) => {
   try {
-    const response = await apiClient.put(
-      `/api/admin/subject-requests/${requestId}/reject?type=${type}`
+    const response = await apiClient.post(
+      `/admin/subject-requests/${requestId}/reject?type=${type}`
     );
     return response.data;
   } catch (error) {

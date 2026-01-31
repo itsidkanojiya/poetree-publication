@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import {
   getSubjectRequests,
-  approveSubjectRequest,
+  approveUserSelections,
   rejectSubjectRequest,
 } from "../../services/adminService";
 import {
@@ -42,9 +42,28 @@ const AdminSubjectRequests = () => {
     }
   };
 
-  const handleApprove = async (requestId, type) => {
+  const handleApprove = async (userId, type, item, requestsData) => {
     try {
-      await approveSubjectRequest(requestId, type);
+      const approvedSubjectIds = (requestsData?.subjects?.approved || []).map(
+        (s) => s.subject_id ?? s.id
+      );
+      const approvedTitleIds = (requestsData?.subject_titles?.approved || []).map(
+        (t) => t.subject_title_id ?? t.id
+      );
+      const subject_ids =
+        type === "subject"
+          ? [...approvedSubjectIds, item.subject_id ?? item.id]
+          : approvedSubjectIds;
+      const subject_title_ids =
+        type === "subject_title"
+          ? [...approvedTitleIds, item.subject_title_id ?? item.id]
+          : approvedTitleIds;
+
+      await approveUserSelections(userId, {
+        subject_ids,
+        subject_title_ids,
+        reject_others: false,
+      });
       setToast({
         message: "Request approved successfully",
         type: "success",
@@ -223,7 +242,12 @@ const AdminSubjectRequests = () => {
                                     <div className="flex gap-2">
                                       <button
                                         onClick={() =>
-                                          handleApprove(subject.id, "subject")
+                                          handleApprove(
+                                            requestGroup.user?.id,
+                                            "subject",
+                                            subject,
+                                            requestGroup.requests
+                                          )
                                         }
                                         className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition flex items-center gap-2"
                                       >
@@ -332,7 +356,12 @@ const AdminSubjectRequests = () => {
                                     <div className="flex gap-2">
                                       <button
                                         onClick={() =>
-                                          handleApprove(title.id, "subject_title")
+                                          handleApprove(
+                                            requestGroup.user?.id,
+                                            "subject_title",
+                                            title,
+                                            requestGroup.requests
+                                          )
                                         }
                                         className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition flex items-center gap-2"
                                       >

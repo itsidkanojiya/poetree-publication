@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import {
   getSubjectRequests,
-  approveSubjectRequest,
+  approveUserSelections,
   rejectSubjectRequest,
 } from "../../../services/adminService";
 import { CheckCircle, XCircle, Search, User, Mail, Eye } from "lucide-react";
@@ -53,9 +53,28 @@ const SubjectRequests = () => {
     setFilteredRequests(filtered);
   };
 
-  const handleApprove = async (requestId, type) => {
+  const handleApprove = async (userId, type, item, requestsData) => {
     try {
-      await approveSubjectRequest(requestId, type);
+      const approvedSubjectIds = (requestsData.subjects?.approved || []).map(
+        (s) => s.subject_id ?? s.id
+      );
+      const approvedTitleIds = (requestsData.subject_titles?.approved || []).map(
+        (t) => t.subject_title_id ?? t.id
+      );
+      const subject_ids =
+        type === "subject"
+          ? [...approvedSubjectIds, item.subject_id ?? item.id]
+          : approvedSubjectIds;
+      const subject_title_ids =
+        type === "subject_title"
+          ? [...approvedTitleIds, item.subject_title_id ?? item.id]
+          : approvedTitleIds;
+
+      await approveUserSelections(userId, {
+        subject_ids,
+        subject_title_ids,
+        reject_others: false,
+      });
       setToast({
         show: true,
         message: "Request approved successfully",
@@ -253,7 +272,7 @@ const SubjectRequests = () => {
                                     Pending
                                   </span>
                                   <button
-                                    onClick={() => handleApprove(subject.id, "subject")}
+                                    onClick={() => handleApprove(user.id, "subject", subject, requestsData)}
                                     className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition"
                                     title="Approve"
                                   >
@@ -328,7 +347,7 @@ const SubjectRequests = () => {
                                   </span>
                                   <button
                                     onClick={() =>
-                                      handleApprove(title.id, "subject_title")
+                                      handleApprove(user.id, "subject_title", title, requestsData)
                                     }
                                     className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition"
                                     title="Approve"
