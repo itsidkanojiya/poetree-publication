@@ -8,10 +8,10 @@ import {
   BookOpen,
   CheckCircle,
   XCircle,
-  Loader2,
   Users,
 } from "lucide-react";
 import Toast from "../Common/Toast";
+import Loader from "../Common/loader/loader";
 
 const AdminSubjectRequests = () => {
   const [requests, setRequests] = useState([]);
@@ -100,7 +100,7 @@ const AdminSubjectRequests = () => {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-8 flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="w-16 h-16 text-blue-600 animate-spin mx-auto mb-4" />
+          <Loader className="mx-auto mb-4" />
           <p className="text-gray-600 text-lg">Loading subject requests...</p>
         </div>
       </div>

@@ -5,6 +5,16 @@
     height: 10em;
 }
 
+.pencil--sm {
+    width: 1.5rem;
+    height: 1.5rem;
+}
+
+.pencil--md {
+    width: 5rem;
+    height: 5rem;
+}
+
 .pencil__body1,
 .pencil__body2,
 .pencil__body3,

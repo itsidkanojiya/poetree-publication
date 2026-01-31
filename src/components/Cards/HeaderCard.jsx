@@ -201,7 +201,7 @@ const HeaderCard = ({
                 })()}
               </div>
               <div>
-                <strong>Marks:</strong> {header.totalMarks || header.marks || "80"}
+                <strong>Marks:</strong> {header.totalMarks ?? header.marks ?? "80"}
               </div>
             </div>
           </div>

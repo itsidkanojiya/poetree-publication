@@ -2,9 +2,11 @@ import { useLocation, useParams, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { XCircle, FileText } from "lucide-react";
 import { useHeader } from "../../context/HeaderContext";
+import { useUserTeaching } from "../../context/UserTeachingContext";
 import HeaderCard from "../Cards/HeaderCard";
 import EditHeaderCard from "../Cards/EditHeaderCard";
 import { getPaperById } from "../../services/paperService";
+import Loader from "../Common/loader/loader";
 
 const EditHeader = () => {
   const location = useLocation();
@@ -14,7 +16,9 @@ const EditHeader = () => {
   const { paperId, paperData, headerData, fromPaper } = location.state || {};
 
   const { headers } = useHeader();
+  const { contextSelection } = useUserTeaching();
   const header = id && id !== "new" ? headers.find((h) => h.id == id) : null;
+  const isNewPaper = !fromPaper && !headerData && !header;
 
   // State to store editable values - Initialize with empty object first
   const [editedHeader, setEditedHeader] = useState(null);
@@ -83,29 +87,30 @@ const EditHeader = () => {
           subjectTitle: header.subjectTitle || "",
         });
       } else {
-        // New header - always initialize with user profile data
+        // New header - pre-fill from teaching context when available (no need to ask again)
+        const ctx = contextSelection;
         setEditedHeader({
           image: userLogo,
           schoolName: userSchoolName,
           address: userAddress,
-          subject: "",
-          subjectTitle: null,
-          board: "",
-          class: "",
+          subject: ctx?.subject_name ?? "",
+          subjectTitle: ctx?.subject_title_id ?? null,
+          board: ctx?.board_id ?? "",
+          class: ctx?.standard ?? "",
           documentTitle: "",
           studentName: "",
           rollNo: "",
           section: "",
           date: "",
           timing: "",
-          standard: "",
+          standard: ctx?.standard ?? "",
           division: "",
         });
       }
     };
-    
+
     loadPaperHeader();
-  }, [header, fromPaper, paperId, headerData]);
+  }, [header, fromPaper, paperId, headerData, contextSelection]);
 
   // Handle input changes
   // Note: schoolName, address, and image (logo) cannot be changed here - they come from user profile
@@ -126,7 +131,7 @@ const EditHeader = () => {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <Loader className="mx-auto mb-4" />
           <p className="text-gray-600 text-lg">Loading header...</p>
         </div>
       </div>
@@ -183,6 +188,7 @@ const EditHeader = () => {
             <EditHeaderCard
               editedHeader={editedHeader}
               handleInputChange={handleInputChange}
+              lockContextFields={isNewPaper && !!contextSelection}
             />
 
             {/* Action Buttons */}

@@ -1,46 +1,27 @@
 import { useEffect, useState } from "react";
-import {
-  Eye,
-  Filter,
-  BookOpen,
-  GraduationCap,
-  ClipboardCheck,
-} from "lucide-react";
+import { Eye, ClipboardCheck } from "lucide-react";
 import PDFModal from "../Common/Modals/PDFModal";
 import apiClient from "../../services/apiClient";
 import Loader from "../Common/loader/loader";
+import { useUserTeaching } from "../../context/UserTeachingContext";
 
 const Answersheets = () => {
+  const { contextSelection } = useUserTeaching();
   const [answerSheets, setAnswerSheets] = useState([]);
   const [filteredAnswerSheets, setFilteredAnswerSheets] = useState([]);
-  const [subjects, setSubjects] = useState([]);
-  const [boards, setBoards] = useState([]);
 
   const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState({
-    board: "",
-    subject: "",
-    subject_title: "",
-    standard: "",
-  });
 
   const [selectedPDF, setSelectedPDF] = useState(null);
   const [selectedTitle, setSelectedTitle] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Fetch all data
+  // Fetch answer sheets
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [sheetRes, subjectRes, boardRes] = await Promise.all([
-          apiClient.get("/answersheets"),
-          apiClient.get("/subjects"),
-          apiClient.get("/boards"),
-        ]);
-        setAnswerSheets(sheetRes.data);
-        setFilteredAnswerSheets(sheetRes.data);
-        setSubjects(subjectRes.data);
-        setBoards(boardRes.data);
+        const sheetRes = await apiClient.get("/answersheets");
+        setAnswerSheets(sheetRes.data || []);
       } catch (error) {
         console.error("Error loading data:", error);
       } finally {
@@ -51,25 +32,20 @@ const Answersheets = () => {
     fetchData();
   }, []);
 
-  // Filter answer sheets
+  // Filter by selected teaching context
   useEffect(() => {
+    if (!contextSelection) {
+      setFilteredAnswerSheets(answerSheets);
+      return;
+    }
     const filtered = answerSheets.filter((as) => {
-      return (
-        (filters.subject === "" || as.subject === filters.subject) &&
-        (filters.subject_title === "" ||
-          as.subject_title === filters.subject_title) &&
-        (filters.board === "" || as.board === filters.board) &&
-        (filters.standard === "" ||
-          parseInt(as.standard) === parseInt(filters.standard))
-      );
+      const subjectMatch = !contextSelection.subject_name || as.subject === contextSelection.subject_name;
+      const titleMatch = !contextSelection.subject_title_name || as.subject_title === contextSelection.subject_title_name;
+      const standardMatch = contextSelection.standard == null || parseInt(as.standard) === parseInt(contextSelection.standard);
+      return subjectMatch && titleMatch && standardMatch;
     });
-
     setFilteredAnswerSheets(filtered);
-  }, [filters, answerSheets]);
-
-  const clearFilters = () => {
-    setFilters({ board: "", subject: "", subject_title: "", standard: "" });
-  };
+  }, [contextSelection, answerSheets]);
 
   return (
     <div className="min-h-screen p-8">
@@ -88,94 +64,6 @@ const Answersheets = () => {
                 Access comprehensive answer keys and solutions
               </p>
             </div>
-          </div>
-        </div>
-
-        {/* Filters Section */}
-        <div className="bg-white rounded-2xl shadow-xl p-6 mb-8">
-          <div className="flex items-center gap-2 mb-6">
-            <Filter className="w-5 h-5 text-blue-600" />
-            <h2 className="text-xl font-bold text-gray-800">
-              Filter Answer Sheets
-            </h2>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Board Filter */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                <BookOpen className="w-4 h-4 text-blue-600" />
-                Select Board
-              </label>
-              <select
-                value={filters.board}
-                onChange={(e) =>
-                  setFilters({ ...filters, board: e.target.value })
-                }
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition outline-none"
-              >
-                <option value="">All Boards</option>
-                {boards.map((board) => (
-                  <option key={board.board_id} value={board.board_name}>
-                    {board.board_name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Subject Filter */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                <BookOpen className="w-4 h-4 text-green-600" />
-                Select Subject
-              </label>
-              <select
-                value={filters.subject}
-                onChange={(e) =>
-                  setFilters({ ...filters, subject: e.target.value })
-                }
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-green-500 focus:ring-2 focus:ring-green-200 transition outline-none"
-              >
-                <option value="">All Subjects</option>
-                {subjects.map((sub) => (
-                  <option key={sub.subject_id} value={sub.subject_name}>
-                    {sub.subject_name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Standard Filter */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                <GraduationCap className="w-4 h-4 text-purple-600" />
-                Select Standard
-              </label>
-              <select
-                value={filters.standard}
-                onChange={(e) =>
-                  setFilters({ ...filters, standard: e.target.value })
-                }
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition outline-none"
-              >
-                <option value="">All Standards</option>
-                {Array.from({ length: 12 }, (_, i) => (
-                  <option key={i + 1} value={i + 1}>
-                    Standard {i + 1}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Clear Filters Button */}
-          <div className="mt-6 flex justify-end">
-            <button
-              onClick={clearFilters}
-              className="px-6 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-lg transition"
-            >
-              Clear Filters
-            </button>
           </div>
         </div>
 

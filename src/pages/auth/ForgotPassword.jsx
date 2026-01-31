@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import apiClient from "../../services/apiClient";
 import MinNavbar from "../../components/MinNavbar";
 import { Mail, ArrowLeft, CheckCircle } from "lucide-react";
+import Loader from "../../components/Common/loader/loader";
 
 const ForgotPassword = () => {
   const navigate = useNavigate();
@@ -136,7 +137,7 @@ const ForgotPassword = () => {
                 >
                   {loading ? (
                     <>
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                      <Loader size="sm" className="inline-block text-white" />
                       <span>Sending...</span>
                     </>
                   ) : (

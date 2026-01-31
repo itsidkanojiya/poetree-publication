@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, FileText, Edit, CheckCircle2 } from "lucide-react";
 import { viewTemplate, cloneTemplate } from "../../services/paperService";
 import Toast from "../Common/Toast";
+import Loader from "../Common/loader/loader";
 import apiClient from "../../services/apiClient";
 
 const ViewTemplate = () => {
@@ -161,7 +162,7 @@ const ViewTemplate = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <Loader />
       </div>
     );
   }
@@ -212,7 +213,7 @@ const ViewTemplate = () => {
             >
               {customizing ? (
                 <>
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                  <Loader size="sm" className="inline-block text-white" />
                   <span>Creating Copy...</span>
                 </>
               ) : (

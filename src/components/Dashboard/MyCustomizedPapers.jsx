@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { FileText, Eye, Edit, Search } from "lucide-react";
 import { getMyCustomizedPapers } from "../../services/paperService";
 import Toast from "../Common/Toast";
+import Loader from "../Common/loader/loader";
 
 const MyCustomizedPapers = () => {
   const navigate = useNavigate();
@@ -60,7 +61,7 @@ const MyCustomizedPapers = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <Loader />
       </div>
     );
   }

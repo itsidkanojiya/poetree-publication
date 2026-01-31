@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import MinNavbar from "../../components/MinNavbar";
 import { Mail, Lock, Eye, EyeOff, LogIn } from "lucide-react";
+import Loader from "../../components/Common/loader/loader";
 
 const AdminLogin = () => {
   const { login } = useAuth();
@@ -180,7 +181,7 @@ const AdminLogin = () => {
               >
                 {loading ? (
                   <>
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                    <Loader size="sm" className="inline-block text-white" />
                     <span>Signing In...</span>
                   </>
                 ) : (

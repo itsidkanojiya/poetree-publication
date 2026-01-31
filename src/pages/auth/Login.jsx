@@ -4,6 +4,7 @@ import { useAuth } from "../../context/AuthContext";
 import MinNavbar from "../../components/MinNavbar";
 import VerificationPending from "../../components/Common/VerificationPending";
 import { Mail, Lock, Eye, EyeOff, LogIn, UserPlus } from "lucide-react";
+import Loader from "../../components/Common/loader/loader";
 
 const Login = () => {
   const { login } = useAuth();
@@ -214,7 +215,7 @@ const Login = () => {
               >
                 {loading ? (
                   <>
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                    <Loader size="sm" className="inline-block text-white" />
                     <span>Signing In...</span>
                   </>
                 ) : (

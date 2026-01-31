@@ -16,9 +16,9 @@ import {
   Eye,
   CheckCircle,
   XCircle,
-  Loader2,
 } from "lucide-react";
 import Toast from "../Common/Toast";
+import Loader from "../Common/loader/loader";
 
 const TeacherManagement = () => {
   const location = useLocation();
@@ -168,7 +168,7 @@ const TeacherManagement = () => {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-8 flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="w-16 h-16 text-blue-600 animate-spin mx-auto mb-4" />
+          <Loader className="mx-auto mb-4" />
           <p className="text-gray-600 text-lg">Loading teachers...</p>
         </div>
       </div>
@@ -335,7 +335,7 @@ const TeacherManagement = () => {
             <div className="p-6">
               {loadingSelections ? (
                 <div className="text-center py-12">
-                  <Loader2 className="w-12 h-12 text-blue-600 animate-spin mx-auto mb-4" />
+                  <Loader size="md" className="mx-auto mb-4" />
                   <p className="text-gray-600">Loading selections...</p>
                 </div>
               ) : (

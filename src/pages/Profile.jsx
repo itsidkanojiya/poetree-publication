@@ -17,6 +17,7 @@ import {
   GraduationCap,
   Image,
 } from "lucide-react";
+import Loader from "../components/Common/loader/loader";
 
 const Profile = () => {
   const [user, setUser] = useState(null);
@@ -56,7 +57,7 @@ const Profile = () => {
   if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600"></div>
+        <Loader />
       </div>
     );
   }

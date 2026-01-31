@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Save, X, Plus, Eye } from "lucide-react";
+import { ArrowLeft, Save, X, Plus, Eye, Trash2 } from "lucide-react";
+import Loader from "../Common/loader/loader";
 import { getPaperById, updatePaper } from "../../services/paperService";
-import { getQuestionsByType } from "../../services/adminService";
 import Toast from "../Common/Toast";
 import HeaderCard from "../Cards/HeaderCard";
 // Use CustomPaper's exact pagination logic
@@ -33,10 +33,10 @@ const CustomizePaper = () => {
   }, [id]);
 
   useEffect(() => {
-    if (currentQuestionType && showQuestionSelector) {
+    if (currentQuestionType && showQuestionSelector && paper) {
       fetchQuestionsByType();
     }
-  }, [currentQuestionType, showQuestionSelector]);
+  }, [currentQuestionType, showQuestionSelector, paper?.subject_id, paper?.board, paper?.board_id, paper?.subject_title_id, paper?.standard]);
 
   // Fetch questions by IDs
   const fetchQuestionsByIds = async (questionIds) => {
@@ -214,19 +214,28 @@ const CustomizePaper = () => {
   };
 
   const fetchQuestionsByType = async () => {
+    if (!paper) return;
     try {
-      if (!availableQuestions[currentQuestionType]) {
-        const questionsData = await getQuestionsByType(currentQuestionType);
-        const questionsArray = Array.isArray(questionsData)
-          ? questionsData
-          : questionsData?.questions || questionsData?.data || [];
-        setAvailableQuestions((prev) => ({
-          ...prev,
-          [currentQuestionType]: questionsArray,
-        }));
-      }
+      const params = new URLSearchParams();
+      params.append("type", currentQuestionType);
+      if (paper.subject_id) params.append("subject_id", String(paper.subject_id));
+      if (paper.board_id ?? paper.board) params.append("board_id", String(paper.board_id ?? paper.board));
+      if (paper.subject_title_id) params.append("subject_title_id", String(paper.subject_title_id));
+      if (paper.standard != null && paper.standard !== "") params.append("standard", String(paper.standard));
+
+      const response = await apiClient.get(`/question?${params.toString()}`);
+      const questionsArray = response.data?.questions ?? response.data ?? [];
+      const list = Array.isArray(questionsArray) ? questionsArray : [];
+      setAvailableQuestions((prev) => ({
+        ...prev,
+        [currentQuestionType]: list,
+      }));
     } catch (error) {
       console.error("Error fetching questions:", error);
+      setAvailableQuestions((prev) => ({
+        ...prev,
+        [currentQuestionType]: [],
+      }));
     }
   };
 
@@ -321,6 +330,29 @@ const CustomizePaper = () => {
     }
   };
 
+  const handleDeleteQuestion = (position) => {
+    const bodyArray = JSON.parse(paper.body || "[]");
+    if (position < 1 || position > bodyArray.length) return;
+    bodyArray.splice(position - 1, 1);
+    setPaper((prev) => ({
+      ...prev,
+      body: JSON.stringify(bodyArray),
+    }));
+    setQuestions((prev) =>
+      prev
+        .filter((q) => q.position !== position && q.number !== position)
+        .map((q, i) => ({ ...q, number: i + 1, position: i + 1 }))
+    );
+    setShowQuestionSelector(false);
+    setReplacing(null);
+    setHasChanges(true);
+    setToast({
+      show: true,
+      message: "Question removed from paper. Click 'Update Paper' to save changes.",
+      type: "success",
+    });
+  };
+
   const handleUpdatePaper = async () => {
     try {
       setSaving(true);
@@ -400,6 +432,15 @@ const CustomizePaper = () => {
     passage: 5,
     match: 5,
     default: 0,
+  };
+
+  // Total marks = sum of all questions' marks (from question.marks or marksMap by type)
+  const getTotalMarksFromQuestions = () => {
+    if (!questions.length) return paper?.total_marks ?? 0;
+    return questions.reduce((sum, q) => {
+      const marks = q.marks != null && q.marks !== "" ? Number(q.marks) : (marksMap[q.type] ?? marksMap.default);
+      return sum + (Number.isFinite(marks) ? marks : 0);
+    }, 0);
   };
 
   // ✅ USE ADMIN'S EXACT PAGINATION LOGIC
@@ -662,7 +703,7 @@ const CustomizePaper = () => {
   if (loading && !paper) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <Loader />
       </div>
     );
   }
@@ -695,7 +736,7 @@ const CustomizePaper = () => {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button
-              onClick={() => navigate("/dashboard/my-customized")}
+              onClick={() => navigate("/dashboard/history")}
               className="p-2 hover:bg-gray-100 rounded-lg transition"
             >
               <ArrowLeft className="w-5 h-5" />
@@ -716,7 +757,7 @@ const CustomizePaper = () => {
           >
             {saving ? (
               <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                <Loader size="sm" className="inline-block" />
                 <span>Updating...</span>
               </>
             ) : (
@@ -789,7 +830,11 @@ const CustomizePaper = () => {
                   {/* Header - Only on first page */}
                   {pageIndex === 0 && header && (
                     <HeaderCard
-                      header={header}
+                      header={{
+                        ...header,
+                        totalMarks: getTotalMarksFromQuestions(),
+                        marks: getTotalMarksFromQuestions(),
+                      }}
                       disableHover={true}
                       disableStyles
                       disableNavigation={true}
@@ -1256,18 +1301,45 @@ const CustomizePaper = () => {
                 <h3 className="text-xl font-bold">
                   Select Question to Replace Q{replacing}
                 </h3>
-                <button
-                  onClick={() => {
-                    setShowQuestionSelector(false);
-                    setReplacing(null);
-                  }}
-                  className="p-2 hover:bg-gray-100 rounded-lg"
-                >
-                  <X className="w-5 h-5" />
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      handleDeleteQuestion(replacing);
+                    }}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-red-100 text-red-700 hover:bg-red-200 rounded-lg font-medium transition"
+                    title="Remove this question from the paper"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Delete Q{replacing}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowQuestionSelector(false);
+                      setReplacing(null);
+                    }}
+                    className="p-2 hover:bg-gray-100 rounded-lg"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Paper filters: only questions matching this paper's subject, subject title, board & standard */}
+              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm font-medium text-blue-800 mb-1">Showing questions for this paper only:</p>
+                <p className="text-sm text-gray-700">
+                  <span className="font-semibold">Subject:</span> {paper?.subject ?? paper?.subject_id ?? "—"}
+                  {" • "}
+                  <span className="font-semibold">Subject Title:</span> {paper?.subject_title_id ?? "—"}
+                  {" • "}
+                  <span className="font-semibold">Board:</span> {paper?.board ?? paper?.board_id ?? "—"}
+                  {" • "}
+                  <span className="font-semibold">Std:</span> {paper?.standard ?? "—"}
+                </p>
               </div>
 
               <div className="mb-4">
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Question type</label>
                 <select
                   value={currentQuestionType}
                   onChange={(e) => setCurrentQuestionType(e.target.value)}
@@ -1286,12 +1358,13 @@ const CustomizePaper = () => {
 
               {!availableQuestions[currentQuestionType] ? (
                 <div className="text-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                  <Loader size="md" className="mx-auto mb-2" />
                   <p className="text-gray-600">Loading questions...</p>
                 </div>
               ) : availableQuestions[currentQuestionType]?.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
-                  <p>No {currentQuestionType} questions available</p>
+                  <p>No {currentQuestionType} questions available for this paper&apos;s subject, board & standard.</p>
+                  <p className="text-sm mt-1">Try another question type or add questions in admin for this context.</p>
                 </div>
               ) : (
                 <div className="space-y-3">

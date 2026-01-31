@@ -3,11 +3,14 @@ import { getAllPapers, getPapersByUserId } from "../services/paperService";
 import { usePaper } from "../context/PaperContext";
 import PaperCard from "../components/Cards/PaperCard";
 import { useAuth } from "../context/AuthContext";
+import { useUserTeaching } from "../context/UserTeachingContext";
 import { Filter, Calendar, FileText, Clock, Search } from "lucide-react";
+import Loader from "../components/Common/loader/loader";
 import { useLocation } from "react-router-dom";
 
 const History = () => {
   const { papers, refreshPapers, loading } = usePaper();
+  const { contextSelection } = useUserTeaching();
   const location = useLocation();
   const [filters, setFilters] = useState({
     type: "all",
@@ -18,6 +21,24 @@ const History = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   let allPapers = Array.isArray(papers) ? papers : papers?.papers || [];
+
+  // Apply context filter (subject, subject title, standard)
+  if (contextSelection) {
+    allPapers = allPapers.filter((paper) => {
+      const subjectMatch =
+        paper.subject_id != null && String(paper.subject_id) === String(contextSelection.subject_id) ||
+        (paper.subject != null && contextSelection.subject_name && paper.subject === contextSelection.subject_name);
+      const titleMatch =
+        paper.subject_title_id == null ||
+        contextSelection.subject_title_id == null ||
+        String(paper.subject_title_id) === String(contextSelection.subject_title_id);
+      const standardMatch =
+        paper.standard == null ||
+        contextSelection.standard == null ||
+        Number(paper.standard) === Number(contextSelection.standard);
+      return subjectMatch && titleMatch && standardMatch;
+    });
+  }
 
   // Apply all filters
   const filteredPapers = allPapers.filter((paper) => {
@@ -248,7 +269,7 @@ const History = () => {
         {/* Loading Indicator */}
         {(loading || isRefreshing) && (
           <div className="text-center py-12">
-            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+            <Loader className="mx-auto mb-4" />
             <p className="text-gray-600 font-semibold">Loading papers...</p>
           </div>
         )}

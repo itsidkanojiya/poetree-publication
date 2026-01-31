@@ -16,6 +16,7 @@ import {
   getAllSubjectTitles,
 } from "../../../services/adminService";
 import Toast from "../../Common/Toast";
+import Loader from "../../Common/loader/loader";
 
 const BulkUploadModal = ({ questionType, onClose, onSuccess }) => {
   const [excelFile, setExcelFile] = useState(null);
@@ -945,7 +946,7 @@ const BulkUploadModal = ({ questionType, onClose, onSuccess }) => {
             >
               {uploading ? (
                 <>
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                  <Loader size="sm" className="inline-block text-white" />
                   <span>Uploading...</span>
                 </>
               ) : (

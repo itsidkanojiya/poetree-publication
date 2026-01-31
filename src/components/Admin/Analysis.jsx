@@ -9,6 +9,7 @@ import {
   BarChart3,
   Activity,
 } from "lucide-react";
+import Loader from "../Common/loader/loader";
 
 const Analysis = () => {
   const [teacherData, setTeacherData] = useState(null);
@@ -42,7 +43,7 @@ const Analysis = () => {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-8 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <Loader className="mx-auto mb-4" />
           <p className="text-gray-600 text-lg">Loading analysis data...</p>
         </div>
       </div>

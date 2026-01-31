@@ -7,6 +7,7 @@ import {
 } from "../../../services/adminService";
 import { Plus, Trash2, Search, FileText, Eye } from "lucide-react";
 import Toast from "../../Common/Toast";
+import Loader from "../../Common/loader/loader";
 import AddAnswerSheetModal from "./AddAnswerSheetModal";
 
 const AnswerSheetManagement = () => {
@@ -83,7 +84,7 @@ const AnswerSheetManagement = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <Loader />
       </div>
     );
   }

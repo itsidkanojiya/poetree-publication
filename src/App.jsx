@@ -38,7 +38,6 @@ import TemplateDetails from "./components/Admin/Templates/TemplateDetails";
 import BrowseTemplates from "./components/Dashboard/BrowseTemplates";
 import ViewTemplate from "./components/Dashboard/ViewTemplate";
 import CustomizePaper from "./components/Dashboard/CustomizePaper";
-import MyCustomizedPapers from "./components/Dashboard/MyCustomizedPapers";
 
 function App() {
   return (
@@ -80,7 +79,6 @@ function App() {
         <Route path="templates" element={<BrowseTemplates />} />
         <Route path="templates/:id" element={<ViewTemplate />} />
         <Route path="papers/:id/customize" element={<CustomizePaper />} />
-        <Route path="my-customized" element={<MyCustomizedPapers />} />
       </Route>
 
       {/* Admin Routes */}

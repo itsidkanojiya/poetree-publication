@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { FileText, Eye, Search, Filter } from "lucide-react";
 import Toast from "../Common/Toast";
 import apiClient from "../../services/apiClient";
+import Loader from "../Common/loader/loader";
 
 const BrowseTemplates = () => {
   const navigate = useNavigate();
@@ -109,7 +110,7 @@ const BrowseTemplates = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <Loader className="mx-auto" />
       </div>
     );
   }
@@ -126,7 +127,7 @@ const BrowseTemplates = () => {
       <div className="space-y-6">
         {/* Header */}
         <div>
-          <h1 className="text-3xl font-bold text-gray-800">Browse Templates</h1>
+          <h1 className="text-3xl font-bold text-gray-800">Prebuilt Question</h1>
           <p className="text-gray-600 mt-1">Choose a template to customize</p>
         </div>
 
@@ -167,7 +168,7 @@ const BrowseTemplates = () => {
         {filteredTemplates.length === 0 ? (
           <div className="bg-white rounded-lg shadow-md p-12 text-center">
             <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-700 mb-2">No Templates Available</h3>
+            <h3 className="text-xl font-semibold text-gray-700 mb-2">No prebuilt questions available</h3>
             <p className="text-gray-500">No templates match your criteria</p>
           </div>
         ) : (

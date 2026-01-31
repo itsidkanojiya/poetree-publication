@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, FileText, FileDown, Eye, Save } from "lucide-react";
 import { updatePaper } from "../../../services/paperService";
 import Toast from "../../Common/Toast";
+import Loader from "../../Common/loader/loader";
 import downloadPDF from "../../../utils/downloadPdf";
 import HeaderCard from "../../Cards/HeaderCard";
 // Use CustomPaper's exact pagination logic
@@ -725,7 +726,7 @@ const TemplateDetails = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <Loader />
       </div>
     );
   }
@@ -780,7 +781,7 @@ const TemplateDetails = () => {
             >
               {saving ? (
                 <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  <Loader size="sm" className="inline-block text-white" />
                   <span>Saving...</span>
                 </>
               ) : (

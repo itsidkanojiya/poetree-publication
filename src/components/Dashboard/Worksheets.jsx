@@ -1,20 +1,15 @@
 import { useEffect, useState } from "react";
-import { Eye, Filter, BookOpen, GraduationCap, FileText } from "lucide-react";
+import { Eye, FileText } from "lucide-react";
 import PDFModal from "../Common/Modals/PDFModal";
 import apiClient from "../../services/apiClient";
+import Loader from "../Common/loader/loader";
+import { useUserTeaching } from "../../context/UserTeachingContext";
 
 const Worksheets = () => {
+  const { contextSelection } = useUserTeaching();
   const [loading, setLoading] = useState(true);
   const [worksheets, setWorksheets] = useState([]);
   const [filteredWorksheets, setFilteredWorksheets] = useState([]);
-  const [subjects, setSubjects] = useState([]);
-  const [boards, setBoards] = useState([]);
-
-  const [filters, setFilters] = useState({
-    board: "",
-    subject: "",
-    standard: "",
-  });
 
   const [selectedPDF, setSelectedPDF] = useState(null);
   const [selectedTitle, setSelectedTitle] = useState("");
@@ -23,16 +18,8 @@ const Worksheets = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [worksheetRes, subjectRes, boardRes] = await Promise.all([
-          apiClient.get("/worksheets"),
-          apiClient.get("/subjects"),
-          apiClient.get("/boards"),
-        ]);
-
-        setWorksheets(worksheetRes.data);
-        setFilteredWorksheets(worksheetRes.data);
-        setSubjects(subjectRes.data);
-        setBoards(boardRes.data);
+        const worksheetRes = await apiClient.get("/worksheets");
+        setWorksheets(worksheetRes.data || []);
       } catch (error) {
         console.error("Error fetching data:", error);
       } finally {
@@ -43,21 +30,19 @@ const Worksheets = () => {
     fetchData();
   }, []);
 
+  // Filter by selected teaching context
   useEffect(() => {
+    if (!contextSelection) {
+      setFilteredWorksheets(worksheets);
+      return;
+    }
     const filtered = worksheets.filter((ws) => {
-      return (
-        (filters.board === "" || ws.board === filters.board) &&
-        (filters.subject === "" || ws.subject === filters.subject) &&
-        (filters.standard === "" ||
-          parseInt(ws.standard) === parseInt(filters.standard))
-      );
+      const subjectMatch = !contextSelection.subject_name || ws.subject === contextSelection.subject_name;
+      const standardMatch = contextSelection.standard == null || parseInt(ws.standard) === parseInt(contextSelection.standard);
+      return subjectMatch && standardMatch;
     });
     setFilteredWorksheets(filtered);
-  }, [filters, worksheets]);
-
-  const clearFilters = () => {
-    setFilters({ board: "", subject: "", standard: "" });
-  };
+  }, [contextSelection, worksheets]);
 
   return (
     <div className="min-h-screen p-8">
@@ -79,94 +64,6 @@ const Worksheets = () => {
           </div>
         </div>
 
-        {/* Filters Section */}
-        <div className="bg-white rounded-2xl shadow-xl p-6 mb-8">
-          <div className="flex items-center gap-2 mb-6">
-            <Filter className="w-5 h-5 text-blue-600" />
-            <h2 className="text-xl font-bold text-gray-800">
-              Filter Worksheets
-            </h2>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Board Filter */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                <BookOpen className="w-4 h-4 text-blue-600" />
-                Select Board
-              </label>
-              <select
-                value={filters.board}
-                onChange={(e) =>
-                  setFilters({ ...filters, board: e.target.value })
-                }
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition outline-none"
-              >
-                <option value="">All Boards</option>
-                {boards.map((board) => (
-                  <option key={board.board_id} value={board.board_name}>
-                    {board.board_name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Subject Filter */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                <BookOpen className="w-4 h-4 text-green-600" />
-                Select Subject
-              </label>
-              <select
-                value={filters.subject}
-                onChange={(e) =>
-                  setFilters({ ...filters, subject: e.target.value })
-                }
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-green-500 focus:ring-2 focus:ring-green-200 transition outline-none"
-              >
-                <option value="">All Subjects</option>
-                {subjects.map((sub) => (
-                  <option key={sub.subject_id} value={sub.subject_name}>
-                    {sub.subject_name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Standard Filter */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                <GraduationCap className="w-4 h-4 text-purple-600" />
-                Select Standard
-              </label>
-              <select
-                value={filters.standard}
-                onChange={(e) =>
-                  setFilters({ ...filters, standard: e.target.value })
-                }
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition outline-none"
-              >
-                <option value="">All Standards</option>
-                {Array.from({ length: 12 }, (_, i) => (
-                  <option key={i + 1} value={i + 1}>
-                    Standard {i + 1}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Clear Filters Button */}
-          <div className="mt-6 flex justify-end">
-            <button
-              onClick={clearFilters}
-              className="px-6 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-lg transition"
-            >
-              Clear Filters
-            </button>
-          </div>
-        </div>
-
         {/* Results Count */}
         <div className="mb-6">
           <p className="text-gray-600">
@@ -182,7 +79,7 @@ const Worksheets = () => {
         {/* Worksheets Grid */}
         {loading ? (
           <div className="flex justify-center items-center py-20">
-            <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-green-600"></div>
+            <Loader />
           </div>
         ) : filteredWorksheets.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">

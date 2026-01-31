@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, FileText, Eye, Copy, CheckCircle2 } from "lucide-react";
 import Toast from "../Common/Toast";
+import Loader from "../Common/loader/loader";
 import HeaderCard from "../Cards/HeaderCard";
 // Use CustomPaper's exact pagination logic
 import apiClient from "../../services/apiClient";
@@ -350,7 +351,7 @@ const TemplateDetail = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <Loader />
       </div>
     );
   }
@@ -402,7 +403,7 @@ const TemplateDetail = () => {
           >
             {cloning ? (
               <>
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                <Loader size="sm" className="inline-block text-white" />
                 <span>Cloning...</span>
               </>
             ) : (

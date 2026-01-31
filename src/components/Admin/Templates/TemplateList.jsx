@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { FileText, Plus, Eye, Search, Filter } from "lucide-react";
 import Toast from "../../Common/Toast";
+import Loader from "../../Common/loader/loader";
 import apiClient from "../../../services/apiClient";
 
 const TemplateList = () => {
@@ -110,7 +111,7 @@ const TemplateList = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <Loader />
       </div>
     );
   }

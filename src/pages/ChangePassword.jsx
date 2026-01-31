@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import apiClient from "../services/apiClient";
 import Toast from "../components/Common/Toast";
 import { ArrowLeft, Lock, Eye, EyeOff, Key, CheckCircle } from "lucide-react";
+import Loader from "../components/Common/loader/loader";
 
 const ChangePassword = () => {
   const navigate = useNavigate();
@@ -281,8 +282,8 @@ const ChangePassword = () => {
                 className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-bold rounded-lg shadow-lg hover:shadow-xl transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? (
-                  <>
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                    <>
+                    <Loader size="sm" className="inline-block text-white" />
                     <span>Changing Password...</span>
                   </>
                 ) : (

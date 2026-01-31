@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import MinNavbar from "../../components/MinNavbar";
 import Toast from "../../components/Common/Toast";
+import Loader from "../../components/Common/loader/loader";
 import apiClient from "../../services/apiClient";
 import {
   User,
@@ -523,7 +524,7 @@ const Register = () => {
                     />
                     {loadingPincode && (
                       <div className="absolute right-3 top-3.5">
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                        <Loader size="sm" className="inline-block" />
                       </div>
                     )}
                   </div>

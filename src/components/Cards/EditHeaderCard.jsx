@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Upload, Image } from "lucide-react";
 import apiClient from "../../services/apiClient";
 
-const EditHeaderCard = ({ editedHeader, handleInputChange }) => {
+const EditHeaderCard = ({ editedHeader, handleInputChange, lockContextFields = false }) => {
   const [approvedSubjects, setApprovedSubjects] = useState([]);
   const [approvedSubjectTitles, setApprovedSubjectTitles] = useState([]);
   const [boards, setBoards] = useState([]);
@@ -314,7 +314,7 @@ const EditHeaderCard = ({ editedHeader, handleInputChange }) => {
                 </div>
               </div>
             ) : key === "subject" ? (
-              // Subject Dropdown with Approved Subjects
+              // Subject: read-only from context or dropdown
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   {fieldLabels[key] ||
@@ -322,7 +322,12 @@ const EditHeaderCard = ({ editedHeader, handleInputChange }) => {
                       .replace(/([A-Z])/g, " $1")
                       .replace(/^./, (str) => str.toUpperCase())}
                 </label>
-                {loadingSubjects ? (
+                {lockContextFields && editedHeader[key] ? (
+                  <div className="w-full border-2 border-gray-200 p-3 rounded-lg bg-gray-50 text-gray-700">
+                    {editedHeader[key]}
+                    <p className="text-xs text-gray-500 mt-1">From your teaching context</p>
+                  </div>
+                ) : loadingSubjects ? (
                   <div className="w-full border-2 border-gray-200 p-3 rounded-lg bg-gray-50">
                     <p className="text-sm text-gray-500">Loading subjects...</p>
                   </div>
@@ -349,7 +354,7 @@ const EditHeaderCard = ({ editedHeader, handleInputChange }) => {
                 )}
               </div>
             ) : key === "class" ? (
-              // Class Dropdown with options 1 to 12
+              // Class: read-only from context or dropdown
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   {fieldLabels[key] ||
@@ -357,21 +362,28 @@ const EditHeaderCard = ({ editedHeader, handleInputChange }) => {
                       .replace(/([A-Z])/g, " $1")
                       .replace(/^./, (str) => str.toUpperCase())}
                 </label>
-                <select
-                  value={editedHeader[key] || ""}
-                  onChange={(e) => handleInputChange(e, key)}
-                  className="w-full border-2 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 p-3 rounded-lg transition outline-none bg-white"
-                >
-                  <option value="">Select Class</option>
-                  {Array.from({ length: 12 }, (_, i) => i + 1).map((num) => (
-                    <option key={num} value={num}>
-                      {num}
-                    </option>
-                  ))}
-                </select>
+                {lockContextFields && (editedHeader[key] !== "" && editedHeader[key] != null) ? (
+                  <div className="w-full border-2 border-gray-200 p-3 rounded-lg bg-gray-50 text-gray-700">
+                    {editedHeader[key]}
+                    <p className="text-xs text-gray-500 mt-1">From your teaching context</p>
+                  </div>
+                ) : (
+                  <select
+                    value={editedHeader[key] || ""}
+                    onChange={(e) => handleInputChange(e, key)}
+                    className="w-full border-2 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 p-3 rounded-lg transition outline-none bg-white"
+                  >
+                    <option value="">Select Class</option>
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map((num) => (
+                      <option key={num} value={num}>
+                        {num}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
             ) : key === "board" ? (
-              // Board Dropdown
+              // Board: read-only from context or dropdown
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   {fieldLabels[key] ||
@@ -379,7 +391,16 @@ const EditHeaderCard = ({ editedHeader, handleInputChange }) => {
                       .replace(/([A-Z])/g, " $1")
                       .replace(/^./, (str) => str.toUpperCase())}
                 </label>
-                {boards.length === 0 ? (
+                {lockContextFields && (editedHeader[key] !== "" && editedHeader[key] != null) ? (
+                  <div className="w-full border-2 border-gray-200 p-3 rounded-lg bg-gray-50 text-gray-700">
+                    {(() => {
+                      const bid = editedHeader[key];
+                      const b = boards.find((x) => String(x.board_id ?? x.id) === String(bid));
+                      return b ? (b.board_name ?? b.name ?? b.boardName) : bid;
+                    })()}
+                    <p className="text-xs text-gray-500 mt-1">From your teaching context</p>
+                  </div>
+                ) : boards.length === 0 ? (
                   <div className="w-full border-2 border-gray-200 p-3 rounded-lg bg-gray-50">
                     <p className="text-sm text-gray-500">Loading boards...</p>
                   </div>
@@ -402,7 +423,7 @@ const EditHeaderCard = ({ editedHeader, handleInputChange }) => {
                 )}
               </div>
             ) : key === "subjectTitle" ? (
-              // Subject Title Dropdown
+              // Subject Title: read-only from context or dropdown
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   {fieldLabels[key] ||
@@ -410,7 +431,16 @@ const EditHeaderCard = ({ editedHeader, handleInputChange }) => {
                       .replace(/([A-Z])/g, " $1")
                       .replace(/^./, (str) => str.toUpperCase())}
                 </label>
-                {approvedSubjectTitles.length === 0 ? (
+                {lockContextFields && (editedHeader[key] != null && editedHeader[key] !== "") ? (
+                  <div className="w-full border-2 border-gray-200 p-3 rounded-lg bg-gray-50 text-gray-700">
+                    {(() => {
+                      const tid = editedHeader[key];
+                      const t = approvedSubjectTitles.find((x) => String(x.id) === String(tid));
+                      return t ? `${t.name}${t.subject_name ? ` (${t.subject_name})` : ""}` : `ID ${tid}`;
+                    })()}
+                    <p className="text-xs text-gray-500 mt-1">From your teaching context</p>
+                  </div>
+                ) : approvedSubjectTitles.length === 0 ? (
                   <div className="w-full border-2 border-gray-200 p-3 rounded-lg bg-gray-50">
                     <p className="text-sm text-gray-500">
                       No subject titles available

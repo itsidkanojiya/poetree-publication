@@ -19,6 +19,7 @@ import {
 } from "../../../services/adminService";
 import { getProfile } from "../../../services/authService";
 import Toast from "../../Common/Toast";
+import Loader from "../../Common/loader/loader";
 import HeaderCard from "../../Cards/HeaderCard";
 // Use CustomPaper's exact pagination logic
 import QuestionTypeTitleEditor from "./QuestionTypeTitleEditor";
@@ -1587,7 +1588,7 @@ const CreateTemplate = () => {
                 >
                   {loading ? (
                     <>
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                      <Loader size="sm" className="inline-block text-white" />
                       <span>Creating...</span>
                     </>
                   ) : (

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Save, Upload, Image, School, MapPin } from "lucide-react";
 import { getProfile, updateProfile } from "../services/authService";
 import Toast from "../components/Common/Toast";
+import Loader from "../components/Common/loader/loader";
 
 const EditProfile = () => {
   const [user, setUser] = useState(null);
@@ -123,7 +124,7 @@ const EditProfile = () => {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600"></div>
+        <Loader />
       </div>
     );
   }
@@ -253,7 +254,7 @@ const EditProfile = () => {
                 >
                   {saving ? (
                     <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      <Loader size="sm" className="inline-block text-white" />
                       <span>Saving...</span>
                     </>
                   ) : (

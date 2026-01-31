@@ -22,6 +22,7 @@ import HeaderCard from "../Cards/HeaderCard";
 import apiClient from "../../services/apiClient";
 import { getPaperById, updatePaper } from "../../services/paperService";
 import Toast from "../Common/Toast";
+import Loader from "../Common/loader/loader";
 
 // Constants
 const PAGE_DIMENSIONS = {
@@ -1054,7 +1055,7 @@ const CustomPaper = () => {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <Loader className="mx-auto mb-4" />
           <p className="text-gray-600 font-semibold">Loading paper data...</p>
         </div>
       </div>
@@ -1629,7 +1630,11 @@ const CustomPaper = () => {
                   {pageIndex === 0 && (
                     <div className="mb-6 pb-6">
                       <HeaderCard
-                        header={paperHeader || header}
+                        header={{
+                          ...(paperHeader || header),
+                          totalMarks: getTotalMarks(),
+                          marks: getTotalMarks(),
+                        }}
                         disableHover={true}
                         disableStyles
                       />

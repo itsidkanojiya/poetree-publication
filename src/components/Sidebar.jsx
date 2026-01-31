@@ -15,7 +15,6 @@ import {
   BookOpen,
   Sparkles,
   LayoutTemplate,
-  FileEdit,
 } from "lucide-react";
 
 const LogoutModal = ({ isOpen, onClose, onConfirm }) => {
@@ -89,14 +88,9 @@ const Sidebar = () => {
       state: { from: "prebuild" },
     },
     {
-      name: "Templates",
+      name: "Prebuilt Question",
       href: "/dashboard/templates",
       icon: LayoutTemplate,
-    },
-    {
-      name: "My Customized",
-      href: "/dashboard/my-customized",
-      icon: FileEdit,
     },
     {
       name: "Worksheets",
@@ -125,8 +119,8 @@ const Sidebar = () => {
     if (path === "/dashboard") {
       return location.pathname === "/dashboard" || location.pathname === "/dashboard/";
     }
-    // For templates and customize routes, check if pathname starts with the route path
-    if (path === "/dashboard/templates" || path === "/dashboard/my-customized") {
+    // For templates (Prebuilt Question) route, check if pathname starts with the route path
+    if (path === "/dashboard/templates") {
       return location.pathname.startsWith(path);
     }
     // For other routes, check exact match

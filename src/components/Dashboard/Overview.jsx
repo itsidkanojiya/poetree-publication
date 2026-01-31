@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   FileText,
   FilePlus,
@@ -13,14 +13,16 @@ import {
 import { Link, useNavigate } from "react-router-dom";
 import apiClient from "../../services/apiClient";
 import Toast from "../Common/Toast";
+import { usePaper } from "../../context/PaperContext";
+import { useUserTeaching } from "../../context/UserTeachingContext";
 
 const Overview = () => {
   const navigate = useNavigate();
-  const [stats] = useState({
-    papers: 12,
-    worksheets: 10,
-    answerSheets: 5,
-  });
+  const { papers } = usePaper();
+  const { contextSelection } = useUserTeaching();
+  const [worksheets, setWorksheets] = useState([]);
+  const [answerSheets, setAnswerSheets] = useState([]);
+  const [statsLoading, setStatsLoading] = useState(true);
   const [approvedSubjectIds, setApprovedSubjectIds] = useState([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState({
@@ -28,6 +30,75 @@ const Overview = () => {
     message: "",
     type: "error",
   });
+
+  const allPapers = Array.isArray(papers) ? papers : papers?.papers || [];
+
+  const stats = useMemo(() => {
+    if (!contextSelection) {
+      return { papers: 0, worksheets: 0, answerSheets: 0 };
+    }
+    const papersFiltered = allPapers.filter((paper) => {
+      const subjectMatch =
+        (paper.subject_id != null && String(paper.subject_id) === String(contextSelection.subject_id)) ||
+        (paper.subject != null && contextSelection.subject_name && paper.subject === contextSelection.subject_name);
+      const titleMatch =
+        paper.subject_title_id == null ||
+        contextSelection.subject_title_id == null ||
+        String(paper.subject_title_id) === String(contextSelection.subject_title_id);
+      const standardMatch =
+        paper.standard == null ||
+        contextSelection.standard == null ||
+        Number(paper.standard) === Number(contextSelection.standard);
+      return subjectMatch && titleMatch && standardMatch;
+    });
+    const worksheetsFiltered = worksheets.filter((ws) => {
+      const subjectMatch = !contextSelection.subject_name || ws.subject === contextSelection.subject_name;
+      const standardMatch =
+        contextSelection.standard == null ||
+        parseInt(ws.standard) === parseInt(contextSelection.standard);
+      return subjectMatch && standardMatch;
+    });
+    const answerSheetsFiltered = answerSheets.filter((as) => {
+      const subjectMatch = !contextSelection.subject_name || as.subject === contextSelection.subject_name;
+      const titleMatch =
+        !contextSelection.subject_title_name || as.subject_title === contextSelection.subject_title_name;
+      const standardMatch =
+        contextSelection.standard == null ||
+        parseInt(as.standard) === parseInt(contextSelection.standard);
+      return subjectMatch && titleMatch && standardMatch;
+    });
+    return {
+      papers: papersFiltered.length,
+      worksheets: worksheetsFiltered.length,
+      answerSheets: answerSheetsFiltered.length,
+    };
+  }, [contextSelection, allPapers, worksheets, answerSheets]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const fetchWorksheetsAndSheets = async () => {
+      setStatsLoading(true);
+      try {
+        const [wsRes, asRes] = await Promise.all([
+          apiClient.get("/worksheets"),
+          apiClient.get("/answersheets"),
+        ]);
+        if (!cancelled) {
+          setWorksheets(Array.isArray(wsRes?.data) ? wsRes.data : []);
+          setAnswerSheets(Array.isArray(asRes?.data) ? asRes.data : []);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setWorksheets([]);
+          setAnswerSheets([]);
+        }
+      } finally {
+        if (!cancelled) setStatsLoading(false);
+      }
+    };
+    fetchWorksheetsAndSheets();
+    return () => { cancelled = true; };
+  }, []);
 
   // Fetch approved subjects on component mount
   useEffect(() => {
@@ -119,7 +190,7 @@ const Overview = () => {
       }, 2000);
       return;
     }
-    navigate("/dashboard/generate/header", { state: { from: "prebuild" } });
+    navigate("/dashboard/templates");
   };
 
   const handleCustomNavigate = () => {
@@ -163,7 +234,7 @@ const Overview = () => {
           </p>
         </div>
 
-        {/* Stats Cards */}
+        {/* Stats Cards – filtered by selected subject context */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
           {/* Papers Card */}
           <Link to="/dashboard/history">
@@ -172,17 +243,19 @@ const Overview = () => {
                 <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg group-hover:shadow-blue-300 transition-shadow">
                   <FileText className="w-8 h-8 text-white" />
                 </div>
-                <div className="flex items-center gap-1 text-green-600 text-sm font-semibold">
-                  <TrendingUp className="w-4 h-4" />
-                  <span>+12%</span>
-                </div>
+                {!statsLoading && (
+                  <div className="flex items-center gap-1 text-green-600 text-sm font-semibold">
+                    <TrendingUp className="w-4 h-4" />
+                    <span>—</span>
+                  </div>
+                )}
               </div>
               <h3 className="text-3xl font-bold text-gray-800 mb-1">
-                {stats.papers}
+                {statsLoading ? "…" : stats.papers}
               </h3>
               <p className="text-gray-600 font-medium">Question Papers</p>
               <p className="text-xs text-gray-500 mt-2">
-                Total papers generated
+                Total papers (for selected context)
               </p>
             </div>
           </Link>
@@ -194,17 +267,19 @@ const Overview = () => {
                 <div className="p-3 bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg group-hover:shadow-green-300 transition-shadow">
                   <FilePlus className="w-8 h-8 text-white" />
                 </div>
-                <div className="flex items-center gap-1 text-green-600 text-sm font-semibold">
-                  <TrendingUp className="w-4 h-4" />
-                  <span>+8%</span>
-                </div>
+                {!statsLoading && (
+                  <div className="flex items-center gap-1 text-green-600 text-sm font-semibold">
+                    <TrendingUp className="w-4 h-4" />
+                    <span>—</span>
+                  </div>
+                )}
               </div>
               <h3 className="text-3xl font-bold text-gray-800 mb-1">
-                {stats.worksheets}
+                {statsLoading ? "…" : stats.worksheets}
               </h3>
               <p className="text-gray-600 font-medium">Practice Worksheets</p>
               <p className="text-xs text-gray-500 mt-2">
-                Active worksheets created
+                Active worksheets (for selected context)
               </p>
             </div>
           </Link>
@@ -216,17 +291,19 @@ const Overview = () => {
                 <div className="p-3 bg-gradient-to-br from-red-500 to-red-600 rounded-xl shadow-lg group-hover:shadow-red-300 transition-shadow">
                   <ClipboardCheck className="w-8 h-8 text-white" />
                 </div>
-                <div className="flex items-center gap-1 text-green-600 text-sm font-semibold">
-                  <TrendingUp className="w-4 h-4" />
-                  <span>+5%</span>
-                </div>
+                {!statsLoading && (
+                  <div className="flex items-center gap-1 text-green-600 text-sm font-semibold">
+                    <TrendingUp className="w-4 h-4" />
+                    <span>—</span>
+                  </div>
+                )}
               </div>
               <h3 className="text-3xl font-bold text-gray-800 mb-1">
-                {stats.answerSheets}
+                {statsLoading ? "…" : stats.answerSheets}
               </h3>
               <p className="text-gray-600 font-medium">Answer Sheets</p>
               <p className="text-xs text-gray-500 mt-2">
-                Assessment solutions ready
+                Assessment solutions (for selected context)
               </p>
             </div>
           </Link>
