@@ -1,9 +1,9 @@
 import axios from "axios";
 import { isTokenExpired } from "../utils/tokenUtils";
+import { API_BASE_URL } from "../config/api";
 
 const apiClient = axios.create({
-  baseURL:
-    import.meta.env.VITE_API_URL || "https://poetreebackend.netlify.app/api",
+  baseURL: API_BASE_URL,
   headers: {
     "Content-Type": "application/json",
   },

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Eye, Trash2, Edit, Calendar, FileText } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { API_ORIGIN } from "../../config/api";
 
 const PaperCard = ({
   id,
@@ -39,10 +40,8 @@ const PaperCard = ({
     if (logoUrl.startsWith("http://") || logoUrl.startsWith("https://")) {
       return logoUrl;
     }
-    // If relative path, prepend API base URL
-    const apiBaseUrl =
-      import.meta.env.VITE_API_URL || "http://localhost:4000/api";
-    const baseUrl = apiBaseUrl.replace("/api", "");
+    // If relative path, prepend API origin (from single config)
+    const baseUrl = API_ORIGIN;
     // Handle both absolute and relative paths
     if (logoUrl.startsWith("/")) {
       return `${baseUrl}${logoUrl}`;
