@@ -46,7 +46,7 @@ const EditHeader = () => {
 
           if (paper) {
             const headerFromPaper = {
-              // Always use user profile values for school info
+              // A lways use user profile values for school info
               schoolName: userSchoolName,
               address: userAddress,
               image: userLogo,
