@@ -13,19 +13,18 @@ jobs:
       - name: Deploy to VPS via SSH
         uses: appleboy/ssh-action@v1.0.0
         with:
-          host: 72.62.227.2
-          username: root
-          key: b3BlbnNzaC1rZXktdjEAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAABFwAAAAdzc2gtZWQyNTUxOQAAACmgjCpbkPwKS3EAVvsRW0W8zywWP54sD2DXLEhCC0XwAAAJDD622kAAAAAAdzc2gtZWQyNTUxOQAAACmgjCpbkPwKS3EAVvsRW0W8zywWP54sD2DXLEhCC0XwAAAECBnFDbIZuShOW2DYQUumUfLIhKsmyvt86YCYCNCPcIyqaCMKls08rApLcQBW+xFahbzPLBY/niwPYNcsSEII5fAAAAADGdpdGh1Yi1jaS1jZA==
-
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_KEY }}
           script: |
             set -e
             echo "🚀 Deploy started on VPS"
+
 
             # ===== FRONTEND =====
             cd /var/www/poetreefrontend/poetree-publication
             git pull origin main
             npm install
             npm run build
-
 
             echo "✅ Deploy finished successfully"
