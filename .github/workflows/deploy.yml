@@ -15,7 +15,8 @@ jobs:
         with:
           host: 72.62.227.2
           username: root
-          key: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKaCMKlso8rApLcQBW+xFahbzPLBY/niwPYNcsSEII5f github-ci-cd
+          key:b3BlbnNzaC1rZXktdjEAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAABFwAAAAdzc2gtZWQyNTUxOQAAACmgjCpbkPwKS3EAVvsRW0W8zywWP54sD2DXLEhCC0XwAAAJDD622kAAAAAAdzc2gtZWQyNTUxOQAAACmgjCpbkPwKS3EAVvsRW0W8zywWP54sD2DXLEhCC0XwAAAECBnFDbIZuShOW2DYQUumUfLIhKsmyvt86YCYCNCPcIyqaCMKls08rApLcQBW+xFahbzPLBY/niwPYNcsSEII5fAAAAADGdpdGh1Yi1jaS1jZA==
+
           script: |
             set -e
             echo "🚀 Deploy started on VPS"
