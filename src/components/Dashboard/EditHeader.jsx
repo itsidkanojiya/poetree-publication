@@ -31,9 +31,11 @@ const EditHeader = () => {
       const user = JSON.parse(localStorage.getItem("user") || "null");
       // Always use user profile values for school info (not editable in paper form)
       const userSchoolName = user?.school_name || "";
-      const userAddress = user?.address || (user?.school_address_city && user?.school_address_state
-        ? `${user.school_address_city}, ${user.school_address_state}`
-        : user?.school_address || "");
+      const userAddress =
+        user?.address ||
+        (user?.school_address_city && user?.school_address_state
+          ? `${user.school_address_city}, ${user.school_address_state}`
+          : user?.school_address || "");
       const userLogo = user?.logo || user?.logo_url || null;
 
       if (fromPaper && paperId) {
@@ -41,7 +43,7 @@ const EditHeader = () => {
         try {
           const response = await getPaperById(paperId);
           const paper = response.data || response;
-          
+
           if (paper) {
             const headerFromPaper = {
               // Always use user profile values for school info
@@ -51,7 +53,7 @@ const EditHeader = () => {
               // Paper-specific fields
               standard: paper.standard || "",
               timing: paper.timing || "",
-              date: paper.date ? paper.date.split('T')[0] : "",
+              date: paper.date ? paper.date.split("T")[0] : "",
               division: paper.division || "",
               subject: paper.subject || "",
               board: paper.board || "",
@@ -78,7 +80,7 @@ const EditHeader = () => {
         });
       } else if (header) {
         // Use header from context, but always use user profile for school info
-        setEditedHeader({ 
+        setEditedHeader({
           ...header,
           schoolName: userSchoolName,
           address: userAddress,
@@ -127,7 +129,11 @@ const EditHeader = () => {
   };
 
   // Show loading state while header is being loaded
-  if (loading || (!header && !headerData && !fromPaper && id !== "new") || !editedHeader) {
+  if (
+    loading ||
+    (!header && !headerData && !fromPaper && id !== "new") ||
+    !editedHeader
+  ) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center">
         <div className="text-center">
@@ -146,7 +152,7 @@ const EditHeader = () => {
           {fromPaper ? "Edit Paper Header" : "Edit Header"}
         </h1>
         <p className="text-gray-600 text-lg">
-          {fromPaper 
+          {fromPaper
             ? "Update your paper header details, then continue to edit questions"
             : "Customize your school paper header"}
         </p>
@@ -171,8 +177,16 @@ const EditHeader = () => {
             {/* Info Card */}
             <div className="mt-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-200">
               <p className="text-sm text-gray-700">
-                <strong className="text-blue-700">💡 Tip:</strong> School name, address, and logo are automatically taken from your profile. 
-                Update them in <a href="/dashboard/profile" className="underline font-semibold text-blue-600">Profile Settings</a>.
+                <strong className="text-blue-700">💡 Tip:</strong> School name,
+                address, and logo are automatically taken from your profile.
+                Update them in{" "}
+                <a
+                  href="/dashboard/profile"
+                  className="underline font-semibold text-blue-600"
+                >
+                  Profile Settings
+                </a>
+                .
               </p>
             </div>
           </div>
@@ -206,8 +220,8 @@ const EditHeader = () => {
                   if (fromPaper && paperId) {
                     // Editing existing paper - go to CustomPaper with edit mode
                     navigate("/dashboard/generate/custompaper", {
-                      state: { 
-                        header: editedHeader, 
+                      state: {
+                        header: editedHeader,
                         headerId: id,
                         paperId: paperId,
                         editMode: true,
