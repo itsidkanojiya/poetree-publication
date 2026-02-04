@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      '/api': "https://poetreebackend.netlify.app"  // Backend runs on port 4000
+      '/api': "http://72.62.227.2:4000/"  // Backend runs on port 4000
     }
   },
   resolve: {

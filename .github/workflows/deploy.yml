@@ -1,0 +1,30 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to VPS via SSH
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: 72.62.227.2
+          username: root
+          key: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKaCMKlso8rApLcQBW+xFahbzPLBY/niwPYNcsSEII5f github-ci-cd
+          script: |
+            set -e
+            echo "🚀 Deploy started on VPS"
+
+            # ===== FRONTEND =====
+            cd /var/www/poetreefrontend/poetree-publication
+            git pull origin main
+            npm install
+            npm run build
+
+
+            echo "✅ Deploy finished successfully"
