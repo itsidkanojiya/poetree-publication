@@ -64,7 +64,7 @@ const EditHeader = () => {
             setEditedHeader(headerFromPaper);
           }
         } catch (error) {
-          console.error("Error loading paper:", error);
+          console.error("Error loading paper: ", error);
         } finally {
           setLoading(false);
         }
