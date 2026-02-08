@@ -37,8 +37,12 @@ const Worksheets = () => {
       return;
     }
     const filtered = worksheets.filter((ws) => {
-      const subjectMatch = !contextSelection.subject_name || ws.subject === contextSelection.subject_name;
-      const standardMatch = contextSelection.standard == null || parseInt(ws.standard) === parseInt(contextSelection.standard);
+      const subjectMatch =
+        !contextSelection.subject_name ||
+        ws.subject === contextSelection.subject_name;
+      const standardMatch =
+        contextSelection.standard == null ||
+        parseInt(ws.standard) === parseInt(contextSelection.standard);
       return subjectMatch && standardMatch;
     });
     setFilteredWorksheets(filtered);
