@@ -15,16 +15,22 @@ jobs:
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_KEY }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: 22
           script: |
             set -e
             echo "🚀 Deploy started on VPS"
-
 
             # ===== FRONTEND =====
             cd /var/www/poetreefrontend/poetree-publication
             git pull origin main
             npm install
             npm run build
+
+
+
+            # ===== NGINX =====
+            nginx -t
+            systemctl reload nginx
 
             echo "✅ Deploy finished successfully"
