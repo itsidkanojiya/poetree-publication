@@ -6,7 +6,7 @@
  * Deployment:     Use default or set VITE_API_URL=https://poetreebackend.netlify.app/api in build env
  */ //http://72.62.227.2:4000/api
 export const API_BASE_URL =
-  import.meta.env.VITE_API_URL || "https://api.poetreepublications.com";
+  import.meta.env.VITE_API_URL || "http://72.62.227.2:4000/api";
 
 /** Base URL without /api (e.g. for images/assets on same host) */
 export const API_ORIGIN = API_BASE_URL.replace(/\/api\/?$/, "") || API_BASE_URL;
