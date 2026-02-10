@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      '/api': "http://72.62.227.2:4000/api"  // Backend runs on port 4000
+      '/api': "https://api.poetreepublications.com/api"  // Backend runs on port 4000
     }
   },
   resolve: {
