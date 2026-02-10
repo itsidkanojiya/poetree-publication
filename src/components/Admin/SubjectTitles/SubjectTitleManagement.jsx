@@ -182,7 +182,9 @@ const SubjectTitleManagement = () => {
                       {title.subject || "N/A"}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">
-                      {title.standard || "N/A"}
+                      {Array.isArray(title.standard)
+                        ? title.standard.join(", ")
+                        : title.standard || "N/A"}
                     </td>
                     <td className="px-6 py-4 text-sm">
                       <button

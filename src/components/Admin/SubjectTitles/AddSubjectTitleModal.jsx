@@ -1,20 +1,33 @@
 import { useState } from "react";
 import { X } from "lucide-react";
 
+const STANDARDS = Array.from({ length: 12 }, (_, i) => String(i + 1));
+
 const AddSubjectTitleModal = ({ subjects, onClose, onSave }) => {
   const [formData, setFormData] = useState({
     title_name: "",
     subject_id: "",
-    standard: "",
+    standard: [],
   });
   const [errors, setErrors] = useState({});
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-    // Clear error when user starts typing
     if (errors[name]) {
       setErrors((prev) => ({ ...prev, [name]: "" }));
+    }
+  };
+
+  const toggleStandard = (std) => {
+    setFormData((prev) => {
+      const next = prev.standard.includes(std)
+        ? prev.standard.filter((s) => s !== std)
+        : [...prev.standard, std].sort((a, b) => Number(a) - Number(b));
+      return { ...prev, standard: next };
+    });
+    if (errors.standard) {
+      setErrors((prev) => ({ ...prev, standard: "" }));
     }
   };
 
@@ -26,8 +39,8 @@ const AddSubjectTitleModal = ({ subjects, onClose, onSave }) => {
     if (!formData.subject_id) {
       newErrors.subject_id = "Subject is required";
     }
-    if (!formData.standard.trim()) {
-      newErrors.standard = "Standard is required";
+    if (!formData.standard.length) {
+      newErrors.standard = "Select at least one standard";
     }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -103,21 +116,37 @@ const AddSubjectTitleModal = ({ subjects, onClose, onSave }) => {
             )}
           </div>
 
-          {/* Standard */}
+          {/* Standard - multi-select 1 to 12 */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
               Standard <span className="text-red-500">*</span>
             </label>
-            <input
-              type="text"
-              name="standard"
-              value={formData.standard}
-              onChange={handleChange}
-              className={`w-full px-4 py-3 border-2 rounded-lg focus:ring-2 focus:ring-blue-200 transition outline-none ${
-                errors.standard ? "border-red-300" : "border-gray-200 focus:border-blue-500"
+            <p className="text-xs text-gray-500 mb-2">Select one or more standards (1–12)</p>
+            <div
+              className={`flex flex-wrap gap-2 p-3 border-2 rounded-lg min-h-[52px] ${
+                errors.standard ? "border-red-300" : "border-gray-200 focus-within:border-blue-500"
               }`}
-              placeholder="Enter standard (e.g., 10, 11-12)"
-            />
+            >
+              {STANDARDS.map((std) => (
+                <label
+                  key={std}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 bg-gray-50 hover:bg-gray-100 cursor-pointer transition has-[:checked]:bg-blue-50 has-[:checked]:border-blue-300 has-[:checked]:text-blue-700"
+                >
+                  <input
+                    type="checkbox"
+                    checked={formData.standard.includes(std)}
+                    onChange={() => toggleStandard(std)}
+                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-sm font-medium">{std}</span>
+                </label>
+              ))}
+            </div>
+            {formData.standard.length > 0 && (
+              <p className="mt-1.5 text-sm text-gray-600">
+                Selected: {formData.standard.join(", ")}
+              </p>
+            )}
             {errors.standard && (
               <p className="mt-1 text-sm text-red-600">{errors.standard}</p>
             )}
