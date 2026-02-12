@@ -107,16 +107,23 @@ export const getUserSelections = async (userId) => {
  * POST /api/admin/approve-selections/{userId}
  * Body: { subject_ids: number[], subject_title_ids: number[], reject_others: boolean }
  */
-export const approveUserSelections = async (userId, { subject_ids, subject_title_ids, reject_others = false }) => {
+export const approveUserSelections = async (
+  userId,
+  { subject_ids, subject_title_ids, reject_others = false },
+) => {
   try {
     const body = {
-      subject_ids: Array.isArray(subject_ids) ? subject_ids.map((id) => Number(id)) : [],
-      subject_title_ids: Array.isArray(subject_title_ids) ? subject_title_ids.map((id) => Number(id)) : [],
+      subject_ids: Array.isArray(subject_ids)
+        ? subject_ids.map((id) => Number(id))
+        : [],
+      subject_title_ids: Array.isArray(subject_title_ids)
+        ? subject_title_ids.map((id) => Number(id))
+        : [],
       reject_others: Boolean(reject_others),
     };
     const response = await apiClient.post(
       `/admin/approve-selections/${userId}`,
-      body
+      body,
     );
     return response.data;
   } catch (error) {
@@ -148,7 +155,7 @@ export const getSubjectRequests = async () => {
 export const approveSubjectRequest = async (requestId, type) => {
   try {
     const response = await apiClient.put(
-      `/admin/subject-requests/${requestId}/approve?type=${type}`
+      `/admin/subject-requests/${requestId}/approve?type=${type}`,
     );
     return response.data;
   } catch (error) {
@@ -164,7 +171,7 @@ export const approveSubjectRequest = async (requestId, type) => {
 export const rejectSubjectRequest = async (requestId, type) => {
   try {
     const response = await apiClient.post(
-      `/admin/subject-requests/${requestId}/reject?type=${type}`
+      `/admin/subject-requests/${requestId}/reject?type=${type}`,
     );
     return response.data;
   } catch (error) {
@@ -376,11 +383,11 @@ export const addAnswerSheet = async (formData) => {
 
 /**
  * Delete answer sheet
- * DELETE /api/answersheets?id={id}
+ * DELETE /api/answersheets/{id}
  */
 export const deleteAnswerSheet = async (id) => {
   try {
-    const response = await apiClient.delete(`/answersheets?id=${id}`);
+    const response = await apiClient.delete(`/answersheets/${id}`);
     return response.data;
   } catch (error) {
     console.error("Error deleting answer sheet:", error);
@@ -450,9 +457,9 @@ export const createTemplate = async (templateData) => {
     console.log("createTemplate - templateData received:", templateData);
     console.log(
       "createTemplate - school_name value:",
-      templateData.school_name
+      templateData.school_name,
     );
-    
+
     // Required fields
     formData.append("user_id", templateData.user_id);
     formData.append("type", templateData.type || "default");
@@ -479,22 +486,22 @@ export const createTemplate = async (templateData) => {
     console.log("=== SCHOOL_NAME DEBUG ===");
     console.log(
       "createTemplate - templateData.school_name:",
-      templateData.school_name
+      templateData.school_name,
     );
     console.log("createTemplate - finalSchoolName:", finalSchoolName);
     console.log(
       "createTemplate - Appending school_name to FormData:",
-      finalSchoolName
+      finalSchoolName,
     );
 
     // Verify it was added to FormData BEFORE sending
     const formDataEntries = Array.from(formData.entries());
     const schoolNameEntry = formDataEntries.find(
-      ([key]) => key === "school_name"
+      ([key]) => key === "school_name",
     );
     console.log(
       "createTemplate - Verified school_name in FormData:",
-      schoolNameEntry
+      schoolNameEntry,
     );
     console.log("=== END SCHOOL_NAME DEBUG ===");
 
@@ -514,7 +521,7 @@ export const createTemplate = async (templateData) => {
         formData.append("logo", templateData.logo);
         console.log(
           "createTemplate - Appending logo file:",
-          templateData.logo.name
+          templateData.logo.name,
         );
       }
     }
@@ -523,18 +530,18 @@ export const createTemplate = async (templateData) => {
     formData.append("subject_id", String(templateData.subject_id || ""));
     formData.append(
       "subject_title_id",
-      String(templateData.subject_title_id || "")
+      String(templateData.subject_title_id || ""),
     );
     formData.append("board_id", String(templateData.board_id || ""));
     formData.append("subject", templateData.subject || "NA");
     formData.append("board", templateData.board || "NA");
     formData.append(
       "date",
-      templateData.date || new Date().toISOString().split("T")[0]
+      templateData.date || new Date().toISOString().split("T")[0],
     );
     formData.append("body", templateData.body || "[]");
     formData.append("total_marks", String(templateData.total_marks || 0));
-    
+
     // Marks breakdown
     formData.append("marks_mcq", String(templateData.marks_mcq || 0));
     formData.append("marks_short", String(templateData.marks_short || 0));
@@ -543,15 +550,15 @@ export const createTemplate = async (templateData) => {
     formData.append("marks_onetwo", String(templateData.marks_onetwo || 0));
     formData.append(
       "marks_truefalse",
-      String(templateData.marks_truefalse || 0)
+      String(templateData.marks_truefalse || 0),
     );
     formData.append("marks_passage", String(templateData.marks_passage || 0));
     formData.append("marks_match", String(templateData.marks_match || 0));
-    
+
     // Optional fields
     if (templateData.timing)
       formData.append("timing", String(templateData.timing));
-    
+
     // Template metadata (includes header_id and question_types)
     // Always send template_metadata - never null
     if (templateData.template_metadata) {
@@ -571,11 +578,11 @@ export const createTemplate = async (templateData) => {
       "/papers/templates/create",
       formData,
       {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
         timeout: 60000, // 60 seconds timeout for large requests
-      }
+      },
     );
 
     return response.data;

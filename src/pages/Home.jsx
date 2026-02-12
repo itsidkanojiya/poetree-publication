@@ -2,6 +2,7 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { Navbar } from "../components/Navbar";
 import Footer from "../components/Footer";
+import { BROCHURE_PDF_URL } from "../config/api";
 import {
   FileText,
   BookOpen,
@@ -12,6 +13,7 @@ import {
   ArrowRight,
   CheckCircle2,
   Sparkles,
+  FileDown,
 } from "lucide-react";
 
 const Home = () => {
@@ -101,6 +103,21 @@ const Home = () => {
             >
               Sign In
             </Link>
+            <a
+              href={BROCHURE_PDF_URL || "#"}
+              target={BROCHURE_PDF_URL ? "_blank" : undefined}
+              rel={BROCHURE_PDF_URL ? "noopener noreferrer" : undefined}
+              onClick={!BROCHURE_PDF_URL ? (e) => e.preventDefault() : undefined}
+              className={`inline-flex items-center gap-2 px-8 py-4 rounded-xl font-semibold border transition ${
+                BROCHURE_PDF_URL
+                  ? "bg-white/10 hover:bg-white/20 text-white border-white/20"
+                  : "bg-white/5 text-white/60 border-white/10 cursor-not-allowed"
+              }`}
+              title={BROCHURE_PDF_URL ? "Open brochure PDF" : "Brochure link will be added soon"}
+            >
+              <FileDown className="w-5 h-5" />
+              Download Brochure
+            </a>
           </div>
         </div>
       </section>
@@ -220,6 +237,21 @@ const Home = () => {
             >
               Sign In
             </Link>
+            <a
+              href={BROCHURE_PDF_URL || "#"}
+              target={BROCHURE_PDF_URL ? "_blank" : undefined}
+              rel={BROCHURE_PDF_URL ? "noopener noreferrer" : undefined}
+              onClick={!BROCHURE_PDF_URL ? (e) => e.preventDefault() : undefined}
+              className={`inline-flex items-center gap-2 px-8 py-4 rounded-xl font-semibold border transition ${
+                BROCHURE_PDF_URL
+                  ? "bg-white/10 hover:bg-white/20 text-white border-white/20"
+                  : "bg-white/5 text-white/60 border-white/10 cursor-not-allowed"
+              }`}
+              title={BROCHURE_PDF_URL ? "Open brochure PDF" : "Brochure link will be added soon"}
+            >
+              <FileDown className="w-5 h-5" />
+              Download Brochure
+            </a>
           </div>
         </div>
       </section>

@@ -382,11 +382,11 @@ export const addAnswerSheet = async (formData) => {
 
 /**
  * Delete answer sheet
- * DELETE /api/answersheets?id={id}
+ * DELETE /api/answersheets/{id}
  */
 export const deleteAnswerSheet = async (id) => {
   try {
-    const response = await apiClient.delete(`/answersheets?id=${id}`);
+    const response = await apiClient.delete(`/answersheets/${id}`);
     return response.data;
   } catch (error) {
     console.error("Error deleting answer sheet:", error);
