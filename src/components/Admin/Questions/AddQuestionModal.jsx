@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { X, Plus, Trash2 } from "lucide-react";
-import { addQuestion, editQuestion, getAllSubjects, getAllBoards } from "../../../services/adminService";
+import { addQuestion, editQuestion, getAllSubjects, getAllBoards, getSubjectTitlesBySubject } from "../../../services/adminService";
 import Toast from "../../Common/Toast";
 
 const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
@@ -28,12 +28,34 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
   const [passageQuestions, setPassageQuestions] = useState([{ question: "", answer: "" }]);
   const [matchPairs, setMatchPairs] = useState({ left: [""], right: [""] });
 
+  // For MCQ: option list (frontend only); formData.options/answer still sent as JSON array + 1-based index
+  const [mcqOptionList, setMcqOptionList] = useState(["", "", "", ""]);
+
   useEffect(() => {
     fetchInitialData();
     if (question) {
       loadQuestionData();
+    } else if (questionType === "mcq") {
+      setMcqOptionList(["", "", "", ""]);
     }
-  }, [question]);
+  }, [question, questionType]);
+
+  // When subject_id is set (e.g. after loadQuestionData or user selection), fetch subject titles
+  useEffect(() => {
+    if (!formData.subject_id) {
+      setSubjectTitles([]);
+      return;
+    }
+    let cancelled = false;
+    getSubjectTitlesBySubject(formData.subject_id)
+      .then((titlesData) => {
+        if (!cancelled) setSubjectTitles(Array.isArray(titlesData) ? titlesData : []);
+      })
+      .catch((err) => {
+        if (!cancelled) console.error("Error fetching subject titles:", err);
+      });
+    return () => { cancelled = true; };
+  }, [formData.subject_id]);
 
   const fetchInitialData = async () => {
     try {
@@ -83,6 +105,17 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
         console.error("Error parsing match pairs:", e);
       }
     }
+
+    if (questionType === "mcq" && question.options) {
+      try {
+        const opts = Array.isArray(question.options)
+          ? question.options
+          : JSON.parse(question.options || "[]");
+        setMcqOptionList(Array.isArray(opts) && opts.length > 0 ? opts : ["", "", "", ""]);
+      } catch (e) {
+        setMcqOptionList(["", "", "", ""]);
+      }
+    }
   };
 
   const handleChange = (e) => {
@@ -100,8 +133,6 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
   const handleSubjectChange = (e) => {
     const subjectId = e.target.value;
     setFormData((prev) => ({ ...prev, subject_id: subjectId, subject_title_id: "" }));
-    // Fetch subject titles for selected subject
-    // This would require a new API call - for now, we'll handle it in the form
   };
 
   const handleSubmit = async (e) => {
@@ -125,7 +156,8 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
 
       // Handle type-specific fields
       if (questionType === "mcq") {
-        formDataToSend.append("options", formData.options);
+        const optionsArray = mcqOptionList.map((o) => (o && o.trim()) || "").filter(Boolean);
+        formDataToSend.append("options", JSON.stringify(optionsArray));
         formDataToSend.append("answer", formData.answer);
       } else if (questionType === "passage") {
         formDataToSend.append("options", JSON.stringify(passageQuestions));
@@ -179,8 +211,14 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
     if (!formData.answer && questionType !== "passage" && questionType !== "match") {
       newErrors.answer = "Answer is required";
     }
-    if (questionType === "mcq" && !formData.options) {
-      newErrors.options = "Options are required for MCQ";
+    if (questionType === "mcq") {
+      const validOptions = mcqOptionList.map((o) => (o && o.trim()) || "").filter(Boolean);
+      if (validOptions.length === 0) newErrors.options = "At least one option is required";
+      if (!formData.answer) newErrors.answer = "Please select the correct answer";
+      if (formData.answer && validOptions.length > 0) {
+        const idx = Number(formData.answer);
+        if (idx < 1 || idx > validOptions.length) newErrors.answer = "Correct answer must be one of the options";
+      }
     }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -198,6 +236,29 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
     const updated = [...passageQuestions];
     updated[index][field] = value;
     setPassageQuestions(updated);
+  };
+
+  const updateMcqOption = (index, value) => {
+    setMcqOptionList((prev) => {
+      const next = [...prev];
+      next[index] = value;
+      return next;
+    });
+  };
+
+  const addMcqOption = () => {
+    setMcqOptionList((prev) => (prev.length >= 4 ? prev : [...prev, ""]));
+  };
+
+  const removeMcqOption = (index) => {
+    setMcqOptionList((prev) => prev.filter((_, i) => i !== index));
+    const oneBased = Number(formData.answer);
+    if (!oneBased) return;
+    if (oneBased === index + 1) {
+      setFormData((prev) => ({ ...prev, answer: "" }));
+    } else if (oneBased > index + 1) {
+      setFormData((prev) => ({ ...prev, answer: String(oneBased - 1) }));
+    }
   };
 
   const addMatchItem = (side) => {
@@ -269,15 +330,20 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   Standard <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="text"
+                <select
                   name="standard"
                   value={formData.standard}
                   onChange={handleChange}
                   className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition outline-none"
-                  placeholder="e.g., 10"
                   required
-                />
+                >
+                  <option value="">Select Standard</option>
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((std) => (
+                    <option key={std} value={std}>
+                      {std}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>
@@ -294,6 +360,25 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
                   {subjects.map((subject) => (
                     <option key={subject.subject_id} value={subject.subject_id}>
                       {subject.subject_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Subject Title
+                </label>
+                <select
+                  name="subject_title_id"
+                  value={formData.subject_title_id}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition outline-none"
+                >
+                  <option value="">Select Subject Title</option>
+                  {subjectTitles.map((st) => (
+                    <option key={st.subject_title_id} value={st.subject_title_id}>
+                      {st.subject_title_name ?? st.title_name ?? st.name ?? `Title ${st.subject_title_id}`}
                     </option>
                   ))}
                 </select>
@@ -340,36 +425,72 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
               <>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Options (JSON array) <span className="text-red-500">*</span>
+                    Options <span className="text-red-500">*</span>
                   </label>
-                  <textarea
-                    name="options"
-                    value={formData.options}
-                    onChange={handleChange}
-                    rows={4}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition outline-none font-mono text-sm"
-                    placeholder='["Option A", "Option B", "Option C", "Option D"]'
-                    required
-                  />
-                  <p className="mt-1 text-sm text-gray-500">
-                    Enter options as JSON array: ["Option 1", "Option 2", "Option 3", "Option 4"]
+                  <p className="mb-2 text-sm text-gray-500">
+                    Add up to 4 options; select which one is the correct answer.
                   </p>
+                  {mcqOptionList.map((opt, index) => (
+                    <div key={index} className="flex gap-2 mb-2">
+                      <input
+                        type="text"
+                        value={opt}
+                        onChange={(e) => updateMcqOption(index, e.target.value)}
+                        className="flex-1 px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition outline-none"
+                        placeholder={`Option ${index + 1}`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeMcqOption(index)}
+                        disabled={mcqOptionList.length <= 1}
+                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition"
+                        title="Remove option"
+                      >
+                        <Trash2 className="w-5 h-5" />
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={addMcqOption}
+                    disabled={mcqOptionList.length >= 4}
+                    className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add option
+                  </button>
+                  {mcqOptionList.length >= 4 && (
+                    <span className="ml-2 text-xs text-gray-500">(max 4 options)</span>
+                  )}
+                  {errors.options && (
+                    <p className="mt-1 text-sm text-red-600">{errors.options}</p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Correct Answer (1-4) <span className="text-red-500">*</span>
+                    Correct Answer <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="number"
+                  <select
                     name="answer"
                     value={formData.answer}
                     onChange={handleChange}
-                    min="1"
-                    max="4"
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition outline-none"
-                    placeholder="1, 2, 3, or 4"
-                    required
-                  />
+                    className={`w-full px-4 py-3 border-2 rounded-lg focus:ring-2 focus:ring-blue-200 transition outline-none ${
+                      errors.answer ? "border-red-300" : "border-gray-200 focus:border-blue-500"
+                    }`}
+                  >
+                    <option value="">Select correct option</option>
+                    {mcqOptionList
+                      .map((o, i) => (o && o.trim()) || "")
+                      .filter(Boolean)
+                      .map((label, i) => (
+                        <option key={i} value={String(i + 1)}>
+                          Option {i + 1}: {label.length > 50 ? label.slice(0, 50) + "…" : label}
+                        </option>
+                      ))}
+                  </select>
+                  {errors.answer && (
+                    <p className="mt-1 text-sm text-red-600">{errors.answer}</p>
+                  )}
                 </div>
               </>
             )}

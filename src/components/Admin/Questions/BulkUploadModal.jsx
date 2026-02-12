@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import {
   X,
   Upload,
+  Download,
   FileSpreadsheet,
   Image,
   CheckCircle2,
@@ -47,6 +48,7 @@ const BulkUploadModal = ({ questionType, onClose, onSuccess }) => {
       answer: "Answer",
       solution: "Solution",
       subject: "Subject",
+      subject_id: "Subject ID",
       subject_title: "Subject Title",
       subject_title_id: "Subject Title ID",
       standard: "Standard",
@@ -85,6 +87,72 @@ const BulkUploadModal = ({ questionType, onClose, onSuccess }) => {
     }
 
     return baseMapping;
+  };
+
+  const downloadDemoFile = () => {
+    const mapping = getColumnMapping();
+    // Demo uses IDs only: Subject ID, Subject Title ID, Board ID (no name columns)
+    const headers = [
+      mapping.question,
+      mapping.answer,
+      mapping.standard,
+      mapping.subject_id,
+      mapping.subject_title_id,
+      mapping.board_id,
+      mapping.marks,
+    ];
+    if (questionType === "mcq") {
+      headers.push(mapping.option1, mapping.option2, mapping.option3, mapping.option4);
+    }
+    if (questionType === "passage") {
+      headers.push(mapping.passage, mapping.passage_questions, mapping.passage_answers);
+    }
+    if (questionType === "match") {
+      headers.push(mapping.left_items, mapping.right_items, mapping.match_answers);
+    }
+    headers.push(mapping.solution, mapping.image);
+
+    // Use first available ID from loaded lists so the demo file passes validation
+    const firstSubject = subjects[0];
+    const firstTitle = subjectTitles[0];
+    const firstBoard = boards[0];
+    const subjectId = firstSubject?.subject_id ?? "1";
+    const titleId = firstTitle?.subject_title_id ?? "1";
+    const boardId = firstBoard?.board_id ?? "1";
+
+    const sampleRow = [
+      "Sample question text?",
+      questionType === "mcq" ? "1" : "Sample answer",
+      "10",
+      subjectId,
+      titleId,
+      boardId,
+      "1",
+    ];
+    if (questionType === "mcq") {
+      sampleRow.push("Option A", "Option B", "Option C", "Option D");
+    }
+    if (questionType === "passage") {
+      sampleRow.push("Sample passage text", '["Q1?", "Q2?"]', '{"q1": "A1", "q2": "A2"}');
+    }
+    if (questionType === "match") {
+      sampleRow.push('["A", "B"]', '["1", "2"]', '{"A": "1", "B": "2"}');
+    }
+    sampleRow.push("Optional solution", "");
+
+    const wsData = [headers, sampleRow];
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Questions");
+    XLSX.writeFile(wb, "BulkUploadQuestions_Template.xlsx");
+
+    if (!firstSubject || !firstTitle || !firstBoard) {
+      setToast({
+        show: true,
+        message: "Template uses placeholder IDs (1,1,1). Replace with valid Subject ID, Subject Title ID, Board ID from the list below.",
+        type: "info",
+      });
+    }
   };
 
   const handleExcelUpload = async (e) => {
@@ -656,6 +724,17 @@ const BulkUploadModal = ({ questionType, onClose, onSuccess }) => {
                 (case-insensitive)
               </li>
             </ul>
+            <button
+              type="button"
+              onClick={downloadDemoFile}
+              className="mt-3 flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium"
+            >
+              <Download className="w-4 h-4" />
+              Download demo file
+            </button>
+            <p className="mt-2 text-xs text-blue-600">
+              Use the template and replace sample data with your questions, then upload here.
+            </p>
           </div>
 
           {/* Available Options Reference */}
