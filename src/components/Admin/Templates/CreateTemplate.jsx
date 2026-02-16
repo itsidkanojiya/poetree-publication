@@ -16,6 +16,7 @@ import {
   getAllBoards,
   getAllSubjectTitles,
   getQuestionsByType,
+  getAllStandards,
 } from "../../../services/adminService";
 import { getProfile } from "../../../services/authService";
 import Toast from "../../Common/Toast";
@@ -89,6 +90,7 @@ const CreateTemplate = () => {
   const [subjects, setSubjects] = useState([]);
   const [subjectTitles, setSubjectTitles] = useState([]);
   const [boards, setBoards] = useState([]);
+  const [standards, setStandards] = useState([]);
   const [availableQuestions, setAvailableQuestions] = useState({});
   const [selectedHeader, setSelectedHeader] = useState(null);
   const [selectedQuestionIds, setSelectedQuestionIds] = useState(new Set());
@@ -133,6 +135,12 @@ const CreateTemplate = () => {
     fetchInitialData();
   }, []);
 
+  // Subject is set from database (one-time); use first subject
+  useEffect(() => {
+    if (subjects.length > 0 && !formData.subject_id) {
+      setFormData((prev) => ({ ...prev, subject_id: String(subjects[0].subject_id) }));
+    }
+  }, [subjects]);
   useEffect(() => {
     if (formData.subject_id) {
       fetchSubjectTitles();
@@ -147,16 +155,21 @@ const CreateTemplate = () => {
 
   const fetchInitialData = async () => {
     try {
-      const [subjectsData, boardsData] = await Promise.all([
+      const [subjectsData, boardsData, standardsData] = await Promise.all([
         getAllSubjects(),
         getAllBoards(),
+        getAllStandards(),
       ]);
       setSubjects(Array.isArray(subjectsData) ? subjectsData : []);
       setBoards(Array.isArray(boardsData) ? boardsData : []);
+      const stdList = Array.isArray(standardsData) ? standardsData : [];
+      setStandards(stdList.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)));
     } catch (error) {
       console.error("Error fetching data:", error);
     }
   };
+
+  const getStandardName = (id) => standards.find((s) => Number(s.standard_id) === Number(id))?.name ?? id;
 
   const fetchSubjectTitles = async () => {
     try {
@@ -323,7 +336,7 @@ const CreateTemplate = () => {
         ...selectedHeader,
         // Note: schoolName will be fetched from user table via user_id
         subject: selectedSubject?.subject_name || "NA",
-        class: `Standard ${formData.standard}`,
+        class: formData.standard ? `Standard ${getStandardName(formData.standard)}` : "",
         date: currentDate,
       };
 
@@ -456,7 +469,7 @@ const CreateTemplate = () => {
         address: userAddress, // Get address from user profile
         logo: userLogo, // Get logo from user profile (optional)
         paper_title: formData.title || "", // Send paper_title (same as title for templates)
-        standard: parseInt(formData.standard),
+        standard: parseInt(formData.standard, 10),
         subject_id: parseInt(formData.subject_id),
         subject_title_id: parseInt(formData.subject_title_id),
         board_id: parseInt(formData.board_id),
@@ -585,7 +598,7 @@ const CreateTemplate = () => {
       address: userAddress || selectedHeader.address || "",
       image: userLogo || selectedHeader.image || "",
       subject: selectedSubject?.subject_name || "",
-      class: formData.standard ? `Standard ${formData.standard}` : "",
+      class: formData.standard ? `Standard ${getStandardName(formData.standard)}` : "",
       date: new Date().toISOString().split("T")[0],
       documentTitle: formData.title || selectedHeader.documentTitle || null,
     };
@@ -653,25 +666,6 @@ const CreateTemplate = () => {
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Subject <span className="text-red-500">*</span>
-          </label>
-          <select
-            name="subject_id"
-            value={formData.subject_id}
-            onChange={handleInputChange}
-            required
-            className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
-          >
-            <option value="">Select Subject</option>
-            {subjects.map((s) => (
-              <option key={s.subject_id} value={s.subject_id}>
-                {s.subject_name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
             Subject Title <span className="text-red-500">*</span>
           </label>
           <select
@@ -702,9 +696,9 @@ const CreateTemplate = () => {
             className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
           >
             <option value="">Select Standard</option>
-            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((std) => (
-              <option key={std} value={std}>
-                Standard {std}
+            {standards.map((s) => (
+              <option key={s.standard_id} value={s.standard_id}>
+                {s.name}
               </option>
             ))}
           </select>
@@ -790,7 +784,7 @@ const CreateTemplate = () => {
                             image: userLogo || header.image || "",
                             subject: selectedSubject,
                             class: formData.standard
-                              ? `Standard ${formData.standard}`
+                              ? `Standard ${getStandardName(formData.standard)}`
                               : "",
                             date: new Date().toISOString().split("T")[0],
                             documentTitle:
@@ -866,7 +860,7 @@ const CreateTemplate = () => {
                     <span className="text-gray-600">Standard:</span>
                     <span className="font-medium">
                       {formData.standard
-                        ? `Standard ${formData.standard}`
+                        ? getStandardName(formData.standard)
                         : "Not set"}
                     </span>
                   </div>
@@ -1279,7 +1273,7 @@ const CreateTemplate = () => {
               <span className="text-sm text-gray-600">Standard:</span>
               <p className="font-semibold text-gray-800">
                 {formData.standard
-                  ? `Standard ${formData.standard}`
+                  ? getStandardName(formData.standard)
                   : "Not set"}
               </p>
             </div>

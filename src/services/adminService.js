@@ -265,6 +265,154 @@ export const getAllBoards = async () => {
   }
 };
 
+// ==================== STANDARDS ====================
+
+/**
+ * Get all standards (no auth – use in dropdowns)
+ * GET /api/standards
+ */
+export const getAllStandards = async () => {
+  try {
+    const response = await apiClient.get("/standards");
+    const data = response.data;
+    const list = Array.isArray(data?.standards) ? data.standards : data;
+    return list || [];
+  } catch (error) {
+    console.error("Error fetching standards:", error);
+    throw error;
+  }
+};
+
+/**
+ * Get one standard by ID
+ * GET /api/standards/:id
+ */
+export const getStandardById = async (id) => {
+  try {
+    const response = await apiClient.get(`/standards/${id}`);
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching standard:", error);
+    throw error;
+  }
+};
+
+/**
+ * Create standard (admin)
+ * POST /api/standards
+ */
+export const createStandard = async (body) => {
+  try {
+    const response = await apiClient.post("/standards", body);
+    return response.data;
+  } catch (error) {
+    console.error("Error creating standard:", error);
+    throw error;
+  }
+};
+
+/**
+ * Update standard (admin)
+ * PUT /api/standards/:id
+ */
+export const updateStandard = async (id, body) => {
+  try {
+    const response = await apiClient.put(`/standards/${id}`, body);
+    return response.data;
+  } catch (error) {
+    console.error("Error updating standard:", error);
+    throw error;
+  }
+};
+
+/**
+ * Delete standard (admin)
+ * DELETE /api/standards/:id
+ */
+export const deleteStandard = async (id) => {
+  try {
+    const response = await apiClient.delete(`/standards/${id}`);
+    return response.data;
+  } catch (error) {
+    console.error("Error deleting standard:", error);
+    throw error;
+  }
+};
+
+// ==================== ANIMATIONS ====================
+
+/**
+ * Get all animations (no auth – for user Animations page)
+ * GET /api/animations
+ */
+export const getAnimations = async () => {
+  try {
+    const response = await apiClient.get("/animations");
+    const data = response.data;
+    const list = Array.isArray(data?.animations) ? data.animations : data;
+    return list || [];
+  } catch (error) {
+    console.error("Error fetching animations:", error);
+    throw error;
+  }
+};
+
+/**
+ * Get one animation by ID
+ * GET /api/animations/:id
+ */
+export const getAnimationById = async (id) => {
+  try {
+    const response = await apiClient.get(`/animations/${id}`);
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching animation:", error);
+    throw error;
+  }
+};
+
+/**
+ * Create animation (admin)
+ * POST /api/animations
+ */
+export const createAnimation = async (body) => {
+  try {
+    const response = await apiClient.post("/animations", body);
+    return response.data;
+  } catch (error) {
+    console.error("Error creating animation:", error);
+    throw error;
+  }
+};
+
+/**
+ * Update animation (admin)
+ * PUT /api/animations/:id
+ */
+export const updateAnimation = async (id, body) => {
+  try {
+    const response = await apiClient.put(`/animations/${id}`, body);
+    return response.data;
+  } catch (error) {
+    console.error("Error updating animation:", error);
+    throw error;
+  }
+};
+
+/**
+ * Delete animation (admin)
+ * DELETE /api/animations/:id
+ */
+export const deleteAnimation = async (id) => {
+  try {
+    const response = await apiClient.delete(`/animations/${id}`);
+    return response.data;
+  } catch (error) {
+    console.error("Error deleting animation:", error);
+    throw error;
+  }
+};
+
 // ==================== QUESTION MANAGEMENT ====================
 
 /**

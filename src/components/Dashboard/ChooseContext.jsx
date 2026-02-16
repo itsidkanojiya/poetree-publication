@@ -2,9 +2,7 @@ import { useState, useEffect } from "react";
 import { BookOpen, CheckCircle } from "lucide-react";
 import Loader from "../Common/loader/loader";
 import { useUserTeaching } from "../../context/UserTeachingContext";
-import { getAllSubjects, getAllSubjectTitles, getAllBoards } from "../../services/adminService";
-
-const STANDARDS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+import { getAllSubjects, getAllSubjectTitles, getAllBoards, getAllStandards } from "../../services/adminService";
 
 const ChooseContext = () => {
   const { approvedSelections, setContextSelection, loading } = useUserTeaching();
@@ -16,6 +14,7 @@ const ChooseContext = () => {
   const [allSubjects, setAllSubjects] = useState([]);
   const [allSubjectTitles, setAllSubjectTitles] = useState([]);
   const [boards, setBoards] = useState([]);
+  const [standards, setStandards] = useState([]);
 
   const { subjects, subject_titles } = approvedSelections;
 
@@ -23,21 +22,25 @@ const ChooseContext = () => {
     let cancelled = false;
     const fetch = async () => {
       try {
-        const [subsRes, titlesRes, boardsRes] = await Promise.all([
+        const [subsRes, titlesRes, boardsRes, standardsRes] = await Promise.all([
           getAllSubjects(),
           getAllSubjectTitles(),
           getAllBoards(),
+          getAllStandards(),
         ]);
         if (!cancelled) {
           setAllSubjects(Array.isArray(subsRes) ? subsRes : subsRes?.subjects ?? []);
           setAllSubjectTitles(Array.isArray(titlesRes) ? titlesRes : titlesRes?.subject_titles ?? titlesRes?.data ?? []);
           setBoards(Array.isArray(boardsRes) ? boardsRes : boardsRes?.boards ?? boardsRes?.data ?? []);
+          const stdList = Array.isArray(standardsRes) ? standardsRes : [];
+          setStandards(stdList.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)));
         }
       } catch {
         if (!cancelled) {
           setAllSubjects([]);
           setAllSubjectTitles([]);
           setBoards([]);
+          setStandards([]);
         }
       }
     };
@@ -75,23 +78,33 @@ const ChooseContext = () => {
     return { id, name, subjectName };
   });
 
+  // Subject is set from database (one-time); use first approved subject, no dropdown
+  useEffect(() => {
+    if (subjectOptions.length > 0 && !subjectId) {
+      setSubjectId(String(subjectOptions[0].id));
+    }
+  }, [subjectOptions, subjectId]);
+  const effectiveSubjectId = subjectId || subjectOptions[0]?.id;
+
   const handleSubmit = (e) => {
     e.preventDefault();
     setSubmitError("");
-    if (!subjectId || !subjectTitleId || standard === "" || !boardId) {
-      setSubmitError("Please select Subject, Subject Title, Standard, and Board.");
+    if (!effectiveSubjectId || !subjectTitleId || standard === "" || !boardId) {
+      setSubmitError("Please select Subject Title, Standard, and Board.");
       return;
     }
-    const sub = subjectOptions.find((o) => String(o.id) === String(subjectId));
+    const sub = subjectOptions.find((o) => String(o.id) === String(effectiveSubjectId));
     const tit = titleOptions.find((o) => String(o.id) === String(subjectTitleId));
     const board = boards.find((b) => String(b.board_id ?? b.id) === String(boardId));
+    const std = standards.find((s) => String(s.standard_id) === String(standard));
     setContextSelection({
-      subject_id: Number(subjectId) || subjectId,
+      subject_id: Number(effectiveSubjectId) || effectiveSubjectId,
       subject_title_id: Number(subjectTitleId) || subjectTitleId,
-      standard: Number(standard) || standard,
+      standard: standard === "" ? null : Number(standard) || standard,
       board_id: Number(boardId) || boardId,
       subject_name: sub?.name ?? "",
       subject_title_name: tit?.name ?? "",
+      standard_name: std?.name ?? "",
       board_name: board?.board_name ?? board?.name ?? "",
     });
   };
@@ -136,28 +149,11 @@ const ChooseContext = () => {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-gray-800">Choose Your Teaching Context</h1>
-            <p className="text-gray-600 text-sm">Select subject, subject title, standard, and board. This will filter your dashboard.</p>
+            <p className="text-gray-600 text-sm">Select subject title, standard, and board. This will filter your dashboard.</p>
           </div>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Subject</label>
-            <select
-              value={subjectId}
-              onChange={(e) => setSubjectId(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-              required
-            >
-              <option value="">Select subject</option>
-              {subjectOptions.map((opt) => (
-                <option key={opt.id} value={opt.id}>
-                  {opt.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">Subject Title</label>
             <select
@@ -184,9 +180,9 @@ const ChooseContext = () => {
               required
             >
               <option value="">Select standard</option>
-              {STANDARDS.map((s) => (
-                <option key={s} value={s}>
-                  {s}
+              {standards.map((s) => (
+                <option key={s.standard_id} value={s.standard_id}>
+                  {s.name}
                 </option>
               ))}
             </select>

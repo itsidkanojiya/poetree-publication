@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { X, Plus, Trash2 } from "lucide-react";
-import { addQuestion, editQuestion, getAllSubjects, getAllBoards, getSubjectTitlesBySubject } from "../../../services/adminService";
+import { addQuestion, editQuestion, getAllSubjects, getAllBoards, getSubjectTitlesBySubject, getAllStandards } from "../../../services/adminService";
 import Toast from "../../Common/Toast";
 
 const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
@@ -19,6 +19,7 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
   });
   const [subjects, setSubjects] = useState([]);
   const [boards, setBoards] = useState([]);
+  const [standards, setStandards] = useState([]);
   const [subjectTitles, setSubjectTitles] = useState([]);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
@@ -59,12 +60,20 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
 
   const fetchInitialData = async () => {
     try {
-      const [subjectsData, boardsData] = await Promise.all([
+      const [subjectsData, boardsData, standardsData] = await Promise.all([
         getAllSubjects(),
         getAllBoards(),
+        getAllStandards(),
       ]);
-      setSubjects(Array.isArray(subjectsData) ? subjectsData : []);
+      const subs = Array.isArray(subjectsData) ? subjectsData : [];
+      setSubjects(subs);
       setBoards(Array.isArray(boardsData) ? boardsData : []);
+      const stdList = Array.isArray(standardsData) ? standardsData : [];
+      setStandards(stdList.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)));
+      // Subject is set from database (one-time); use first subject
+      if (subs.length > 0 && !question) {
+        setFormData((prev) => ({ ...prev, subject_id: String(subs[0].subject_id ?? subs[0].id) }));
+      }
     } catch (error) {
       console.error("Error fetching initial data:", error);
     }
@@ -208,13 +217,11 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
   const validate = () => {
     const newErrors = {};
     if (!formData.question.trim()) newErrors.question = "Question is required";
-    if (!formData.answer && questionType !== "passage" && questionType !== "match") {
-      newErrors.answer = "Answer is required";
-    }
+    // Answer is optional for all question types — user can add a question without an answer
     if (questionType === "mcq") {
       const validOptions = mcqOptionList.map((o) => (o && o.trim()) || "").filter(Boolean);
       if (validOptions.length === 0) newErrors.options = "At least one option is required";
-      if (!formData.answer) newErrors.answer = "Please select the correct answer";
+      // If user provided an answer, it must be a valid option index
       if (formData.answer && validOptions.length > 0) {
         const idx = Number(formData.answer);
         if (idx < 1 || idx > validOptions.length) newErrors.answer = "Correct answer must be one of the options";
@@ -338,28 +345,9 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
                   required
                 >
                   <option value="">Select Standard</option>
-                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((std) => (
-                    <option key={std} value={std}>
-                      {std}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Subject
-                </label>
-                <select
-                  name="subject_id"
-                  value={formData.subject_id}
-                  onChange={handleSubjectChange}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition outline-none"
-                >
-                  <option value="">Select Subject</option>
-                  {subjects.map((subject) => (
-                    <option key={subject.subject_id} value={subject.subject_id}>
-                      {subject.subject_name}
+                  {standards.map((s) => (
+                    <option key={s.standard_id} value={s.standard_id}>
+                      {s.name}
                     </option>
                   ))}
                 </select>
@@ -468,7 +456,7 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Correct Answer <span className="text-red-500">*</span>
+                    Correct Answer (Optional)
                   </label>
                   <select
                     name="answer"
@@ -478,7 +466,7 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
                       errors.answer ? "border-red-300" : "border-gray-200 focus:border-blue-500"
                     }`}
                   >
-                    <option value="">Select correct option</option>
+                    <option value="">Select correct option (optional)</option>
                     {mcqOptionList
                       .map((o, i) => (o && o.trim()) || "")
                       .filter(Boolean)
@@ -618,7 +606,7 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
             {!["mcq", "passage", "match"].includes(questionType) && (
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Answer <span className="text-red-500">*</span>
+                  Answer (Optional)
                 </label>
                 <textarea
                   name="answer"
@@ -629,7 +617,6 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
                     errors.answer ? "border-red-300" : "border-gray-200 focus:border-blue-500"
                   }`}
                   placeholder="Enter the answer"
-                  required
                 />
                 {errors.answer && (
                   <p className="mt-1 text-sm text-red-600">{errors.answer}</p>

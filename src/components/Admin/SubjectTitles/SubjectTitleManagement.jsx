@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import {
   getAllSubjectTitles,
   getAllSubjects,
+  getAllStandards,
   addSubjectTitle,
   deleteSubjectTitle,
 } from "../../../services/adminService";
@@ -13,6 +14,7 @@ import AddSubjectTitleModal from "./AddSubjectTitleModal";
 const SubjectTitleManagement = () => {
   const [subjectTitles, setSubjectTitles] = useState([]);
   const [subjects, setSubjects] = useState([]);
+  const [standards, setStandards] = useState([]);
   const [filteredTitles, setFilteredTitles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -32,12 +34,15 @@ const SubjectTitleManagement = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [titlesData, subjectsData] = await Promise.all([
+      const [titlesData, subjectsData, standardsData] = await Promise.all([
         getAllSubjectTitles(),
         getAllSubjects(),
+        getAllStandards(),
       ]);
       setSubjectTitles(Array.isArray(titlesData) ? titlesData : []);
       setSubjects(Array.isArray(subjectsData) ? subjectsData : []);
+      const stdList = Array.isArray(standardsData) ? standardsData : [];
+      setStandards(stdList.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)));
     } catch (error) {
       setToast({
         show: true,
@@ -210,6 +215,7 @@ const SubjectTitleManagement = () => {
       {showAddModal && (
         <AddSubjectTitleModal
           subjects={subjects}
+          standards={standards}
           onClose={() => setShowAddModal(false)}
           onSave={handleAdd}
         />

@@ -8,6 +8,7 @@ import downloadPDF from "../../../utils/downloadPdf";
 import HeaderCard from "../../Cards/HeaderCard";
 // Use CustomPaper's exact pagination logic
 import apiClient from "../../../services/apiClient";
+import { getAllStandards } from "../../../services/adminService";
 
 const TemplateDetails = () => {
   const { id } = useParams();
@@ -16,6 +17,7 @@ const TemplateDetails = () => {
   const [questions, setQuestions] = useState([]);
   const [header, setHeader] = useState(null);
   const [templateMetadata, setTemplateMetadata] = useState(null);
+  const [standards, setStandards] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState({
@@ -27,6 +29,19 @@ const TemplateDetails = () => {
   useEffect(() => {
     fetchTemplateDetails();
   }, [id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    getAllStandards()
+      .then((list) => {
+        if (!cancelled) {
+          const sorted = Array.isArray(list) ? [...list].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)) : [];
+          setStandards(sorted);
+        }
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
   // Fetch questions by IDs
   const fetchQuestionsByIds = async (questionIds) => {
@@ -814,7 +829,7 @@ const TemplateDetails = () => {
             <div>
               <span className="text-sm text-gray-600">Standard:</span>
               <p className="font-semibold text-gray-800">
-                Standard {template.standard}
+                {template?.standard != null ? (standards.find((s) => String(s.standard_id) === String(template.standard))?.name ?? template.standard) : "—"}
               </p>
             </div>
             <div>

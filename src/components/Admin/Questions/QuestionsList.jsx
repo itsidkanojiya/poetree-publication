@@ -6,6 +6,7 @@ import {
   getAllSubjects,
   getAllBoards,
   getAllSubjectTitles,
+  getAllStandards,
 } from "../../../services/adminService";
 import { Plus, Trash2, Search, Edit, Upload, Download, Eye, X } from "lucide-react";
 import Toast from "../../Common/Toast";
@@ -24,6 +25,7 @@ const QuestionsList = ({ questionType }) => {
   const [filterBoardId, setFilterBoardId] = useState("");
   const [subjects, setSubjects] = useState([]);
   const [boards, setBoards] = useState([]);
+  const [standards, setStandards] = useState([]);
   const [subjectTitles, setSubjectTitles] = useState([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
@@ -48,14 +50,17 @@ const QuestionsList = ({ questionType }) => {
   useEffect(() => {
     const fetchFilters = async () => {
       try {
-        const [subjectsData, boardsData, titlesData] = await Promise.all([
+        const [subjectsData, boardsData, titlesData, standardsData] = await Promise.all([
           getAllSubjects(),
           getAllBoards(),
           getAllSubjectTitles(),
+          getAllStandards(),
         ]);
         setSubjects(Array.isArray(subjectsData) ? subjectsData : []);
         setBoards(Array.isArray(boardsData) ? boardsData : []);
         setSubjectTitles(Array.isArray(titlesData) ? titlesData : []);
+        const stdList = Array.isArray(standardsData) ? standardsData : [];
+        setStandards(stdList.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)));
       } catch (e) {
         console.error("Error fetching filter options:", e);
       }
@@ -89,6 +94,11 @@ const QuestionsList = ({ questionType }) => {
     if (typeof subject === "string") return subject;
     if (typeof subject === "object" && subject.subject_name) return subject.subject_name;
     return "";
+  };
+
+  const getStandardName = (id) => {
+    if (id == null || id === "") return "";
+    return standards.find((s) => String(s.standard_id) === String(id))?.name ?? id;
   };
 
   const filterQuestions = () => {
@@ -398,7 +408,7 @@ const QuestionsList = ({ questionType }) => {
                       {getSubjectName(question.subject) || "N/A"}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">
-                      {question.standard || "N/A"}
+                      {getStandardName(question.standard) || "N/A"}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">
                       {question.marks || "N/A"}
@@ -530,7 +540,7 @@ const QuestionsList = ({ questionType }) => {
                     </p>
                     <div className="mt-2 flex flex-wrap gap-2 text-xs text-gray-500">
                       <span>Subject: {getSubjectName(q.subject) || "—"}</span>
-                      <span>Standard: {q.standard ?? "—"}</span>
+                      <span>Standard: {getStandardName(q.standard) || "—"}</span>
                       <span>Marks: {q.marks ?? "—"}</span>
                     </div>
                   </div>

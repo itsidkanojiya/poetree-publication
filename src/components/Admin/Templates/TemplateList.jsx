@@ -4,10 +4,12 @@ import { FileText, Plus, Eye, Search, Filter } from "lucide-react";
 import Toast from "../../Common/Toast";
 import Loader from "../../Common/loader/loader";
 import apiClient from "../../../services/apiClient";
+import { getAllStandards } from "../../../services/adminService";
 
 const TemplateList = () => {
   const [templates, setTemplates] = useState([]);
   const [filteredTemplates, setFilteredTemplates] = useState([]);
+  const [standards, setStandards] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filters, setFilters] = useState({
@@ -20,6 +22,19 @@ const TemplateList = () => {
 
   useEffect(() => {
     fetchTemplates();
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    getAllStandards()
+      .then((list) => {
+        if (!cancelled) {
+          const sorted = Array.isArray(list) ? [...list].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)) : [];
+          setStandards(sorted);
+        }
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
@@ -172,9 +187,9 @@ const TemplateList = () => {
                 className="px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
               >
                 <option value="">All Standards</option>
-                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((std) => (
-                  <option key={std} value={std}>
-                    Std {std}
+                {standards.map((s) => (
+                  <option key={s.standard_id} value={s.standard_id}>
+                    {s.name}
                   </option>
                 ))}
               </select>
@@ -225,7 +240,7 @@ const TemplateList = () => {
                 <div className="space-y-2 mb-4">
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-600">Standard:</span>
-                    <span className="font-semibold text-gray-800">Std {template.standard}</span>
+                    <span className="font-semibold text-gray-800">{standards.find((st) => String(st.standard_id) === String(template.standard))?.name ?? template.standard ?? "—"}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-600">Board:</span>

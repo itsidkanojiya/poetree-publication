@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, Save, X, Plus, Eye, Trash2 } from "lucide-react";
 import Loader from "../Common/loader/loader";
 import { getPaperById, updatePaper } from "../../services/paperService";
+import { getAllStandards } from "../../services/adminService";
 import Toast from "../Common/Toast";
 import HeaderCard from "../Cards/HeaderCard";
 // Use CustomPaper's exact pagination logic
@@ -27,10 +28,24 @@ const CustomizePaper = () => {
     type: "success",
   });
   const [hasChanges, setHasChanges] = useState(false);
+  const [standards, setStandards] = useState([]);
 
   useEffect(() => {
     fetchPaperDetails();
   }, [id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    getAllStandards()
+      .then((list) => {
+        if (!cancelled) {
+          const sorted = Array.isArray(list) ? [...list].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)) : [];
+          setStandards(sorted);
+        }
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     if (currentQuestionType && showQuestionSelector && paper) {
@@ -788,7 +803,7 @@ const CustomizePaper = () => {
             <div>
               <span className="text-sm text-gray-600">Standard:</span>
               <p className="font-semibold text-gray-800">
-                Standard {paper.standard}
+                {paper?.standard != null ? (standards.find((s) => String(s.standard_id) === String(paper.standard))?.name ?? paper.standard) : "—"}
               </p>
             </div>
             <div>
@@ -1334,7 +1349,7 @@ const CustomizePaper = () => {
                   {" • "}
                   <span className="font-semibold">Board:</span> {paper?.board ?? paper?.board_id ?? "—"}
                   {" • "}
-                  <span className="font-semibold">Std:</span> {paper?.standard ?? "—"}
+                  <span className="font-semibold">Std:</span> {paper?.standard != null ? (standards.find((s) => String(s.standard_id) === String(paper.standard))?.name ?? paper.standard) : "—"}
                 </p>
               </div>
 

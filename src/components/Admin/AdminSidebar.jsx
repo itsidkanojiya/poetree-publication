@@ -14,6 +14,8 @@ import {
   X,
   ChevronRight,
   LayoutTemplate,
+  GraduationCap,
+  Film,
 } from "lucide-react";
 
 const LogoutModal = ({ isOpen, onClose, onConfirm }) => {
@@ -76,6 +78,8 @@ const AdminSidebar = () => {
     { name: "Dashboard", href: "/admin", icon: BarChart3 },
     { name: "Teachers", href: "/admin/teachers", icon: Users },
     { name: "Subject Titles", href: "/admin/subject-titles", icon: BookOpen },
+    { name: "Manage Standards", href: "/admin/standards", icon: GraduationCap },
+    { name: "Animations", href: "/admin/animations", icon: Film },
     { name: "Answer Sheets", href: "/admin/answer-sheets", icon: ClipboardCheck },
     { name: "Worksheets", href: "/admin/worksheets", icon: FilePlus },
     { name: "Questions", href: "/admin/questions", icon: FileText },

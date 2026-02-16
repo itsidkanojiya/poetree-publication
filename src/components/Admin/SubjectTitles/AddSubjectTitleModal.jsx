@@ -1,15 +1,20 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { X } from "lucide-react";
 
-const STANDARDS = Array.from({ length: 12 }, (_, i) => String(i + 1));
-
-const AddSubjectTitleModal = ({ subjects, onClose, onSave }) => {
+const AddSubjectTitleModal = ({ subjects, standards = [], onClose, onSave }) => {
   const [formData, setFormData] = useState({
     title_name: "",
     subject_id: "",
     standard: [],
   });
   const [errors, setErrors] = useState({});
+
+  // Subject is set from database (one-time); use first subject
+  useEffect(() => {
+    if (subjects?.length > 0 && !formData.subject_id) {
+      setFormData((prev) => ({ ...prev, subject_id: String(subjects[0].subject_id ?? subjects[0].id) }));
+    }
+  }, [subjects]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -19,11 +24,12 @@ const AddSubjectTitleModal = ({ subjects, onClose, onSave }) => {
     }
   };
 
-  const toggleStandard = (std) => {
+  const toggleStandard = (standardId) => {
+    const id = Number(standardId);
     setFormData((prev) => {
-      const next = prev.standard.includes(std)
-        ? prev.standard.filter((s) => s !== std)
-        : [...prev.standard, std].sort((a, b) => Number(a) - Number(b));
+      const next = prev.standard.includes(id)
+        ? prev.standard.filter((s) => s !== id)
+        : [...prev.standard, id].sort((a, b) => a - b);
       return { ...prev, standard: next };
     });
     if (errors.standard) {
@@ -36,8 +42,9 @@ const AddSubjectTitleModal = ({ subjects, onClose, onSave }) => {
     if (!formData.title_name.trim()) {
       newErrors.title_name = "Title name is required";
     }
-    if (!formData.subject_id) {
-      newErrors.subject_id = "Subject is required";
+    const subjectId = formData.subject_id || subjects[0]?.subject_id || subjects[0]?.id;
+    if (!subjectId) {
+      newErrors.subject_id = "No subject available (set in database).";
     }
     if (!formData.standard.length) {
       newErrors.standard = "Select at least one standard";
@@ -49,10 +56,11 @@ const AddSubjectTitleModal = ({ subjects, onClose, onSave }) => {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (validate()) {
+      const subjectId = formData.subject_id || subjects[0]?.subject_id || subjects[0]?.id;
       onSave({
         title_name: formData.title_name,
-        subject_id: parseInt(formData.subject_id),
-        standard: formData.standard,
+        subject_id: parseInt(subjectId, 10),
+        standard: formData.standard.map(Number),
       });
     }
   };
@@ -91,60 +99,35 @@ const AddSubjectTitleModal = ({ subjects, onClose, onSave }) => {
             )}
           </div>
 
-          {/* Subject */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Subject <span className="text-red-500">*</span>
-            </label>
-            <select
-              name="subject_id"
-              value={formData.subject_id}
-              onChange={handleChange}
-              className={`w-full px-4 py-3 border-2 rounded-lg focus:ring-2 focus:ring-blue-200 transition outline-none ${
-                errors.subject_id ? "border-red-300" : "border-gray-200 focus:border-blue-500"
-              }`}
-            >
-              <option value="">Select a subject</option>
-              {subjects.map((subject) => (
-                <option key={subject.subject_id} value={subject.subject_id}>
-                  {subject.subject_name}
-                </option>
-              ))}
-            </select>
-            {errors.subject_id && (
-              <p className="mt-1 text-sm text-red-600">{errors.subject_id}</p>
-            )}
-          </div>
-
-          {/* Standard - multi-select 1 to 12 */}
+          {/* Standard - multi-select from API */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
               Standard <span className="text-red-500">*</span>
             </label>
-            <p className="text-xs text-gray-500 mb-2">Select one or more standards (1–12)</p>
+            <p className="text-xs text-gray-500 mb-2">Select one or more standards</p>
             <div
               className={`flex flex-wrap gap-2 p-3 border-2 rounded-lg min-h-[52px] ${
                 errors.standard ? "border-red-300" : "border-gray-200 focus-within:border-blue-500"
               }`}
             >
-              {STANDARDS.map((std) => (
+              {standards.map((s) => (
                 <label
-                  key={std}
+                  key={s.standard_id}
                   className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 bg-gray-50 hover:bg-gray-100 cursor-pointer transition has-[:checked]:bg-blue-50 has-[:checked]:border-blue-300 has-[:checked]:text-blue-700"
                 >
                   <input
                     type="checkbox"
-                    checked={formData.standard.includes(std)}
-                    onChange={() => toggleStandard(std)}
+                    checked={formData.standard.includes(Number(s.standard_id))}
+                    onChange={() => toggleStandard(s.standard_id)}
                     className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
-                  <span className="text-sm font-medium">{std}</span>
+                  <span className="text-sm font-medium">{s.name}</span>
                 </label>
               ))}
             </div>
             {formData.standard.length > 0 && (
               <p className="mt-1.5 text-sm text-gray-600">
-                Selected: {formData.standard.join(", ")}
+                Selected: {formData.standard.map((id) => standards.find((st) => Number(st.standard_id) === id)?.name ?? id).join(", ")}
               </p>
             )}
             {errors.standard && (

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { X } from "lucide-react";
-import { addAnswerSheet, getAllSubjects, getAllBoards, getSubjectTitlesBySubject } from "../../../services/adminService";
+import { addAnswerSheet, getAllSubjects, getAllBoards, getSubjectTitlesBySubject, getAllStandards } from "../../../services/adminService";
 import Toast from "../../Common/Toast";
 
 const AddAnswerSheetModal = ({ onClose, onSuccess }) => {
@@ -14,6 +14,7 @@ const AddAnswerSheetModal = ({ onClose, onSuccess }) => {
   });
   const [subjects, setSubjects] = useState([]);
   const [boards, setBoards] = useState([]);
+  const [standards, setStandards] = useState([]);
   const [subjectTitles, setSubjectTitles] = useState([]);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
@@ -25,12 +26,21 @@ const AddAnswerSheetModal = ({ onClose, onSuccess }) => {
 
   const fetchInitialData = async () => {
     try {
-      const [subjectsData, boardsData] = await Promise.all([
+      const [subjectsData, boardsData, standardsData] = await Promise.all([
         getAllSubjects(),
         getAllBoards(),
+        getAllStandards(),
       ]);
-      setSubjects(Array.isArray(subjectsData) ? subjectsData : []);
+      const subs = Array.isArray(subjectsData) ? subjectsData : [];
+      setSubjects(subs);
       setBoards(Array.isArray(boardsData) ? boardsData : []);
+      const stdList = Array.isArray(standardsData) ? standardsData : [];
+      setStandards(stdList.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)));
+      if (subs.length > 0) {
+        const firstId = String(subs[0].subject_id ?? subs[0].id);
+        setFormData((prev) => ({ ...prev, subject_id: firstId }));
+        fetchSubjectTitles(firstId);
+      }
     } catch (error) {
       console.error("Error fetching initial data:", error);
     }
@@ -159,38 +169,15 @@ const AddAnswerSheetModal = ({ onClose, onSuccess }) => {
                 required
                >
                  <option value="">Select Standard</option>
-                 {Array.from({ length: 12 }, (_, i) => i + 1).map((num) => (
-                   <option key={num} value={num}>
-                     {num}
+                 {standards.map((s) => (
+                   <option key={s.standard_id} value={s.standard_id}>
+                     {s.name}
                    </option>
                  ))}
                </select>
                {errors.standard && (
                  <p className="mt-1 text-sm text-red-600">{errors.standard}</p>
                )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Subject <span className="text-red-500">*</span>
-              </label>
-              <select
-                name="subject_id"
-                value={formData.subject_id}
-                onChange={handleChange}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition outline-none"
-                required
-              >
-                <option value="">Select Subject</option>
-                {subjects.map((subject) => (
-                  <option key={subject.subject_id} value={subject.subject_id}>
-                    {subject.subject_name}
-                  </option>
-                ))}
-              </select>
-              {errors.subject_id && (
-                <p className="mt-1 text-sm text-red-600">{errors.subject_id}</p>
-              )}
             </div>
 
             <div>
@@ -205,7 +192,7 @@ const AddAnswerSheetModal = ({ onClose, onSuccess }) => {
                 required
                 disabled={!formData.subject_id}
               >
-                <option value="">{formData.subject_id ? "Select Subject Title" : "Select Subject first"}</option>
+                <option value="">{formData.subject_id ? "Select Subject Title" : "Select Subject Title"}</option>
                 {subjectTitles.map((title) => (
                   <option key={title.subject_title_id} value={title.subject_title_id}>
                     {title.title_name}

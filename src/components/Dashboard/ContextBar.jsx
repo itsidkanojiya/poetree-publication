@@ -8,7 +8,7 @@ const ContextBar = () => {
 
   const subjectName = contextSelection.subject_name || `Subject ${contextSelection.subject_id}`;
   const titleName = contextSelection.subject_title_name || `Title ${contextSelection.subject_title_id}`;
-  const standard = contextSelection.standard;
+  const standardDisplay = contextSelection.standard_name ?? contextSelection.standard ?? "—";
   const boardName = contextSelection.board_name || (contextSelection.board_id ? `Board ${contextSelection.board_id}` : "");
 
   return (
@@ -22,7 +22,7 @@ const ContextBar = () => {
             <span className="mx-2 text-gray-400">|</span>
             {titleName}
             <span className="mx-2 text-gray-400">|</span>
-            Std {standard}
+            Std {standardDisplay}
             {boardName && (
               <>
                 <span className="mx-2 text-gray-400">|</span>

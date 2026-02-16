@@ -35,6 +35,8 @@ import WorksheetManagement from "./components/Admin/Worksheets/WorksheetManageme
 import TemplateList from "./components/Admin/Templates/TemplateList";
 import CreateTemplate from "./components/Admin/Templates/CreateTemplate";
 import TemplateDetails from "./components/Admin/Templates/TemplateDetails";
+import StandardsManagement from "./components/Admin/Standards/StandardsManagement";
+import AnimationsManagement from "./components/Admin/Animations/AnimationsManagement";
 import BrowseTemplates from "./components/Dashboard/BrowseTemplates";
 import ViewTemplate from "./components/Dashboard/ViewTemplate";
 import CustomizePaper from "./components/Dashboard/CustomizePaper";
@@ -98,6 +100,8 @@ function App() {
           <Route path="teachers/active" element={<TeachersManagement />} />
           <Route path="teachers/subject-requests" element={<TeachersManagement />} />
           <Route path="subject-titles" element={<SubjectTitleManagement />} />
+          <Route path="standards" element={<StandardsManagement />} />
+          <Route path="animations" element={<AnimationsManagement />} />
           <Route path="questions" element={<QuestionManagement />} />
           <Route path="questions/:type" element={<QuestionManagement />} />
           <Route path="answer-sheets" element={<AnswerSheetManagement />} />
