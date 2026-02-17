@@ -224,6 +224,25 @@ export const getAllSubjectTitles = async () => {
 };
 
 /**
+ * Get subject titles filtered by subject_id and/or standard
+ * GET /api/subjectTitle?subject_id=1&standard=5
+ */
+export const getSubjectTitlesFiltered = async ({ subject_id, standard } = {}) => {
+  try {
+    const params = new URLSearchParams();
+    if (subject_id != null && subject_id !== "") params.append("subject_id", String(subject_id));
+    if (standard != null && standard !== "") params.append("standard", String(standard));
+    const query = params.toString();
+    const response = await apiClient.get(`/subjectTitle${query ? `?${query}` : ""}`);
+    const data = response.data;
+    return Array.isArray(data) ? data : data?.subject_titles ?? data?.data ?? [];
+  } catch (error) {
+    console.error("Error fetching subject titles:", error);
+    throw error;
+  }
+};
+
+/**
  * Add new subject title
  * POST /api/subjectTitle
  */

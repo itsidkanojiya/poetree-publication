@@ -73,6 +73,8 @@ export const savePaper = async (
       let marksBlank = 0;
       let marksOnetwo = 0;
       let marksTruefalse = 0;
+      let marksPassage = 0;
+      let marksMatch = 0;
 
       questionSections.forEach((section) => {
         const count = section.selectedQuestions.length;
@@ -98,6 +100,12 @@ export const savePaper = async (
           case "true_false":
             marksTruefalse = totalMarks;
             break;
+          case "passage":
+            marksPassage = totalMarks;
+            break;
+          case "match":
+            marksMatch = totalMarks;
+            break;
         }
       });
 
@@ -107,6 +115,8 @@ export const savePaper = async (
       formData.append("marks_blank", marksBlank);
       formData.append("marks_onetwo", marksOnetwo);
       formData.append("marks_truefalse", marksTruefalse);
+      formData.append("marks_passage", marksPassage);
+      formData.append("marks_match", marksMatch);
     } else {
       // Default to 0 if not provided
       formData.append("marks_mcq", 0);
@@ -115,6 +125,8 @@ export const savePaper = async (
       formData.append("marks_blank", 0);
       formData.append("marks_onetwo", 0);
       formData.append("marks_truefalse", 0);
+      formData.append("marks_passage", 0);
+      formData.append("marks_match", 0);
     }
 
     // Note: logo is now fetched from user table via user_id, no need to send it here

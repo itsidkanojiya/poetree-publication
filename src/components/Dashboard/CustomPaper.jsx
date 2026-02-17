@@ -43,11 +43,15 @@ const COMPONENT_HEIGHTS = {
 const INITIAL_QUESTION_SECTIONS = [
   { type: "mcq", selectedQuestions: [] },
   { type: "blank", selectedQuestions: [] },
+  { type: "true_false", selectedQuestions: [] },
+  { type: "onetwo", selectedQuestions: [] },
   { type: "short", selectedQuestions: [] },
   { type: "long", selectedQuestions: [] },
+  { type: "passage", selectedQuestions: [] },
+  { type: "match", selectedQuestions: [] },
 ];
 
-// Map question types to section letters (A, B, C, D, E)
+// Map question types to section letters (A, B, C, D, E, F, G, H)
 const SECTION_LETTERS = {
   mcq: "A",
   blank: "B",
@@ -55,6 +59,8 @@ const SECTION_LETTERS = {
   onetwo: "D",
   short: "D",
   long: "E",
+  passage: "F",
+  match: "G",
 };
 
 const QUESTION_TYPE_CONFIG = {
@@ -78,6 +84,26 @@ const QUESTION_TYPE_CONFIG = {
     color: "bg-orange-500",
     badge: "bg-orange-100 text-orange-700",
   },
+  onetwo: {
+    label: "One or Two Sentence Questions",
+    color: "bg-teal-500",
+    badge: "bg-teal-100 text-teal-700",
+  },
+  true_false: {
+    label: "True or False",
+    color: "bg-amber-500",
+    badge: "bg-amber-100 text-amber-700",
+  },
+  passage: {
+    label: "Passage",
+    color: "bg-indigo-500",
+    badge: "bg-indigo-100 text-indigo-700",
+  },
+  match: {
+    label: "Match the Following",
+    color: "bg-rose-500",
+    badge: "bg-rose-100 text-rose-700",
+  },
 };
 
 // Language-specific question type titles
@@ -88,6 +114,8 @@ const titles = {
   onetwo: "Answer the following questions in one or two sentences.",
   short: "Short Answer Questions.",
   long: "Long Answer Questions.",
+  passage: "Read the passage and answer the following questions.",
+  match: "Match the following.",
 };
 
 const hindiTitles = {
@@ -97,6 +125,8 @@ const hindiTitles = {
   onetwo: "⁠निम्नलिखित प्रश्नों के उत्तर एक या दो वाक्यों में दीजिए।",
   short: "⁠लघु उत्तरीय प्रश्न।",
   long: "दीर्घ उत्तरीय प्रश्न।",
+  passage: "⁠गद्यांश पढ़कर निम्नलिखित प्रश्नों के उत्तर दीजिए।",
+  match: "⁠सुमेलित कीजिए।",
 };
 
 const gujaratiTitles = {
@@ -107,6 +137,8 @@ const gujaratiTitles = {
   onetwo: "નીચે આપેલા પ્રશ્નોના બે ત્રણ વાક્યમાં જવાબ લખો. ",
   short: "નીચે આપેલા પ્રશ્નોના જવાબ ટૂંકમાં લખો.",
   long: "નીચે આપેલા પ્રશ્નોના જવાબ વિસ્તારપૂર્વક લખો.",
+  passage: "અંશ વાંચી નીચેના પ્રશ્નોના જવાબ લખો.",
+  match: "જોડકાં જોડો.",
 };
 
 // Function to detect language from subject name
@@ -251,8 +283,12 @@ const CustomPaper = () => {
       : {
           mcq: 1,
           blank: 1,
+          true_false: 1,
+          onetwo: 2,
           short: 3,
           long: 5,
+          passage: 2,
+          match: 2,
         };
   });
 
@@ -304,6 +340,8 @@ const CustomPaper = () => {
               blank: paper.marks_blank || 0,
               onetwo: paper.marks_onetwo || 0,
               true_false: paper.marks_truefalse || 0,
+              passage: paper.marks_passage || 0,
+              match: paper.marks_match || 0,
             };
             setPaperMarks(marksData);
             
@@ -376,6 +414,8 @@ const CustomPaper = () => {
         long: [],
         onetwo: [],
         true_false: [],
+        passage: [],
+        match: [],
       };
       
       fetchedQuestions.forEach((question) => {
@@ -417,6 +457,12 @@ const CustomPaper = () => {
                 break;
               case "true_false":
                 calculatedMarks.true_false = marksData.true_false / questionCount || 1;
+                break;
+              case "passage":
+                calculatedMarks.passage = (marksData.passage || marksData.marks_passage) / questionCount || 2;
+                break;
+              case "match":
+                calculatedMarks.match = (marksData.match || marksData.marks_match) / questionCount || 2;
                 break;
             }
           }
@@ -641,8 +687,12 @@ const CustomPaper = () => {
     setMarksPerType({
       mcq: 1,
       blank: 1,
+      true_false: 1,
+      onetwo: 2,
       short: 3,
       long: 5,
+      passage: 2,
+      match: 2,
     });
     localStorage.removeItem("questionSections");
     localStorage.removeItem("marksPerType");
@@ -835,6 +885,8 @@ const CustomPaper = () => {
         let marksBlank = 0;
         let marksOnetwo = 0;
         let marksTruefalse = 0;
+        let marksPassage = 0;
+        let marksMatch = 0;
 
         questionSections.forEach((section) => {
           const count = section.selectedQuestions.length;
@@ -860,6 +912,12 @@ const CustomPaper = () => {
             case "true_false":
               marksTruefalse = totalMarks;
               break;
+            case "passage":
+              marksPassage = totalMarks;
+              break;
+            case "match":
+              marksMatch = totalMarks;
+              break;
           }
         });
 
@@ -869,6 +927,8 @@ const CustomPaper = () => {
         formData.append("marks_blank", marksBlank);
         formData.append("marks_onetwo", marksOnetwo);
         formData.append("marks_truefalse", marksTruefalse);
+        formData.append("marks_passage", marksPassage);
+        formData.append("marks_match", marksMatch);
         
         // Note: logo is now fetched from user table via user_id, no need to send it here
         
@@ -1215,6 +1275,10 @@ const CustomPaper = () => {
               <option value="short">Short Answer Questions</option>
               <option value="long">Long Answer Questions</option>
               <option value="blank">Fill in the Blanks</option>
+              <option value="onetwo">One or Two Sentence Questions</option>
+              <option value="true_false">True or False</option>
+              <option value="passage">Passage</option>
+              <option value="match">Match the Following</option>
             </select>
             {currentType && (
               <div className="mt-4 animate-in slide-in-from-top-2">

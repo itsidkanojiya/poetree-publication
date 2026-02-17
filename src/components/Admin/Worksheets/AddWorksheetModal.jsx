@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { X } from "lucide-react";
-import { addWorksheet, getAllSubjects, getAllBoards, getSubjectTitlesBySubject, getAllStandards } from "../../../services/adminService";
+import { addWorksheet, getAllSubjects, getAllBoards, getSubjectTitlesFiltered, getAllStandards } from "../../../services/adminService";
 import Toast from "../../Common/Toast";
 
 const AddWorksheetModal = ({ onClose, onSuccess }) => {
@@ -31,43 +31,45 @@ const AddWorksheetModal = ({ onClose, onSuccess }) => {
         getAllBoards(),
         getAllStandards(),
       ]);
-      const subs = Array.isArray(subjectsData) ? subjectsData : [];
-      setSubjects(subs);
+      setSubjects(Array.isArray(subjectsData) ? subjectsData : []);
       setBoards(Array.isArray(boardsData) ? boardsData : []);
       const stdList = Array.isArray(standardsData) ? standardsData : [];
       setStandards(stdList.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)));
-      if (subs.length > 0) {
-        const firstId = String(subs[0].subject_id ?? subs[0].id);
-        setFormData((prev) => ({ ...prev, subject_id: firstId }));
-        fetchSubjectTitles(firstId);
-      }
     } catch (error) {
       console.error("Error fetching initial data:", error);
     }
   };
 
-  const fetchSubjectTitles = async (subjectId) => {
-    if (!subjectId) {
+  const fetchSubjectTitles = async (subjectId, standardId) => {
+    if (!subjectId || !standardId) {
       setSubjectTitles([]);
       return;
     }
     try {
-      const subjectTitlesData = await getSubjectTitlesBySubject(subjectId);
-      setSubjectTitles(Array.isArray(subjectTitlesData) ? subjectTitlesData : []);
+      const list = await getSubjectTitlesFiltered({ subject_id: subjectId, standard: standardId });
+      setSubjectTitles(Array.isArray(list) ? list : []);
     } catch (error) {
       console.error("Error fetching subject titles:", error);
       setSubjectTitles([]);
     }
   };
 
+  useEffect(() => {
+    if (formData.subject_id && formData.standard) {
+      fetchSubjectTitles(formData.subject_id, formData.standard);
+    } else {
+      setSubjectTitles([]);
+    }
+  }, [formData.subject_id, formData.standard]);
+
   const handleChange = (e) => {
     const { name, value, files } = e.target;
     if (name === "worksheet_url" || name === "worksheet_coverlink") {
       setFormData((prev) => ({ ...prev, [name]: files[0] || null }));
     } else if (name === "subject_id") {
-      // When subject changes, fetch subject titles and clear subject_title_id
-      setFormData((prev) => ({ ...prev, subject_id: value, subject_title_id: "" }));
-      fetchSubjectTitles(value);
+      setFormData((prev) => ({ ...prev, subject_id: value, subject_title_id: "", standard: "" }));
+    } else if (name === "standard") {
+      setFormData((prev) => ({ ...prev, standard: value, subject_title_id: "" }));
     } else {
       setFormData((prev) => ({ ...prev, [name]: value }));
     }
@@ -159,25 +161,52 @@ const AddWorksheetModal = ({ onClose, onSuccess }) => {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Subject <span className="text-red-500">*</span>
+              </label>
+              <select
+                name="subject_id"
+                value={formData.subject_id}
+                onChange={handleChange}
+                className={`w-full px-4 py-3 border-2 rounded-lg focus:ring-2 focus:ring-blue-200 transition outline-none ${
+                  errors.subject_id ? "border-red-300" : "border-gray-200 focus:border-blue-500"
+                }`}
+                required
+              >
+                <option value="">Select Subject</option>
+                {subjects.map((s) => (
+                  <option key={s.subject_id} value={s.subject_id}>
+                    {s.subject_name}
+                  </option>
+                ))}
+              </select>
+              {errors.subject_id && (
+                <p className="mt-1 text-sm text-red-600">{errors.subject_id}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
                 Standard <span className="text-red-500">*</span>
               </label>
-               <select
+              <select
                 name="standard"
                 value={formData.standard}
                 onChange={handleChange}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition outline-none"
+                className={`w-full px-4 py-3 border-2 rounded-lg focus:ring-2 focus:ring-blue-200 transition outline-none ${
+                  errors.standard ? "border-red-300" : "border-gray-200 focus:border-blue-500"
+                }`}
                 required
-               >
-                 <option value="">Select Standard</option>
-                 {standards.map((s) => (
-                   <option key={s.standard_id} value={s.standard_id}>
-                     {s.name}
-                   </option>
-                 ))}
-               </select>
-               {errors.standard && (
-                 <p className="mt-1 text-sm text-red-600">{errors.standard}</p>
-               )}
+              >
+                <option value="">Select Standard</option>
+                {standards.map((s) => (
+                  <option key={s.standard_id} value={s.standard_id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+              {errors.standard && (
+                <p className="mt-1 text-sm text-red-600">{errors.standard}</p>
+              )}
             </div>
 
             <div>
@@ -188,14 +217,20 @@ const AddWorksheetModal = ({ onClose, onSuccess }) => {
                 name="subject_title_id"
                 value={formData.subject_title_id}
                 onChange={handleChange}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition outline-none"
+                className={`w-full px-4 py-3 border-2 rounded-lg focus:ring-2 focus:ring-blue-200 transition outline-none disabled:bg-gray-100 ${
+                  errors.subject_title_id ? "border-red-300" : "border-gray-200 focus:border-blue-500"
+                }`}
                 required
-                disabled={!formData.subject_id}
+                disabled={!formData.subject_id || !formData.standard}
               >
-                <option value="">{formData.subject_id ? "Select Subject Title" : "Select Subject Title"}</option>
+                <option value="">
+                  {formData.subject_id && formData.standard
+                    ? "Select Subject Title"
+                    : "Select subject and standard first"}
+                </option>
                 {subjectTitles.map((title) => (
-                  <option key={title.subject_title_id} value={title.subject_title_id}>
-                    {title.title_name}
+                  <option key={title.subject_title_id ?? title.id} value={title.subject_title_id ?? title.id}>
+                    {title.title_name ?? title.subject_title_name ?? title.name}
                   </option>
                 ))}
               </select>

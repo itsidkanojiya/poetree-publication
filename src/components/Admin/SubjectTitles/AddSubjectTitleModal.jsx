@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { X } from "lucide-react";
 
 const AddSubjectTitleModal = ({ subjects, standards = [], onClose, onSave }) => {
@@ -8,13 +8,6 @@ const AddSubjectTitleModal = ({ subjects, standards = [], onClose, onSave }) => 
     standard: [],
   });
   const [errors, setErrors] = useState({});
-
-  // Subject is set from database (one-time); use first subject
-  useEffect(() => {
-    if (subjects?.length > 0 && !formData.subject_id) {
-      setFormData((prev) => ({ ...prev, subject_id: String(subjects[0].subject_id ?? subjects[0].id) }));
-    }
-  }, [subjects]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -42,9 +35,8 @@ const AddSubjectTitleModal = ({ subjects, standards = [], onClose, onSave }) => 
     if (!formData.title_name.trim()) {
       newErrors.title_name = "Title name is required";
     }
-    const subjectId = formData.subject_id || subjects[0]?.subject_id || subjects[0]?.id;
-    if (!subjectId) {
-      newErrors.subject_id = "No subject available (set in database).";
+    if (!formData.subject_id) {
+      newErrors.subject_id = "Subject is required";
     }
     if (!formData.standard.length) {
       newErrors.standard = "Select at least one standard";
@@ -56,10 +48,9 @@ const AddSubjectTitleModal = ({ subjects, standards = [], onClose, onSave }) => 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (validate()) {
-      const subjectId = formData.subject_id || subjects[0]?.subject_id || subjects[0]?.id;
       onSave({
         title_name: formData.title_name,
-        subject_id: parseInt(subjectId, 10),
+        subject_id: parseInt(formData.subject_id, 10),
         standard: formData.standard.map(Number),
       });
     }
@@ -96,6 +87,31 @@ const AddSubjectTitleModal = ({ subjects, standards = [], onClose, onSave }) => 
             />
             {errors.title_name && (
               <p className="mt-1 text-sm text-red-600">{errors.title_name}</p>
+            )}
+          </div>
+
+          {/* Subject - required */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Subject <span className="text-red-500">*</span>
+            </label>
+            <select
+              name="subject_id"
+              value={formData.subject_id}
+              onChange={handleChange}
+              className={`w-full px-4 py-3 border-2 rounded-lg focus:ring-2 focus:ring-blue-200 transition outline-none ${
+                errors.subject_id ? "border-red-300" : "border-gray-200 focus:border-blue-500"
+              }`}
+            >
+              <option value="">Select a subject</option>
+              {(subjects || []).map((subject) => (
+                <option key={subject.subject_id} value={subject.subject_id}>
+                  {subject.subject_name}
+                </option>
+              ))}
+            </select>
+            {errors.subject_id && (
+              <p className="mt-1 text-sm text-red-600">{errors.subject_id}</p>
             )}
           </div>
 
