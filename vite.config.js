@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      '/api': "http://localhost:4000/api"  // Backend runs on port 4000
+      '/api': "https://api.poetreebackend.app/api"  // Backend runs on port 4000
     }
   },
   resolve: {
