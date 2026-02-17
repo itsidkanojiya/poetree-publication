@@ -3,6 +3,7 @@ import {
   getAllSubjectTitles,
   getAllSubjects,
   getAllStandards,
+  getAllBoards,
   addSubjectTitle,
   deleteSubjectTitle,
 } from "../../../services/adminService";
@@ -11,10 +12,30 @@ import Toast from "../../Common/Toast";
 import Loader from "../../Common/loader/loader";
 import AddSubjectTitleModal from "./AddSubjectTitleModal";
 
+/** Get standard display: names from title.standards or map title.standard IDs to names via standards list */
+const getStandardDisplay = (title, standardsList) => {
+  if (Array.isArray(title.standards) && title.standards.length) {
+    return title.standards.map((s) => s.name ?? s.standard_name ?? s.standard_id).join(", ");
+  }
+  const ids = Array.isArray(title.standard)
+    ? title.standard
+    : title.standard != null && title.standard !== ""
+    ? [title.standard]
+    : [];
+  if (!ids.length) return "N/A";
+  if (!Array.isArray(standardsList) || !standardsList.length) {
+    return ids.join(", ");
+  }
+  return ids
+    .map((id) => standardsList.find((s) => Number(s.standard_id) === Number(id))?.name ?? id)
+    .join(", ");
+};
+
 const SubjectTitleManagement = () => {
   const [subjectTitles, setSubjectTitles] = useState([]);
   const [subjects, setSubjects] = useState([]);
   const [standards, setStandards] = useState([]);
+  const [boards, setBoards] = useState([]);
   const [filteredTitles, setFilteredTitles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -34,15 +55,17 @@ const SubjectTitleManagement = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [titlesData, subjectsData, standardsData] = await Promise.all([
+      const [titlesData, subjectsData, standardsData, boardsData] = await Promise.all([
         getAllSubjectTitles(),
         getAllSubjects(),
         getAllStandards(),
+        getAllBoards(),
       ]);
       setSubjectTitles(Array.isArray(titlesData) ? titlesData : []);
       setSubjects(Array.isArray(subjectsData) ? subjectsData : []);
       const stdList = Array.isArray(standardsData) ? standardsData : [];
       setStandards(stdList.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)));
+      setBoards(Array.isArray(boardsData) ? boardsData : []);
     } catch (error) {
       setToast({
         show: true,
@@ -64,6 +87,7 @@ const SubjectTitleManagement = () => {
       (title) =>
         title.title_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         title.subject?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        title.board?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         title.standard?.toString().includes(searchTerm)
     );
     setFilteredTitles(filtered);
@@ -150,7 +174,7 @@ const SubjectTitleManagement = () => {
           <Search className="absolute left-3 top-3.5 w-5 h-5 text-gray-400" />
           <input
             type="text"
-            placeholder="Search by title name, subject, or standard..."
+            placeholder="Search by title name, subject, board, or standard..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition outline-none"
@@ -166,6 +190,7 @@ const SubjectTitleManagement = () => {
               <tr>
                 <th className="px-6 py-4 text-left text-sm font-semibold">Title Name</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold">Subject</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold">Board</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold">Standard</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold">Actions</th>
               </tr>
@@ -173,7 +198,7 @@ const SubjectTitleManagement = () => {
             <tbody className="divide-y divide-gray-200">
               {filteredTitles.length === 0 ? (
                 <tr>
-                  <td colSpan="4" className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan="5" className="px-6 py-8 text-center text-gray-500">
                     No subject titles found
                   </td>
                 </tr>
@@ -187,9 +212,10 @@ const SubjectTitleManagement = () => {
                       {title.subject || "N/A"}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">
-                      {Array.isArray(title.standard)
-                        ? title.standard.join(", ")
-                        : title.standard || "N/A"}
+                      {title.board || "N/A"}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-600">
+                      {getStandardDisplay(title, standards)}
                     </td>
                     <td className="px-6 py-4 text-sm">
                       <button
@@ -216,6 +242,7 @@ const SubjectTitleManagement = () => {
         <AddSubjectTitleModal
           subjects={subjects}
           standards={standards}
+          boards={boards}
           onClose={() => setShowAddModal(false)}
           onSave={handleAdd}
         />

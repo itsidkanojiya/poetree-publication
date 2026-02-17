@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { X } from "lucide-react";
-import { addAnswerSheet, getAllSubjects, getAllBoards, getSubjectTitlesFiltered, getAllStandards } from "../../../services/adminService";
+import { addAnswerSheet, getAllSubjects, getAllBoards, getSubjectTitlesBySubjectAndContext, getAllStandards } from "../../../services/adminService";
 import Toast from "../../Common/Toast";
 
 const AddAnswerSheetModal = ({ onClose, onSuccess }) => {
@@ -40,13 +40,16 @@ const AddAnswerSheetModal = ({ onClose, onSuccess }) => {
     }
   };
 
-  const fetchSubjectTitles = async (subjectId, standardId) => {
-    if (!subjectId || !standardId) {
+  const fetchSubjectTitles = async (subjectId, standardId, boardId) => {
+    if (!subjectId || !standardId || !boardId) {
       setSubjectTitles([]);
       return;
     }
     try {
-      const list = await getSubjectTitlesFiltered({ subject_id: subjectId, standard: standardId });
+      const list = await getSubjectTitlesBySubjectAndContext(subjectId, {
+        board_id: boardId,
+        standard: standardId,
+      });
       setSubjectTitles(Array.isArray(list) ? list : []);
     } catch (error) {
       console.error("Error fetching subject titles:", error);
@@ -55,12 +58,12 @@ const AddAnswerSheetModal = ({ onClose, onSuccess }) => {
   };
 
   useEffect(() => {
-    if (formData.subject_id && formData.standard) {
-      fetchSubjectTitles(formData.subject_id, formData.standard);
+    if (formData.subject_id && formData.standard && formData.board_id) {
+      fetchSubjectTitles(formData.subject_id, formData.standard, formData.board_id);
     } else {
       setSubjectTitles([]);
     }
-  }, [formData.subject_id, formData.standard]);
+  }, [formData.subject_id, formData.standard, formData.board_id]);
 
   const handleChange = (e) => {
     const { name, value, files } = e.target;
@@ -70,6 +73,8 @@ const AddAnswerSheetModal = ({ onClose, onSuccess }) => {
       setFormData((prev) => ({ ...prev, subject_id: value, subject_title_id: "", standard: "" }));
     } else if (name === "standard") {
       setFormData((prev) => ({ ...prev, standard: value, subject_title_id: "" }));
+    } else if (name === "board_id") {
+      setFormData((prev) => ({ ...prev, board_id: value, subject_title_id: "" }));
     } else {
       setFormData((prev) => ({ ...prev, [name]: value }));
     }
@@ -211,43 +216,15 @@ const AddAnswerSheetModal = ({ onClose, onSuccess }) => {
 
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Subject Title <span className="text-red-500">*</span>
-              </label>
-              <select
-                name="subject_title_id"
-                value={formData.subject_title_id}
-                onChange={handleChange}
-                className={`w-full px-4 py-3 border-2 rounded-lg focus:ring-2 focus:ring-blue-200 transition outline-none disabled:bg-gray-100 ${
-                  errors.subject_title_id ? "border-red-300" : "border-gray-200 focus:border-blue-500"
-                }`}
-                required
-                disabled={!formData.subject_id || !formData.standard}
-              >
-                <option value="">
-                  {formData.subject_id && formData.standard
-                    ? "Select Subject Title"
-                    : "Select subject and standard first"}
-                </option>
-                {subjectTitles.map((title) => (
-                  <option key={title.subject_title_id ?? title.id} value={title.subject_title_id ?? title.id}>
-                    {title.title_name ?? title.subject_title_name ?? title.name}
-                  </option>
-                ))}
-              </select>
-              {errors.subject_title_id && (
-                <p className="mt-1 text-sm text-red-600">{errors.subject_title_id}</p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
                 Board <span className="text-red-500">*</span>
               </label>
               <select
                 name="board_id"
                 value={formData.board_id}
                 onChange={handleChange}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition outline-none"
+                className={`w-full px-4 py-3 border-2 rounded-lg focus:ring-2 focus:ring-blue-200 transition outline-none ${
+                  errors.board_id ? "border-red-300" : "border-gray-200 focus:border-blue-500"
+                }`}
                 required
               >
                 <option value="">Select Board</option>
@@ -259,6 +236,36 @@ const AddAnswerSheetModal = ({ onClose, onSuccess }) => {
               </select>
               {errors.board_id && (
                 <p className="mt-1 text-sm text-red-600">{errors.board_id}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Subject Title <span className="text-red-500">*</span>
+              </label>
+              <select
+                name="subject_title_id"
+                value={formData.subject_title_id}
+                onChange={handleChange}
+                className={`w-full px-4 py-3 border-2 rounded-lg focus:ring-2 focus:ring-blue-200 transition outline-none disabled:bg-gray-100 ${
+                  errors.subject_title_id ? "border-red-300" : "border-gray-200 focus:border-blue-500"
+                }`}
+                required
+                disabled={!formData.subject_id || !formData.standard || !formData.board_id}
+              >
+                <option value="">
+                  {formData.subject_id && formData.standard && formData.board_id
+                    ? "Select Subject Title"
+                    : "Select subject, standard and board first"}
+                </option>
+                {subjectTitles.map((title) => (
+                  <option key={title.subject_title_id ?? title.id} value={title.subject_title_id ?? title.id}>
+                    {title.title_name ?? title.subject_title_name ?? title.name}
+                  </option>
+                ))}
+              </select>
+              {errors.subject_title_id && (
+                <p className="mt-1 text-sm text-red-600">{errors.subject_title_id}</p>
               )}
             </div>
 

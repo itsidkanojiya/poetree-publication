@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import {
   getAllSubjectTitles,
   getAllSubjects,
+  getAllBoards,
+  getAllStandards,
   addSubjectTitle,
   deleteSubjectTitle,
 } from "../../services/adminService";
@@ -9,9 +11,26 @@ import { BookOpen, Plus, Trash2, X } from "lucide-react";
 import Loader from "../Common/loader/loader";
 import Toast from "../Common/Toast";
 
+/** Get standard display: names from title.standards (API) or map title.standard IDs via standardsList */
+const getStandardDisplay = (title, standardsList) => {
+  if (Array.isArray(title.standards) && title.standards.length) {
+    return title.standards.map((s) => s.name ?? s.standard_name ?? s.standard_id).join(", ");
+  }
+  const ids = Array.isArray(title.standard)
+    ? title.standard
+    : title.standard != null && title.standard !== "" ? [title.standard] : [];
+  if (!ids.length) return "N/A";
+  if (!Array.isArray(standardsList) || !standardsList.length) return ids.join(", ");
+  return ids
+    .map((id) => standardsList.find((s) => Number(s.standard_id) === Number(id))?.name ?? id)
+    .join(", ");
+};
+
 const SubjectTitleManagement = () => {
   const [subjectTitles, setSubjectTitles] = useState([]);
   const [subjects, setSubjects] = useState([]);
+  const [boards, setBoards] = useState([]);
+  const [standards, setStandards] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [toast, setToast] = useState(null);
@@ -20,6 +39,7 @@ const SubjectTitleManagement = () => {
   const [formData, setFormData] = useState({
     title_name: "",
     subject_id: "",
+    board_id: "",
     standard: [],
   });
 
@@ -31,12 +51,17 @@ const SubjectTitleManagement = () => {
     setLoading(true);
     setError(null);
     try {
-      const [titlesData, subjectsData] = await Promise.all([
+      const [titlesData, subjectsData, boardsData, standardsData] = await Promise.all([
         getAllSubjectTitles(),
         getAllSubjects(),
+        getAllBoards(),
+        getAllStandards(),
       ]);
       setSubjectTitles(Array.isArray(titlesData) ? titlesData : []);
       setSubjects(Array.isArray(subjectsData) ? subjectsData : []);
+      setBoards(Array.isArray(boardsData) ? boardsData : []);
+      const stdList = Array.isArray(standardsData) ? standardsData : [];
+      setStandards(stdList.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)));
     } catch (err) {
       console.error("Error fetching data:", err);
       setError("Failed to load data");
@@ -79,6 +104,7 @@ const SubjectTitleManagement = () => {
       await addSubjectTitle({
         title_name: formData.title_name,
         subject_id: parseInt(formData.subject_id),
+        board_id: parseInt(formData.board_id, 10),
         standard: formData.standard,
       });
       setToast({
@@ -86,7 +112,7 @@ const SubjectTitleManagement = () => {
         type: "success",
       });
       setShowAddModal(false);
-      setFormData({ title_name: "", subject_id: "", standard: [] });
+      setFormData({ title_name: "", subject_id: "", board_id: "", standard: [] });
       fetchData();
     } catch (err) {
       setToast({
@@ -170,6 +196,7 @@ const SubjectTitleManagement = () => {
                   <th className="px-6 py-4 text-left font-semibold">ID</th>
                   <th className="px-6 py-4 text-left font-semibold">Title Name</th>
                   <th className="px-6 py-4 text-left font-semibold">Subject</th>
+                  <th className="px-6 py-4 text-left font-semibold">Board</th>
                   <th className="px-6 py-4 text-left font-semibold">Standard</th>
                   <th className="px-6 py-4 text-center font-semibold">Actions</th>
                 </tr>
@@ -177,7 +204,7 @@ const SubjectTitleManagement = () => {
               <tbody className="divide-y divide-gray-200">
                 {subjectTitles.length === 0 ? (
                   <tr>
-                    <td colSpan="5" className="px-6 py-12 text-center text-gray-500">
+                    <td colSpan="6" className="px-6 py-12 text-center text-gray-500">
                       No subject titles found
                     </td>
                   </tr>
@@ -192,9 +219,10 @@ const SubjectTitleManagement = () => {
                         {title.subject || title.subject_name || "N/A"}
                       </td>
                       <td className="px-6 py-4">
-                        {Array.isArray(title.standard)
-                          ? title.standard.join(", ")
-                          : title.standard || "N/A"}
+                        {title.board || "N/A"}
+                      </td>
+                      <td className="px-6 py-4">
+                        {getStandardDisplay(title, standards)}
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center justify-center gap-2">
@@ -225,7 +253,7 @@ const SubjectTitleManagement = () => {
               <button
                 onClick={() => {
                   setShowAddModal(false);
-                  setFormData({ title_name: "", subject_id: "", standard: [] });
+                  setFormData({ title_name: "", subject_id: "", board_id: "", standard: [] });
                 }}
                 className="text-gray-500 hover:text-gray-700"
               >
@@ -271,6 +299,25 @@ const SubjectTitleManagement = () => {
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Board <span className="text-red-500">*</span>
+                </label>
+                <select
+                  name="board_id"
+                  value={formData.board_id}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition outline-none"
+                  required
+                >
+                  <option value="">Select Board</option>
+                  {boards.map((board) => (
+                    <option key={board.board_id} value={board.board_id}>
+                      {board.board_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
                   Standard <span className="text-red-500">*</span>
                 </label>
                 <p className="text-xs text-gray-500 mb-2">Select one or more standards (1–12)</p>
@@ -301,7 +348,7 @@ const SubjectTitleManagement = () => {
                   type="button"
                   onClick={() => {
                     setShowAddModal(false);
-                    setFormData({ title_name: "", subject_id: "", standard: [] });
+                    setFormData({ title_name: "", subject_id: "", board_id: "", standard: [] });
                   }}
                   className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition"
                 >

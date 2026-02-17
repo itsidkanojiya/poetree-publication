@@ -22,9 +22,21 @@ export const addNewPaper = async (paperData) => {
   }
 };
 
-export const getPapersByUserId = async (user_id) => {
+/**
+ * Paper history – list papers for a user (excludes templates).
+ * GET /api/papers/user/:user_id
+ * @param {number|string} user_id - User ID
+ * @param {{ type?: 'custom' | 'default' }} [options] - Optional: type filter
+ */
+export const getPapersByUserId = async (user_id, options = {}) => {
   try {
-    const response = await apiClient.get(`/papers/user/${user_id}`);
+    const params = new URLSearchParams();
+    if (options.type === "custom" || options.type === "default") {
+      params.append("type", options.type);
+    }
+    const query = params.toString();
+    const url = `/papers/user/${user_id}${query ? `?${query}` : ""}`;
+    const response = await apiClient.get(url);
     let data = response.data;
     
     // Parse template_metadata if it comes as a string

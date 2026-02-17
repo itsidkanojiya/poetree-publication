@@ -236,6 +236,11 @@ const EditHeaderCard = ({ editedHeader, handleInputChange, lockContextFields = f
         )
           return null;
 
+        // When context is set, only allow choosing the date; everything else comes from context
+        if (lockContextFields && key !== "date") {
+          return null;
+        }
+
         return (
           <div key={key}>
             {key === "image" ? (

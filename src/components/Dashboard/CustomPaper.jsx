@@ -779,11 +779,14 @@ const CustomPaper = () => {
 
         let capturePromise = Promise.all(loadPromises).then(() => {
           return html2canvas(page, {
-            scale: 1.5,
+            scale: 2.5,
             useCORS: true,
+            allowTaint: false,
+            logging: false,
+            backgroundColor: "#ffffff",
             ignoreElements: (element) => element.classList.contains("no-print"),
           }).then((canvas) => {
-            const imgData = canvas.toDataURL("image/jpeg", 0.7);
+            const imgData = canvas.toDataURL("image/png", 1.0);
             const imgWidth = 210;
             const imgHeight = (canvas.height * imgWidth) / canvas.width;
             const maxHeight = 297;
@@ -1404,14 +1407,28 @@ const CustomPaper = () => {
                   return (
                     <div
                       key={q.question_id}
-                      className={`group rounded-2xl border-2 transition-all duration-300 transform hover:scale-[1.02] ${
+                      className={`group relative rounded-2xl border-2 transition-all duration-300 transform hover:scale-[1.02] ${
                         isSelected
                           ? "bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-400 shadow-xl shadow-blue-200/50"
                           : "bg-white border-gray-200 hover:border-blue-300 hover:shadow-lg hover:shadow-blue-100/50"
                       }`}
                     >
+                      {/* Select button fixed at top-right so it's always visible for long questions */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleQuestionSelection(q);
+                        }}
+                        className={`absolute top-4 right-4 z-10 px-4 py-2 text-xs font-bold rounded-xl transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105 active:scale-95 flex-shrink-0 ${
+                          isSelected
+                            ? "bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700"
+                            : "bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700"
+                        }`}
+                      >
+                        {isSelected ? "✓ Selected" : "Select"}
+                      </button>
                       <div
-                        className="p-5 cursor-pointer"
+                        className="p-5 pr-28 cursor-pointer"
                         onClick={() =>
                           setExpandedQuestionId(
                             isExpanded ? null : q.question_id
@@ -1435,38 +1452,23 @@ const CustomPaper = () => {
                             )}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="flex-1">
-                                <p className="text-gray-800 font-semibold leading-relaxed text-base">
-                                  {q.question}
-                                </p>
-                                {(q.answer || q.solution || q.image_url) && (
-                                  <button className="mt-2 text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1.5 group/expand">
-                                    <span>View details</span>
-                                    <span
-                                      className={`inline-block transition-transform duration-300 ${
-                                        isExpanded ? "rotate-180" : ""
-                                      }`}
-                                    >
-                                      ▼
-                                    </span>
-                                  </button>
-                                )}
-                              </div>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  toggleQuestionSelection(q);
-                                }}
-                                className={`px-4 py-2 text-xs font-bold rounded-xl transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105 active:scale-95 ${
-                                  isSelected
-                                    ? "bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700"
-                                    : "bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700"
-                                }`}
-                              >
-                                {isSelected ? "✓ Selected" : "Select"}
-                              </button>
+                            <div className="max-h-28 overflow-y-auto overflow-x-hidden pr-2 rounded">
+                              <p className="text-gray-800 font-semibold leading-relaxed text-base break-words">
+                                {q.question}
+                              </p>
                             </div>
+                            {(q.answer || q.solution || q.image_url) && (
+                              <button className="mt-2 text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1.5 group/expand">
+                                <span>View details</span>
+                                <span
+                                  className={`inline-block transition-transform duration-300 ${
+                                    isExpanded ? "rotate-180" : ""
+                                  }`}
+                                >
+                                  ▼
+                                </span>
+                              </button>
+                            )}
                             {q.type === "mcq" && q.options && (
                               <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-100 space-y-1.5">
                                 {q.options.slice(0, 2).map((option, idx) => (

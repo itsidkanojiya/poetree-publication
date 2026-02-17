@@ -202,7 +202,7 @@ const EditHeader = () => {
             <EditHeaderCard
               editedHeader={editedHeader}
               handleInputChange={handleInputChange}
-              lockContextFields={isNewPaper && !!contextSelection}
+              lockContextFields={!!contextSelection}
             />
 
             {/* Action Buttons */}

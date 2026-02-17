@@ -210,6 +210,26 @@ export const getSubjectTitlesBySubject = async (subjectId) => {
 };
 
 /**
+ * Get subject titles by subject ID with board and standard
+ * GET /api/subject/{subjectId}/titles?board_id=1&standard=5
+ */
+export const getSubjectTitlesBySubjectAndContext = async (subjectId, { board_id, standard } = {}) => {
+  if (!subjectId) return [];
+  try {
+    const params = new URLSearchParams();
+    if (board_id != null && board_id !== "") params.append("board_id", String(board_id));
+    if (standard != null && standard !== "") params.append("standard", String(standard));
+    const query = params.toString();
+    const response = await apiClient.get(`/subject/${subjectId}/titles${query ? `?${query}` : ""}`);
+    const data = response.data;
+    return Array.isArray(data) ? data : data?.subject_titles ?? data?.data ?? [];
+  } catch (error) {
+    console.error("Error fetching subject titles by context:", error);
+    throw error;
+  }
+};
+
+/**
  * Get all subject titles
  * GET /api/subjectTitle
  */

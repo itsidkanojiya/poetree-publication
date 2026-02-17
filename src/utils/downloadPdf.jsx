@@ -6,20 +6,22 @@ const downloadPDF = async (pdfPages) => {
   const pdfWidth = 210;
   const pdfHeight = 297;
 
-  // Compression settings
-  const JPEG_QUALITY = 0.85; // 0.85 = 85% quality (good balance between size and quality)
-  const SCALE = 1.5; // Reduced from 2 to reduce file size (still good quality)
+  // High quality settings for sharp, clear PDF output
+  const SCALE = 2.5; // Higher scale = sharper text and graphics (2.5 = good quality)
+  const USE_PNG = true; // PNG = lossless quality; use false + JPEG for smaller files
 
   for (let i = 0; i < pdfPages.length; i++) {
     const canvas = await html2canvas(pdfPages[i], {
       scale: SCALE,
       useCORS: true,
-      logging: false, // Disable logging for better performance
-      backgroundColor: "#ffffff", // Ensure white background
+      allowTaint: false,
+      logging: false,
+      backgroundColor: "#ffffff",
     });
 
-    // Convert to JPEG instead of PNG for better compression
-    const imgData = canvas.toDataURL("image/jpeg", JPEG_QUALITY);
+    const imgData = USE_PNG
+      ? canvas.toDataURL("image/png", 1.0)
+      : canvas.toDataURL("image/jpeg", 0.95);
 
     const img = new Image();
     img.src = imgData;
@@ -43,8 +45,7 @@ const downloadPDF = async (pdfPages) => {
           yPos = -(imgHeight - pdfHeight) / 2;
         }
 
-        // Add image with compression (JPEG format is already compressed)
-        pdf.addImage(imgData, "JPEG", xPos, yPos, imgWidth, imgHeight);
+        pdf.addImage(imgData, USE_PNG ? "PNG" : "JPEG", xPos, yPos, imgWidth, imgHeight);
 
         if (i < pdfPages.length - 1) {
           pdf.addPage();

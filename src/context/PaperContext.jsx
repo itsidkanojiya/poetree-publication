@@ -1,4 +1,4 @@
-import { createContext, useState, useContext, useEffect } from "react";
+import { createContext, useState, useContext, useEffect, useCallback } from "react";
 import {
   getAllPapers,
   addNewPaper,
@@ -14,27 +14,29 @@ export const PaperProvider = ({ children }) => {
   const [papers, setPapers] = useState({papers:[]});
   const [loading, setLoading] = useState(false);
 
-  const fetchPapers = async () => {
-    if (user && user.id) {
+  const fetchPapers = useCallback(async () => {
+    if (user?.id) {
       try {
         setLoading(true);
         const data = await getPapersByUserId(user.id);
-        setPapers(data);
+        const list = Array.isArray(data) ? data : (data?.papers || []);
+        setPapers({ papers: list });
       } catch (error) {
         console.error("Error fetching papers:", error);
+        setPapers({ papers: [] });
       } finally {
         setLoading(false);
       }
     }
-  };
+  }, [user?.id]);
 
   useEffect(() => {
     fetchPapers();
-  }, [user]);
+  }, [fetchPapers]);
 
-  const refreshPapers = async () => {
+  const refreshPapers = useCallback(async () => {
     await fetchPapers();
-  };
+  }, [fetchPapers]);
 
   const deletePaper = async (id) => {
     try {

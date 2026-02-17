@@ -3,14 +3,12 @@ import { getAllPapers, getPapersByUserId } from "../services/paperService";
 import { usePaper } from "../context/PaperContext";
 import PaperCard from "../components/Cards/PaperCard";
 import { useAuth } from "../context/AuthContext";
-import { useUserTeaching } from "../context/UserTeachingContext";
 import { Filter, Calendar, FileText, Clock, Search } from "lucide-react";
 import Loader from "../components/Common/loader/loader";
 import { useLocation } from "react-router-dom";
 
 const History = () => {
   const { papers, refreshPapers, loading } = usePaper();
-  const { contextSelection } = useUserTeaching();
   const location = useLocation();
   const [filters, setFilters] = useState({
     type: "all",
@@ -22,25 +20,7 @@ const History = () => {
 
   let allPapers = Array.isArray(papers) ? papers : papers?.papers || [];
 
-  // Apply context filter (subject, subject title, standard)
-  if (contextSelection) {
-    allPapers = allPapers.filter((paper) => {
-      const subjectMatch =
-        paper.subject_id != null && String(paper.subject_id) === String(contextSelection.subject_id) ||
-        (paper.subject != null && contextSelection.subject_name && paper.subject === contextSelection.subject_name);
-      const titleMatch =
-        paper.subject_title_id == null ||
-        contextSelection.subject_title_id == null ||
-        String(paper.subject_title_id) === String(contextSelection.subject_title_id);
-      const standardMatch =
-        paper.standard == null ||
-        contextSelection.standard == null ||
-        Number(paper.standard) === Number(contextSelection.standard);
-      return subjectMatch && titleMatch && standardMatch;
-    });
-  }
-
-  // Apply all filters
+  // Apply all filters (Paper History shows all user papers; use filters below to narrow)
   const filteredPapers = allPapers.filter((paper) => {
     // Filter by type
     const typeMatch = filters.type === "all" || paper.type === filters.type;
@@ -58,13 +38,15 @@ const History = () => {
 
     // Filter by search query
     const searchMatch = filters.searchQuery
-      ? paper.title
+      ? (paper.paper_title || paper.title || "")
+          .toLowerCase()
+          .includes(filters.searchQuery.toLowerCase()) ||
+        (paper.subject || "")
           ?.toLowerCase()
           .includes(filters.searchQuery.toLowerCase()) ||
-        paper.subject
-          ?.toLowerCase()
-          .includes(filters.searchQuery.toLowerCase()) ||
-        paper.type?.toLowerCase().includes(filters.searchQuery.toLowerCase())
+        (paper.type || "")
+          .toLowerCase()
+          .includes(filters.searchQuery.toLowerCase())
       : true;
 
     return typeMatch && dateMatch && searchMatch;
@@ -92,10 +74,10 @@ const History = () => {
         setIsRefreshing(false);
       }
     };
-    
+
     refreshData();
   }, [location.pathname]);
-  
+
   // Also refresh when location state indicates a refresh is needed
   useEffect(() => {
     if (location.state?.refresh) {

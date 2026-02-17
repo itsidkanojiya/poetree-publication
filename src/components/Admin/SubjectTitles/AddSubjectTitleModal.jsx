@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { X } from "lucide-react";
 
-const AddSubjectTitleModal = ({ subjects, standards = [], onClose, onSave }) => {
+const AddSubjectTitleModal = ({ subjects, standards = [], boards = [], onClose, onSave }) => {
   const [formData, setFormData] = useState({
     title_name: "",
     subject_id: "",
+    board_id: "",
     standard: [],
   });
   const [errors, setErrors] = useState({});
@@ -38,6 +39,9 @@ const AddSubjectTitleModal = ({ subjects, standards = [], onClose, onSave }) => 
     if (!formData.subject_id) {
       newErrors.subject_id = "Subject is required";
     }
+    if (!formData.board_id) {
+      newErrors.board_id = "Board is required";
+    }
     if (!formData.standard.length) {
       newErrors.standard = "Select at least one standard";
     }
@@ -51,6 +55,7 @@ const AddSubjectTitleModal = ({ subjects, standards = [], onClose, onSave }) => 
       onSave({
         title_name: formData.title_name,
         subject_id: parseInt(formData.subject_id, 10),
+        board_id: parseInt(formData.board_id, 10),
         standard: formData.standard.map(Number),
       });
     }
@@ -112,6 +117,31 @@ const AddSubjectTitleModal = ({ subjects, standards = [], onClose, onSave }) => 
             </select>
             {errors.subject_id && (
               <p className="mt-1 text-sm text-red-600">{errors.subject_id}</p>
+            )}
+          </div>
+
+          {/* Board - required */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Board <span className="text-red-500">*</span>
+            </label>
+            <select
+              name="board_id"
+              value={formData.board_id}
+              onChange={handleChange}
+              className={`w-full px-4 py-3 border-2 rounded-lg focus:ring-2 focus:ring-blue-200 transition outline-none ${
+                errors.board_id ? "border-red-300" : "border-gray-200 focus:border-blue-500"
+              }`}
+            >
+              <option value="">Select a board</option>
+              {(boards || []).map((board) => (
+                <option key={board.board_id} value={board.board_id}>
+                  {board.board_name}
+                </option>
+              ))}
+            </select>
+            {errors.board_id && (
+              <p className="mt-1 text-sm text-red-600">{errors.board_id}</p>
             )}
           </div>
 
