@@ -55,6 +55,7 @@ const AnswerSheetManagement = () => {
         sheet.subject?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         sheet.subject_title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         sheet.standard?.toString().includes(searchTerm) ||
+        sheet.standard_name?.toString().includes(searchTerm) ||
         sheet.board?.toLowerCase().includes(searchTerm.toLowerCase())
     );
     setFilteredSheets(filtered);
@@ -170,8 +171,8 @@ const AnswerSheetManagement = () => {
                   </p>
                 )}
                 <div className="flex items-center gap-4 text-sm text-gray-500 mb-4">
-                  {sheet.standard && (
-                    <span>Std: {sheet.standard}</span>
+                  {(sheet.standard_name ?? sheet.standard) && (
+                    <span>Std: {sheet.standard_name ?? sheet.standard}</span>
                   )}
                   {sheet.board && (
                     <span>Board: {sheet.board}</span>

@@ -55,6 +55,7 @@ const WorksheetManagement = () => {
         worksheet.subject?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         worksheet.subject_title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         worksheet.standard?.toString().includes(searchTerm) ||
+        worksheet.standard_name?.toString().includes(searchTerm) ||
         worksheet.board?.toLowerCase().includes(searchTerm.toLowerCase())
     );
     setFilteredWorksheets(filtered);
@@ -170,8 +171,8 @@ const WorksheetManagement = () => {
                   </p>
                 )}
                 <div className="flex items-center gap-4 text-sm text-gray-500 mb-4">
-                  {worksheet.standard && (
-                    <span>Std: {worksheet.standard}</span>
+                  {(worksheet.standard_name ?? worksheet.standard) && (
+                    <span>Std: {worksheet.standard_name ?? worksheet.standard}</span>
                   )}
                   {worksheet.board && (
                     <span>Board: {worksheet.board}</span>

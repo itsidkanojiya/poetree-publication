@@ -30,7 +30,7 @@ const Worksheets = () => {
     fetchData();
   }, []);
 
-  // Filter by selected teaching context
+  // Filter by selected teaching context (subject, subject title, standard, board)
   useEffect(() => {
     if (!contextSelection) {
       setFilteredWorksheets(worksheets);
@@ -38,12 +38,21 @@ const Worksheets = () => {
     }
     const filtered = worksheets.filter((ws) => {
       const subjectMatch =
-        !contextSelection.subject_name ||
-        ws.subject === contextSelection.subject_name;
+        !contextSelection.subject_id && !contextSelection.subject_name ||
+        String(ws.subject_id ?? "") === String(contextSelection.subject_id) ||
+        (contextSelection.subject_name && ws.subject === contextSelection.subject_name);
+      const titleMatch =
+        !contextSelection.subject_title_id && !contextSelection.subject_title_name ||
+        String(ws.subject_title_id ?? "") === String(contextSelection.subject_title_id) ||
+        (contextSelection.subject_title_name && (ws.subject_title_name || ws.subject_title) === contextSelection.subject_title_name);
       const standardMatch =
         contextSelection.standard == null ||
         parseInt(ws.standard) === parseInt(contextSelection.standard);
-      return subjectMatch && standardMatch;
+      const boardMatch =
+        !contextSelection.board_id && !contextSelection.board_name ||
+        String(ws.board_id ?? "") === String(contextSelection.board_id) ||
+        (contextSelection.board_name && (ws.board_name || ws.board) === contextSelection.board_name);
+      return subjectMatch && titleMatch && standardMatch && boardMatch;
     });
     setFilteredWorksheets(filtered);
   }, [contextSelection, worksheets]);
@@ -130,7 +139,7 @@ const Worksheets = () => {
                       {sheet.board || "N/A"}
                     </span>
                     <span className="px-3 py-1 bg-purple-100 text-purple-700 text-xs font-bold rounded-full">
-                      Std {sheet.standard}
+                      Std {sheet.standard_name ?? sheet.standard}
                     </span>
                   </div>
                 </div>

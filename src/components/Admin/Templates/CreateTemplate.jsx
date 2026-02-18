@@ -14,7 +14,7 @@ import { createTemplate } from "../../../services/adminService";
 import {
   getAllSubjects,
   getAllBoards,
-  getAllSubjectTitles,
+  getSubjectTitlesBySubjectAndContext,
   getQuestionsByType,
   getAllStandards,
 } from "../../../services/adminService";
@@ -135,17 +135,16 @@ const CreateTemplate = () => {
     fetchInitialData();
   }, []);
 
-  // Subject is set from database (one-time); use first subject
   useEffect(() => {
-    if (subjects.length > 0 && !formData.subject_id) {
-      setFormData((prev) => ({ ...prev, subject_id: String(subjects[0].subject_id) }));
-    }
-  }, [subjects]);
-  useEffect(() => {
-    if (formData.subject_id) {
+    if (formData.subject_id && formData.standard && formData.board_id) {
       fetchSubjectTitles();
+    } else {
+      setSubjectTitles([]);
+      if (!formData.subject_id || !formData.standard || !formData.board_id) {
+        setFormData((prev) => ({ ...prev, subject_title_id: "" }));
+      }
     }
-  }, [formData.subject_id]);
+  }, [formData.subject_id, formData.standard, formData.board_id]);
 
   useEffect(() => {
     if (currentQuestionType) {
@@ -172,15 +171,17 @@ const CreateTemplate = () => {
   const getStandardName = (id) => standards.find((s) => Number(s.standard_id) === Number(id))?.name ?? id;
 
   const fetchSubjectTitles = async () => {
+    const { subject_id, standard, board_id } = formData;
+    if (!subject_id || !standard || !board_id) return;
     try {
-      const titlesData = await getAllSubjectTitles();
-      const allTitles = Array.isArray(titlesData) ? titlesData : [];
-      const filtered = allTitles.filter(
-        (st) => st.subject_id === parseInt(formData.subject_id)
-      );
-      setSubjectTitles(filtered);
+      const list = await getSubjectTitlesBySubjectAndContext(subject_id, {
+        board_id,
+        standard,
+      });
+      setSubjectTitles(Array.isArray(list) ? list : []);
     } catch (error) {
       console.error("Error fetching subject titles:", error);
+      setSubjectTitles([]);
     }
   };
 
@@ -203,10 +204,13 @@ const CreateTemplate = () => {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    if (name === "subject_id") {
+      setFormData((prev) => ({ ...prev, subject_id: value, standard: "", board_id: "", subject_title_id: "" }));
+    } else if (name === "standard" || name === "board_id") {
+      setFormData((prev) => ({ ...prev, [name]: value, subject_title_id: "" }));
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: value }));
+    }
   };
 
   const handleQuestionToggle = (questionId) => {
@@ -645,6 +649,8 @@ const CreateTemplate = () => {
     </div>
   );
 
+  const canSelectSubjectTitle = formData.subject_id && formData.standard && formData.board_id;
+
   const renderStep1 = () => (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold text-gray-800 mb-6">
@@ -666,20 +672,19 @@ const CreateTemplate = () => {
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Subject Title <span className="text-red-500">*</span>
+            Subject <span className="text-red-500">*</span>
           </label>
           <select
-            name="subject_title_id"
-            value={formData.subject_title_id}
+            name="subject_id"
+            value={formData.subject_id}
             onChange={handleInputChange}
             required
-            disabled={!formData.subject_id}
-            className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none disabled:bg-gray-100"
+            className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
           >
-            <option value="">Select Subject Title</option>
-            {subjectTitles.map((st) => (
-              <option key={st.subject_title_id} value={st.subject_title_id}>
-                {st.title_name}
+            <option value="">Select Subject</option>
+            {subjects.map((s) => (
+              <option key={s.subject_id} value={s.subject_id}>
+                {s.subject_name}
               </option>
             ))}
           </select>
@@ -718,6 +723,28 @@ const CreateTemplate = () => {
             {boards.map((b) => (
               <option key={b.board_id} value={b.board_id}>
                 {b.board_name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="md:col-span-2">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Subject Title <span className="text-red-500">*</span>
+          </label>
+          <select
+            name="subject_title_id"
+            value={formData.subject_title_id}
+            onChange={handleInputChange}
+            required
+            disabled={!canSelectSubjectTitle}
+            className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none disabled:bg-gray-100"
+          >
+            <option value="">
+              {canSelectSubjectTitle ? "Select Subject Title" : "Select subject, standard and board first"}
+            </option>
+            {subjectTitles.map((st) => (
+              <option key={st.subject_title_id} value={st.subject_title_id}>
+                {st.title_name}
               </option>
             ))}
           </select>

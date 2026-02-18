@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Play, Film, X } from "lucide-react";
 import { getAnimations } from "../services/adminService";
 import Loader from "../components/Common/loader/loader";
+import { useUserTeaching } from "../context/UserTeachingContext";
 
 // YouTube thumbnail: maxresdefault (HD), fallback hqdefault
 const getThumbnailUrl = (videoId) => {
@@ -16,6 +17,7 @@ const getThumbnailFallbackUrl = (videoId) => {
 
 const Animations = () => {
   const navigate = useNavigate();
+  const { contextSelection } = useUserTeaching();
   const [animations, setAnimations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
@@ -43,6 +45,14 @@ const Animations = () => {
   const embedUrl = selected?.embed_url || (videoId ? `https://www.youtube.com/embed/${videoId}?autoplay=1` : null);
 
   const filtered = animations.filter((a) => {
+    // Apply chosen teaching context first (subject, subject title, standard, board)
+    if (contextSelection) {
+      if (contextSelection.subject_id != null && String(a.subject_id ?? a.subject?.subject_id) !== String(contextSelection.subject_id)) return false;
+      if (contextSelection.subject_title_id != null && String(a.subject_title_id ?? a.subject_title?.subject_title_id) !== String(contextSelection.subject_title_id)) return false;
+      if (contextSelection.board_id != null && String(a.board_id ?? a.board?.board_id) !== String(contextSelection.board_id)) return false;
+      if (contextSelection.standard != null && String(a.standard_id ?? a.standard?.standard_id ?? a.standard) !== String(contextSelection.standard)) return false;
+    }
+    // Then apply manual filter dropdowns if any
     if (filterSubjectId && String(a.subject_id ?? a.subject?.subject_id) !== filterSubjectId) return false;
     if (filterSubjectTitleId && String(a.subject_title_id ?? a.subject_title?.subject_title_id) !== filterSubjectTitleId) return false;
     if (filterBoardId && String(a.board_id ?? a.board?.board_id) !== filterBoardId) return false;

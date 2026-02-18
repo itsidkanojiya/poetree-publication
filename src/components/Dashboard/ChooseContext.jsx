@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { BookOpen, CheckCircle } from "lucide-react";
 import Loader from "../Common/loader/loader";
 import { useUserTeaching } from "../../context/UserTeachingContext";
-import { getAllSubjects, getAllSubjectTitles, getAllBoards, getAllStandards } from "../../services/adminService";
+import { getAllSubjects, getAllSubjectTitles, getAllBoards, getAllStandards, getSubjectTitlesBySubjectAndContext } from "../../services/adminService";
 
 const ChooseContext = () => {
   const { approvedSelections, setContextSelection, loading } = useUserTeaching();
@@ -15,6 +15,7 @@ const ChooseContext = () => {
   const [allSubjectTitles, setAllSubjectTitles] = useState([]);
   const [boards, setBoards] = useState([]);
   const [standards, setStandards] = useState([]);
+  const [contextSubjectTitles, setContextSubjectTitles] = useState([]);
 
   const { subjects, subject_titles } = approvedSelections;
 
@@ -78,23 +79,35 @@ const ChooseContext = () => {
     return { id, name, subjectName };
   });
 
-  // Subject is set from database (one-time); use first approved subject, no dropdown
+  // Fetch subject titles when Subject, Standard, and Board are set (same flow as elsewhere)
   useEffect(() => {
-    if (subjectOptions.length > 0 && !subjectId) {
-      setSubjectId(String(subjectOptions[0].id));
+    if (!subjectId || !standard || !boardId) {
+      setContextSubjectTitles([]);
+      return;
     }
-  }, [subjectOptions, subjectId]);
+    let cancelled = false;
+    getSubjectTitlesBySubjectAndContext(subjectId, { board_id: boardId, standard })
+      .then((list) => {
+        if (!cancelled) setContextSubjectTitles(Array.isArray(list) ? list : []);
+      })
+      .catch(() => {
+        if (!cancelled) setContextSubjectTitles([]);
+      });
+    return () => { cancelled = true; };
+  }, [subjectId, standard, boardId]);
+
   const effectiveSubjectId = subjectId || subjectOptions[0]?.id;
 
   const handleSubmit = (e) => {
     e.preventDefault();
     setSubmitError("");
     if (!effectiveSubjectId || !subjectTitleId || standard === "" || !boardId) {
-      setSubmitError("Please select Subject Title, Standard, and Board.");
+      setSubmitError("Please select Subject, Standard, Board, and Subject Title.");
       return;
     }
     const sub = subjectOptions.find((o) => String(o.id) === String(effectiveSubjectId));
-    const tit = titleOptions.find((o) => String(o.id) === String(subjectTitleId));
+    const tit = contextSubjectTitles.find((t) => String(t.subject_title_id ?? t.id) === String(subjectTitleId))
+      || titleOptions.find((o) => String(o.id) === String(subjectTitleId));
     const board = boards.find((b) => String(b.board_id ?? b.id) === String(boardId));
     const std = standards.find((s) => String(s.standard_id) === String(standard));
     setContextSelection({
@@ -103,7 +116,7 @@ const ChooseContext = () => {
       standard: standard === "" ? null : Number(standard) || standard,
       board_id: Number(boardId) || boardId,
       subject_name: sub?.name ?? "",
-      subject_title_name: tit?.name ?? "",
+      subject_title_name: tit?.title_name ?? tit?.subject_title_name ?? tit?.name ?? "",
       standard_name: std?.name ?? "",
       board_name: board?.board_name ?? board?.name ?? "",
     });
@@ -149,33 +162,39 @@ const ChooseContext = () => {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-gray-800">Choose Your Teaching Context</h1>
-            <p className="text-gray-600 text-sm">Select subject title, standard, and board. This will filter your dashboard.</p>
+            <p className="text-gray-600 text-sm">Select subject, standard, board, then subject title. This will filter your dashboard.</p>
           </div>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Subject Title</label>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Subject <span className="text-red-500">*</span></label>
             <select
-              value={subjectTitleId}
-              onChange={(e) => setSubjectTitleId(e.target.value)}
+              value={subjectId}
+              onChange={(e) => {
+                setSubjectId(e.target.value);
+                setSubjectTitleId("");
+              }}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
               required
             >
-              <option value="">Select subject title</option>
-              {titleOptions.map((opt) => (
+              <option value="">Select subject</option>
+              {subjectOptions.map((opt) => (
                 <option key={opt.id} value={opt.id}>
-                  {opt.name}{opt.subjectName ? ` (${opt.subjectName})` : ""}
+                  {opt.name}
                 </option>
               ))}
             </select>
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Standard</label>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Standard <span className="text-red-500">*</span></label>
             <select
               value={standard}
-              onChange={(e) => setStandard(e.target.value)}
+              onChange={(e) => {
+                setStandard(e.target.value);
+                setSubjectTitleId("");
+              }}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
               required
             >
@@ -189,10 +208,13 @@ const ChooseContext = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Board</label>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Board <span className="text-red-500">*</span></label>
             <select
               value={boardId}
-              onChange={(e) => setBoardId(e.target.value)}
+              onChange={(e) => {
+                setBoardId(e.target.value);
+                setSubjectTitleId("");
+              }}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
               required
             >
@@ -200,6 +222,30 @@ const ChooseContext = () => {
               {boards.map((b) => {
                 const id = b.board_id ?? b.id;
                 const name = b.board_name ?? b.name ?? `Board ${id}`;
+                return (
+                  <option key={id} value={id}>
+                    {name}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Subject Title <span className="text-red-500">*</span></label>
+            <select
+              value={subjectTitleId}
+              onChange={(e) => setSubjectTitleId(e.target.value)}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none disabled:bg-gray-100"
+              required
+              disabled={!subjectId || !standard || !boardId}
+            >
+              <option value="">
+                {subjectId && standard && boardId ? "Select subject title" : "Select subject, standard and board first"}
+              </option>
+              {contextSubjectTitles.map((t) => {
+                const id = t.subject_title_id ?? t.id;
+                const name = t.title_name ?? t.subject_title_name ?? t.name ?? `Title ${id}`;
                 return (
                   <option key={id} value={id}>
                     {name}

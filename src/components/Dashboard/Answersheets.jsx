@@ -32,17 +32,29 @@ const Answersheets = () => {
     fetchData();
   }, []);
 
-  // Filter by selected teaching context
+  // Filter by selected teaching context (subject, subject title, standard, board)
   useEffect(() => {
     if (!contextSelection) {
       setFilteredAnswerSheets(answerSheets);
       return;
     }
     const filtered = answerSheets.filter((as) => {
-      const subjectMatch = !contextSelection.subject_name || as.subject === contextSelection.subject_name;
-      const titleMatch = !contextSelection.subject_title_name || as.subject_title === contextSelection.subject_title_name;
-      const standardMatch = contextSelection.standard == null || parseInt(as.standard) === parseInt(contextSelection.standard);
-      return subjectMatch && titleMatch && standardMatch;
+      const subjectMatch =
+        !contextSelection.subject_id && !contextSelection.subject_name ||
+        String(as.subject_id ?? "") === String(contextSelection.subject_id) ||
+        (contextSelection.subject_name && as.subject === contextSelection.subject_name);
+      const titleMatch =
+        !contextSelection.subject_title_id && !contextSelection.subject_title_name ||
+        String(as.subject_title_id ?? "") === String(contextSelection.subject_title_id) ||
+        (contextSelection.subject_title_name && (as.subject_title_name || as.subject_title) === contextSelection.subject_title_name);
+      const standardMatch =
+        contextSelection.standard == null ||
+        parseInt(as.standard) === parseInt(contextSelection.standard);
+      const boardMatch =
+        !contextSelection.board_id && !contextSelection.board_name ||
+        String(as.board_id ?? "") === String(contextSelection.board_id) ||
+        (contextSelection.board_name && (as.board_name || as.board) === contextSelection.board_name);
+      return subjectMatch && titleMatch && standardMatch && boardMatch;
     });
     setFilteredAnswerSheets(filtered);
   }, [contextSelection, answerSheets]);
@@ -129,7 +141,7 @@ const Answersheets = () => {
                       {sheet.board || "N/A"}
                     </span>
                     <span className="px-3 py-1 bg-purple-100 text-purple-700 text-xs font-bold rounded-full">
-                      Std {sheet.standard}
+                      Std {sheet.standard_name ?? sheet.standard}
                     </span>
                   </div>
                 </div>

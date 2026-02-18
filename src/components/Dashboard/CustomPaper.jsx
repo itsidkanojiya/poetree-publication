@@ -591,21 +591,24 @@ const CustomPaper = () => {
       setLoading(true);
       setError(null);
       try {
-        // Build query parameters for API
+        const effectiveHeader = paperHeader || header;
+        // Build query parameters for API (subject_id, board_id, subject_title_id, standard)
         const params = new URLSearchParams();
         params.append("subject_id", approvedSubjectIds.join(","));
 
-        // Add board filter from header if available
-        if (header?.board) {
-          params.append("board_id", header.board);
+        if (effectiveHeader?.board) {
+          params.append("board_id", effectiveHeader.board);
+        }
+        if (effectiveHeader?.subjectTitle) {
+          params.append("subject_title_id", effectiveHeader.subjectTitle);
+        }
+        if (effectiveHeader?.standard != null && effectiveHeader?.standard !== "") {
+          const standardVal = typeof effectiveHeader.standard === "string"
+            ? (parseInt(effectiveHeader.standard, 10) || effectiveHeader.standard)
+            : effectiveHeader.standard;
+          params.append("standard", String(standardVal));
         }
 
-        // Add subject title filter from header if available
-        if (header?.subjectTitle) {
-          params.append("subject_title_id", header.subjectTitle);
-        }
-
-        // Call API with filters
         const response = await apiClient.get(`/question?${params.toString()}`);
 
         // Handle response format (could be array or object with questions property)
@@ -622,7 +625,7 @@ const CustomPaper = () => {
     };
 
     fetchFilteredQuestions();
-  }, [approvedSubjectIds, header?.board, header?.subjectTitle]);
+  }, [approvedSubjectIds, header?.board, header?.subjectTitle, header?.standard, paperHeader?.board, paperHeader?.subjectTitle, paperHeader?.standard]);
 
   const handleMarksChange = (type, value) => {
     const numValue = parseFloat(value) || 0;
@@ -1710,12 +1713,13 @@ const CustomPaper = () => {
                   <div className="flex-1 space-y-6">
                     {page.map((section, sectionIndex) => {
                       const shouldPrintTitle = !printedTypes.has(section.type);
+                      // First section with questions = A, second = B, etc. (sequential, not fixed by type)
+                      const sectionLetter = shouldPrintTitle
+                        ? String.fromCharCode(65 + printedTypes.size)
+                        : "";
                       if (shouldPrintTitle) {
                         printedTypes.add(section.type);
                       }
-
-                      // Get section letter (A, B, C, D, E)
-                      const sectionLetter = SECTION_LETTERS[section.type] || "";
 
                       return (
                         <div key={sectionIndex}>

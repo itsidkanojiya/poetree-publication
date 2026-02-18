@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { X, Plus, Trash2 } from "lucide-react";
-import { addQuestion, editQuestion, getAllSubjects, getAllBoards, getSubjectTitlesBySubject, getAllStandards } from "../../../services/adminService";
+import { addQuestion, editQuestion, getAllSubjects, getAllBoards, getSubjectTitlesBySubjectAndContext, getAllStandards } from "../../../services/adminService";
 import Toast from "../../Common/Toast";
 
 const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
@@ -41,22 +41,25 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
     }
   }, [question, questionType]);
 
-  // When subject_id is set (e.g. after loadQuestionData or user selection), fetch subject titles
+  // Fetch subject titles only when Subject, Standard, and Board are set (same flow as Worksheet/Answer Sheet)
   useEffect(() => {
-    if (!formData.subject_id) {
+    if (!formData.subject_id || !formData.standard || !formData.board_id) {
       setSubjectTitles([]);
       return;
     }
     let cancelled = false;
-    getSubjectTitlesBySubject(formData.subject_id)
-      .then((titlesData) => {
-        if (!cancelled) setSubjectTitles(Array.isArray(titlesData) ? titlesData : []);
+    getSubjectTitlesBySubjectAndContext(formData.subject_id, {
+      board_id: formData.board_id,
+      standard: formData.standard,
+    })
+      .then((list) => {
+        if (!cancelled) setSubjectTitles(Array.isArray(list) ? list : []);
       })
       .catch((err) => {
         if (!cancelled) console.error("Error fetching subject titles:", err);
       });
     return () => { cancelled = true; };
-  }, [formData.subject_id]);
+  }, [formData.subject_id, formData.standard, formData.board_id]);
 
   const fetchInitialData = async () => {
     try {
@@ -70,10 +73,6 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
       setBoards(Array.isArray(boardsData) ? boardsData : []);
       const stdList = Array.isArray(standardsData) ? standardsData : [];
       setStandards(stdList.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)));
-      // Subject is set from database (one-time); use first subject
-      if (subs.length > 0 && !question) {
-        setFormData((prev) => ({ ...prev, subject_id: String(subs[0].subject_id ?? subs[0].id) }));
-      }
     } catch (error) {
       console.error("Error fetching initial data:", error);
     }
@@ -131,17 +130,16 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
     const { name, value, files } = e.target;
     if (name === "image") {
       setFormData((prev) => ({ ...prev, image: files[0] || null }));
+    } else if (name === "subject_id") {
+      setFormData((prev) => ({ ...prev, subject_id: value, subject_title_id: "" }));
+    } else if (name === "standard" || name === "board_id") {
+      setFormData((prev) => ({ ...prev, [name]: value, subject_title_id: "" }));
     } else {
       setFormData((prev) => ({ ...prev, [name]: value }));
     }
     if (errors[name]) {
       setErrors((prev) => ({ ...prev, [name]: "" }));
     }
-  };
-
-  const handleSubjectChange = (e) => {
-    const subjectId = e.target.value;
-    setFormData((prev) => ({ ...prev, subject_id: subjectId, subject_title_id: "" }));
   };
 
   const handleSubmit = async (e) => {
@@ -216,6 +214,10 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
 
   const validate = () => {
     const newErrors = {};
+    if (!formData.subject_id) newErrors.subject_id = "Subject is required";
+    if (!formData.standard) newErrors.standard = "Standard is required";
+    if (!formData.board_id) newErrors.board_id = "Board is required";
+    if (!formData.subject_title_id) newErrors.subject_title_id = "Subject Title is required";
     if (!formData.question.trim()) newErrors.question = "Question is required";
     // Answer is optional for all question types — user can add a question without an answer
     if (questionType === "mcq") {
@@ -312,22 +314,23 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Common Fields */}
+            {/* Common Fields: Subject → Standard → Board → Subject Title (same flow as Worksheet/Answer Sheet) */}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Board
+                  Subject <span className="text-red-500">*</span>
                 </label>
                 <select
-                  name="board_id"
-                  value={formData.board_id}
+                  name="subject_id"
+                  value={formData.subject_id}
                   onChange={handleChange}
                   className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition outline-none"
+                  required
                 >
-                  <option value="">Select Board</option>
-                  {boards.map((board) => (
-                    <option key={board.board_id} value={board.board_id}>
-                      {board.board_name}
+                  <option value="">Select Subject</option>
+                  {subjects.map((s) => (
+                    <option key={s.subject_id} value={s.subject_id}>
+                      {s.subject_name}
                     </option>
                   ))}
                 </select>
@@ -355,15 +358,41 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Subject Title
+                  Board <span className="text-red-500">*</span>
+                </label>
+                <select
+                  name="board_id"
+                  value={formData.board_id}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition outline-none"
+                  required
+                >
+                  <option value="">Select Board</option>
+                  {boards.map((board) => (
+                    <option key={board.board_id} value={board.board_id}>
+                      {board.board_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Subject Title <span className="text-red-500">*</span>
                 </label>
                 <select
                   name="subject_title_id"
                   value={formData.subject_title_id}
                   onChange={handleChange}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition outline-none"
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition outline-none disabled:bg-gray-100"
+                  required
+                  disabled={!formData.subject_id || !formData.standard || !formData.board_id}
                 >
-                  <option value="">Select Subject Title</option>
+                  <option value="">
+                    {formData.subject_id && formData.standard && formData.board_id
+                      ? "Select Subject Title"
+                      : "Select subject, standard and board first"}
+                  </option>
                   {subjectTitles.map((st) => (
                     <option key={st.subject_title_id} value={st.subject_title_id}>
                       {st.subject_title_name ?? st.title_name ?? st.name ?? `Title ${st.subject_title_id}`}

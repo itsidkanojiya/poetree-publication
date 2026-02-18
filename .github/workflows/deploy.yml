@@ -23,11 +23,22 @@ jobs:
 
             # ===== FRONTEND =====
             cd /var/www/poetreefrontend/poetree-publication
+
+            # Preserve VPS .env so git pull doesn't fail and build has correct env
+            if [ -f .env ]; then
+              cp .env .env.vps
+            fi
             git pull origin main
+            if [ -f .env.vps ]; then
+              cp .env.vps .env
+            fi
+
+            echo "📌 Deployed commit: $(git rev-parse --short HEAD)"
+
             npm install
             npm run build
 
-
+            echo "📦 Build done at $(date -u)"
 
             # ===== NGINX =====
             nginx -t

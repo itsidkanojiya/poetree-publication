@@ -45,21 +45,21 @@ const EditHeader = () => {
           const paper = response.data || response;
 
           if (paper) {
+            const ctx = contextSelection;
+            const classDisplay = ctx?.standard_name ?? (ctx?.standard != null ? `Standard ${ctx.standard}` : (paper.standard ? `Standard ${paper.standard}` : ""));
             const headerFromPaper = {
-              // A lways use user profile values for school info
               schoolName: userSchoolName,
               address: userAddress,
               image: userLogo,
-              // Paper-specific fields
-              standard: paper.standard || "",
+              standard: ctx?.standard ?? paper.standard ?? "",
               timing: paper.timing || "",
               date: paper.date ? paper.date.split("T")[0] : "",
               division: paper.division || "",
-              subject: paper.subject || "",
-              board: paper.board || "",
-              subjectTitle: paper.subject_title_id || null,
+              subject: ctx?.subject_name ?? paper.subject ?? "",
+              board: ctx?.board_id ?? ctx?.board_name ?? paper.board ?? "",
+              subjectTitle: ctx?.subject_title_id ?? paper.subject_title_id ?? null,
               documentTitle: paper.paper_title || "",
-              class: paper.standard ? `Standard ${paper.standard}` : "",
+              class: classDisplay,
             };
             setEditedHeader(headerFromPaper);
           }
@@ -69,28 +69,37 @@ const EditHeader = () => {
           setLoading(false);
         }
       } else if (headerData) {
-        // Use header data from location state, but always use user profile for school info
+        const ctx = contextSelection;
+        const classDisplay = ctx?.standard_name ?? (ctx?.standard != null ? `Standard ${ctx.standard}` : headerData.class ?? "");
         setEditedHeader({
           ...headerData,
           schoolName: userSchoolName,
           address: userAddress,
           image: userLogo,
-          board: headerData.board || "",
-          subjectTitle: headerData.subjectTitle || null,
+          subject: ctx?.subject_name ?? headerData.subject ?? "",
+          board: ctx?.board_id ?? ctx?.board_name ?? headerData.board ?? "",
+          subjectTitle: ctx?.subject_title_id ?? headerData.subjectTitle ?? null,
+          standard: ctx?.standard ?? headerData.standard ?? "",
+          class: classDisplay,
         });
       } else if (header) {
-        // Use header from context, but always use user profile for school info
+        const ctx = contextSelection;
+        const classDisplay = ctx?.standard_name ?? (ctx?.standard != null ? `Standard ${ctx.standard}` : header.class ?? "");
         setEditedHeader({
           ...header,
           schoolName: userSchoolName,
           address: userAddress,
           image: userLogo,
-          board: header.board || "",
-          subjectTitle: header.subjectTitle || "",
+          subject: ctx?.subject_name ?? header.subject ?? "",
+          board: ctx?.board_id ?? ctx?.board_name ?? header.board ?? "",
+          subjectTitle: ctx?.subject_title_id ?? header.subjectTitle ?? "",
+          standard: ctx?.standard ?? header.standard ?? "",
+          class: classDisplay,
         });
       } else {
         // New header - pre-fill from teaching context when available (no need to ask again)
         const ctx = contextSelection;
+        const classDisplay = ctx?.standard_name ?? (ctx?.standard != null ? `Standard ${ctx.standard}` : "");
         setEditedHeader({
           image: userLogo,
           schoolName: userSchoolName,
@@ -98,7 +107,7 @@ const EditHeader = () => {
           subject: ctx?.subject_name ?? "",
           subjectTitle: ctx?.subject_title_id ?? null,
           board: ctx?.board_id ?? "",
-          class: ctx?.standard ?? "",
+          class: classDisplay,
           documentTitle: "",
           studentName: "",
           rollNo: "",
