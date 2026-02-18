@@ -9,6 +9,11 @@ lerna-debug.log*
 
 node_modules
 dist
+
+# Environment (never commit; VPS keeps its own .env)
+.env
+.env.local
+.env.*.local
 dist-ssr
 *.local
 

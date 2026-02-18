@@ -24,13 +24,27 @@ jobs:
             # ===== FRONTEND =====
             cd /var/www/poetreefrontend/poetree-publication
 
-            # Preserve VPS .env so git pull doesn't fail and build has correct env
+            # 1) Backup VPS .env so pull never overwrites it
             if [ -f .env ]; then
               cp .env .env.vps
+              echo "📋 Backed up .env to .env.vps"
             fi
+
+            # 2) Pull latest code (repo must not track .env — see .gitignore)
             git pull origin main
+
+            # 3) Restore VPS .env so build uses your API URL etc.
             if [ -f .env.vps ]; then
               cp .env.vps .env
+              echo "📋 Restored .env from .env.vps"
+            elif [ ! -f .env ] && [ -f .env.example ]; then
+              cp .env.example .env
+              echo "⚠️ No .env.vps found — copied .env.example. Add your real .env on VPS and save as .env.vps for next deploy."
+            fi
+
+            if [ ! -f .env ]; then
+              echo "❌ No .env on VPS. Create .env (or .env.vps) with VITE_API_URL and run deploy again."
+              exit 1
             fi
 
             echo "📌 Deployed commit: $(git rev-parse --short HEAD)"
