@@ -460,7 +460,8 @@ export const deleteAnimation = async (id) => {
  */
 export const getQuestionsByType = async (type) => {
   try {
-    const response = await apiClient.get(`/question?type=${type}`);
+    const apiType = type === "true&false" ? "truefalse" : type;
+    const response = await apiClient.get(`/question?type=${apiType}`);
     // Handle both array and object response formats
     return response.data?.questions || response.data || [];
   } catch (error) {

@@ -29,15 +29,19 @@ const PAGE_DIMENSIONS = {
   HEIGHT: 1123,
   WIDTH: 748,
   MARGIN: 70,
+  SAFETY_BUFFER: 40, // Extra margin so content never overflows and gets clipped
 };
 
 const COMPONENT_HEIGHTS = {
   HEADER: 230,
-  QUESTION: 24,
-  OPTION: 30,
+  QUESTION: 28,
+  OPTION: 32,
   IMAGE: 220,
-  SECTION: 28,
-  SPACING: 16, // Spacing between questions
+  SECTION: 32,
+  SPACING: 18,
+  PASSAGE_LINE: 26,
+  PASSAGE_SUB_Q: 34,
+  MATCH_ROW: 42,
 };
 
 const INITIAL_QUESTION_SECTIONS = [
@@ -160,6 +164,17 @@ const detectLanguage = (subjectName) => {
   return "english";
 };
 
+// Shuffle array (mixed order) for "all questions" view
+const shuffleArray = (arr) => {
+  if (!Array.isArray(arr) || arr.length === 0) return [];
+  const copy = [...arr];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+};
+
 // Function to determine MCQ option layout based on option lengths
 const getMcqLayout = (options) => {
   if (!options || options.length === 0) return "grid-cols-4";
@@ -203,6 +218,44 @@ const getMcqOptionsHeight = (options) => {
   }
 
   return rows * COMPONENT_HEIGHTS.OPTION;
+};
+
+// Estimate height for passage question (passage text + sub-questions)
+const getPassageQuestionHeight = (question) => {
+  let h = COMPONENT_HEIGHTS.QUESTION;
+  const passageText = question.question || "";
+  const passageLines = Math.max(1, Math.ceil(passageText.length / 55));
+  h += passageLines * COMPONENT_HEIGHTS.PASSAGE_LINE;
+  if (question.options) {
+    try {
+      const arr = typeof question.options === "string" ? JSON.parse(question.options) : question.options;
+      if (Array.isArray(arr) && arr.length > 0) {
+        h += arr.length * COMPONENT_HEIGHTS.PASSAGE_SUB_Q;
+      }
+    } catch (_) {}
+  }
+  return h;
+};
+
+// Estimate height for match question (table with left/right items)
+const getMatchQuestionHeight = (question) => {
+  let h = COMPONENT_HEIGHTS.QUESTION;
+  if (question.options) {
+    try {
+      const data = typeof question.options === "string" ? JSON.parse(question.options) : question.options;
+      const left = data?.left || [];
+      const right = data?.right || [];
+      const rows = Math.max(left.length, right.length, 1);
+      h += 40 + rows * COMPONENT_HEIGHTS.MATCH_ROW; // header + rows
+    } catch (_) {}
+  }
+  return h;
+};
+
+// Normalize question type so API "truefalse" and UI "true_false" both work
+const normalizeQuestionType = (type) => {
+  if (!type) return type;
+  return type === "truefalse" ? "true_false" : type;
 };
 
 // Function to get question type title based on language
@@ -262,6 +315,9 @@ const CustomPaper = () => {
   // Prevent duplicate saves
   const [isSaving, setIsSaving] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
+  const [showBackConfirm, setShowBackConfirm] = useState(false);
+  const [questionTypeDropdownOpen, setQuestionTypeDropdownOpen] = useState(false);
+  const questionTypeDropdownRef = useRef(null);
 
   const [approvedSubjectIds, setApprovedSubjectIds] = useState([]);
   const [approvedSubjectsMap, setApprovedSubjectsMap] = useState(new Map()); // Store subject_id -> subject_name mapping
@@ -419,8 +475,9 @@ const CustomPaper = () => {
       };
       
       fetchedQuestions.forEach((question) => {
-        if (groupedQuestions[question.type]) {
-          groupedQuestions[question.type].push(question);
+        const normalizedType = normalizeQuestionType(question.type);
+        if (groupedQuestions[normalizedType]) {
+          groupedQuestions[normalizedType].push(question);
         }
       });
       
@@ -627,6 +684,24 @@ const CustomPaper = () => {
     fetchFilteredQuestions();
   }, [approvedSubjectIds, header?.board, header?.subjectTitle, header?.standard, paperHeader?.board, paperHeader?.subjectTitle, paperHeader?.standard]);
 
+  // When no question type is selected, show all questions in mixed order
+  useEffect(() => {
+    if (!currentType && questions.length > 0) {
+      setFilteredQuestions(shuffleArray(questions));
+    }
+  }, [currentType, questions]);
+
+  // Close question type dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (questionTypeDropdownRef.current && !questionTypeDropdownRef.current.contains(e.target)) {
+        setQuestionTypeDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   const handleMarksChange = (type, value) => {
     const numValue = parseFloat(value) || 0;
     if (numValue >= 0) {
@@ -645,15 +720,20 @@ const CustomPaper = () => {
   };
 
   const handleTypeSelection = (type) => {
-    const filtered = questions.filter((q) => q.type === type);
-    setFilteredQuestions(filtered);
     setCurrentType(type);
+    if (!type) {
+      setFilteredQuestions(shuffleArray(questions));
+    } else {
+      setFilteredQuestions(
+        questions.filter((q) => normalizeQuestionType(q.type) === type)
+      );
+    }
   };
 
   const toggleQuestionSelection = (question) => {
     setQuestionSections((prev) => {
       return prev.map((section) => {
-        if (section.type === question.type) {
+        if (section.type === normalizeQuestionType(question.type)) {
           const questionExists = section.selectedQuestions.some(
             (q) => q.question_id === question.question_id
           );
@@ -825,19 +905,18 @@ const CustomPaper = () => {
     }
   };
 
-  const handleSavePaper = async () => {
+  const handleSavePaper = async (allowDraft = false) => {
     // Prevent duplicate saves
     if (isSaving || isSaved) {
       return;
     }
     
-    // Check if there are any questions selected
     const totalQuestions = questionSections.reduce(
       (total, section) => total + section.selectedQuestions.length,
       0
     );
     
-    if (totalQuestions === 0) {
+    if (totalQuestions === 0 && !allowDraft) {
       setToast({
         message: "Please select at least one question before saving",
         type: "warning",
@@ -1002,6 +1081,19 @@ const CustomPaper = () => {
     }
   };
 
+  const handleDiscardAndGo = () => {
+    setQuestionSections(INITIAL_QUESTION_SECTIONS);
+    localStorage.removeItem("questionSections");
+    localStorage.removeItem("marksPerType");
+    setShowBackConfirm(false);
+    navigate("/dashboard");
+  };
+
+  const handleSaveDraftAndGo = () => {
+    setShowBackConfirm(false);
+    handleSavePaper(true);
+  };
+
   const renderPages = () => {
     let pages = [];
     let currentHeight = PAGE_DIMENSIONS.HEIGHT - COMPONENT_HEIGHTS.HEADER;
@@ -1022,18 +1114,24 @@ const CustomPaper = () => {
         );
 
         // Calculate question height including spacing
-        let questionHeight = COMPONENT_HEIGHTS.QUESTION;
+        let questionHeight;
+        if (question.type === "passage") {
+          questionHeight = getPassageQuestionHeight(question);
+        } else if (question.type === "match") {
+          questionHeight = getMatchQuestionHeight(question);
+        } else {
+          questionHeight = COMPONENT_HEIGHTS.QUESTION;
+          if (question.type === "mcq" && Array.isArray(question.options)) {
+            questionHeight += getMcqOptionsHeight(question.options);
+          }
+        }
         if (isFirstQuestionOfType) {
           questionHeight += COMPONENT_HEIGHTS.SECTION;
         }
-        if (question.type === "mcq" && Array.isArray(question.options)) {
-          questionHeight += getMcqOptionsHeight(question.options);
-        }
-        if (question.image_url !== null) {
+        if (question.image_url != null && question.image_url !== "") {
           questionHeight += COMPONENT_HEIGHTS.IMAGE;
         }
         // Add spacing between questions (except for first question on page)
-        // Check if there are already questions on the current page
         const hasQuestionsOnPage = currentPage.some(
           (s) => s.selectedQuestions.length > 0
         );
@@ -1041,9 +1139,8 @@ const CustomPaper = () => {
           questionHeight += COMPONENT_HEIGHTS.SPACING;
         }
 
-        // Check if question fits on current page (with margin buffer)
-        // We need at least MARGIN pixels of space remaining after adding this question
-        const availableHeight = currentHeight - PAGE_DIMENSIONS.MARGIN;
+        // Check if question fits on current page (with margin + safety buffer to avoid clipping)
+        const availableHeight = currentHeight - PAGE_DIMENSIONS.MARGIN - (PAGE_DIMENSIONS.SAFETY_BUFFER || 0);
 
         if (questionHeight > availableHeight) {
           // Save current page if it has content
@@ -1057,12 +1154,18 @@ const CustomPaper = () => {
           currentHeight = PAGE_DIMENSIONS.HEIGHT; // Full page height for subsequent pages (no header)
 
           // Recalculate question height for new page (it's now first of its type on this page)
-          let newQuestionHeight =
-            COMPONENT_HEIGHTS.QUESTION + COMPONENT_HEIGHTS.SECTION;
-          if (question.type === "mcq" && Array.isArray(question.options)) {
-            newQuestionHeight += getMcqOptionsHeight(question.options);
+          let newQuestionHeight;
+          if (question.type === "passage") {
+            newQuestionHeight = getPassageQuestionHeight(question) + COMPONENT_HEIGHTS.SECTION;
+          } else if (question.type === "match") {
+            newQuestionHeight = getMatchQuestionHeight(question) + COMPONENT_HEIGHTS.SECTION;
+          } else {
+            newQuestionHeight = COMPONENT_HEIGHTS.QUESTION + COMPONENT_HEIGHTS.SECTION;
+            if (question.type === "mcq" && Array.isArray(question.options)) {
+              newQuestionHeight += getMcqOptionsHeight(question.options);
+            }
           }
-          if (question.image_url !== null) {
+          if (question.image_url != null && question.image_url !== "") {
             newQuestionHeight += COMPONENT_HEIGHTS.IMAGE;
           }
           // No spacing needed for first question on new page
@@ -1094,8 +1197,10 @@ const CustomPaper = () => {
           currentHeight -= questionHeight;
         }
 
-        // Number questions within each section (1, 2, 3...)
-        question.questionNumber = questionCounters[question.type]++;
+        // Number questions within each section (1, 2, 3...) — use normalized type so "truefalse" matches "true_false"
+        const typeKey = normalizeQuestionType(question.type);
+        if (!(typeKey in questionCounters)) questionCounters[typeKey] = 1;
+        question.questionNumber = questionCounters[typeKey]++;
       });
     });
 
@@ -1135,7 +1240,7 @@ const CustomPaper = () => {
         <div className="flex items-center justify-between w-full">
           <div className="flex items-center gap-4">
             <button
-              onClick={() => navigate(-1)}
+              onClick={() => setShowBackConfirm(true)}
               className="group flex items-center gap-2 px-3 py-2 text-gray-700 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200 font-medium"
             >
               <ChevronLeft
@@ -1208,6 +1313,42 @@ const CustomPaper = () => {
         </div>
       </div>
 
+      {/* Back to Dashboard confirmation */}
+      {showBackConfirm && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 border border-gray-200">
+            <h3 className="text-xl font-bold text-gray-800 mb-2">Leave this page?</h3>
+            <p className="text-gray-600 mb-6">
+              Are you sure? You can save as draft and continue later, or discard and start fresh next time.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-end">
+              <button
+                type="button"
+                onClick={() => setShowBackConfirm(false)}
+                className="px-4 py-2.5 rounded-xl font-semibold border-2 border-gray-300 text-gray-700 hover:bg-gray-50 transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDiscardAndGo}
+                className="px-4 py-2.5 rounded-xl font-semibold bg-rose-500 text-white hover:bg-rose-600 transition"
+              >
+                Discard
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveDraftAndGo}
+                disabled={isSaving}
+                className="px-4 py-2.5 rounded-xl font-semibold bg-violet-500 text-white hover:bg-violet-600 transition disabled:opacity-50"
+              >
+                {isSaving ? "Saving..." : "Save as draft"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Hidden Logo Upload Input */}
       <input 
         type="file" 
@@ -1264,38 +1405,64 @@ const CustomPaper = () => {
             </div>
           )}
 
-          {/* Question Type Selector - Modern Design */}
-          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6 hover:shadow-xl transition-all duration-300">
+          {/* Question Type Selector - Modern custom dropdown */}
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6 hover:shadow-xl transition-all duration-300" ref={questionTypeDropdownRef}>
             <label className="block text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
-              <span className="w-1 h-5 bg-gradient-to-b from-blue-500 to-indigo-600 rounded-full"></span>
+              <span className="w-1 h-5 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full"></span>
               Select Question Type
             </label>
-            <select
-              onChange={(e) => handleTypeSelection(e.target.value)}
-              value={currentType}
-              disabled={approvedSubjectIds.length === 0}
-              className="w-full px-4 py-3.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-gray-800 font-semibold bg-white hover:border-blue-300 cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <option value="">Choose a question type...</option>
-              <option value="mcq">Multiple Choice Questions</option>
-              <option value="short">Short Answer Questions</option>
-              <option value="long">Long Answer Questions</option>
-              <option value="blank">Fill in the Blanks</option>
-              <option value="onetwo">One or Two Sentence Questions</option>
-              <option value="true_false">True or False</option>
-              <option value="passage">Passage</option>
-              <option value="match">Match the Following</option>
-            </select>
-            {currentType && (
-              <div className="mt-4 animate-in slide-in-from-top-2">
-                <span
-                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold shadow-md ${QUESTION_TYPE_CONFIG[currentType]?.badge}`}
-                >
-                  <div className="w-2 h-2 rounded-full bg-current animate-pulse"></div>
-                  {QUESTION_TYPE_CONFIG[currentType]?.label}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => approvedSubjectIds.length > 0 && setQuestionTypeDropdownOpen((o) => !o)}
+                disabled={approvedSubjectIds.length === 0}
+                className="w-full px-4 py-3.5 flex items-center justify-between gap-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-left bg-white hover:border-blue-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+              >
+                <span className="font-semibold text-gray-800 truncate">
+                  {currentType ? (
+                    <span className={`inline-flex items-center gap-2 ${QUESTION_TYPE_CONFIG[currentType]?.badge} px-3 py-1 rounded-lg`}>
+                      <span className={`w-2 h-2 rounded-full ${QUESTION_TYPE_CONFIG[currentType]?.color}`} />
+                      {QUESTION_TYPE_CONFIG[currentType]?.label}
+                    </span>
+                  ) : (
+                    <span className="text-gray-500">Choose a question type or view all (mixed)</span>
+                  )}
                 </span>
-              </div>
-            )}
+                <ChevronDown
+                  size={20}
+                  className={`flex-shrink-0 text-gray-500 transition-transform duration-200 ${questionTypeDropdownOpen ? "rotate-180" : ""}`}
+                />
+              </button>
+              {questionTypeDropdownOpen && (
+                <div className="absolute top-full left-0 right-0 mt-2 py-2 bg-white border-2 border-gray-200 rounded-xl shadow-xl z-50 max-h-80 overflow-y-auto">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleTypeSelection("");
+                      setQuestionTypeDropdownOpen(false);
+                    }}
+                    className={`w-full px-4 py-3 flex items-center gap-3 text-left hover:bg-gray-50 transition-colors ${!currentType ? "bg-blue-50 border-l-4 border-blue-500" : ""}`}
+                  >
+                    <span className="w-2 h-2 rounded-full bg-gray-400" />
+                    <span className="font-medium text-gray-700">All types (mixed)</span>
+                  </button>
+                  {Object.entries(QUESTION_TYPE_CONFIG).map(([type, config]) => (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => {
+                        handleTypeSelection(type);
+                        setQuestionTypeDropdownOpen(false);
+                      }}
+                      className={`w-full px-4 py-3 flex items-center gap-3 text-left hover:bg-gray-50 transition-colors ${currentType === type ? "bg-blue-50 border-l-4 border-blue-500" : ""}`}
+                    >
+                      <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${config.color}`} />
+                      <span className="font-medium text-gray-800">{config.label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Marks Configuration Toggle Button */}
@@ -1400,8 +1567,9 @@ const CustomPaper = () => {
             {filteredQuestions.length > 0 ? (
               <>
                 {filteredQuestions.map((q) => {
+                  const sectionType = currentType || normalizeQuestionType(q.type);
                   const isSelected = questionSections
-                    .find((p) => p.type === currentType)
+                    .find((p) => p.type === sectionType)
                     ?.selectedQuestions.some(
                       (qItem) => qItem.question_id === q.question_id
                     );
@@ -1695,9 +1863,9 @@ const CustomPaper = () => {
                 className="bg-white rounded-2xl shadow-2xl border-4 border-gray-200 overflow-hidden transform hover:scale-[1.01] transition-transform duration-300"
                 style={{ height: "1123px", width: "748px" }}
               >
-                <div className="p-8 h-full flex flex-col">
+                <div className="p-8 h-full flex flex-col min-h-0">
                   {pageIndex === 0 && (
-                    <div className="mb-6 pb-6">
+                    <div className="mb-6 pb-6 flex-shrink-0">
                       <HeaderCard
                         header={{
                           ...(paperHeader || header),
@@ -1710,7 +1878,7 @@ const CustomPaper = () => {
                     </div>
                   )}
 
-                  <div className="flex-1 space-y-6">
+                  <div className="flex-1 min-h-0 overflow-y-auto space-y-6">
                     {page.map((section, sectionIndex) => {
                       const shouldPrintTitle = !printedTypes.has(section.type);
                       // First section with questions = A, second = B, etc. (sequential, not fixed by type)
@@ -1789,43 +1957,60 @@ const CustomPaper = () => {
                             {section.selectedQuestions.map(
                               (question, qIndex) => (
                                 <div key={qIndex} className="mb-4">
-                                  <p
-                                    className="text-gray-800"
-                                    style={{
-                                      fontSize: "14px",
-                                      fontWeight: "normal",
-                                      lineHeight: "1.7",
-                                    }}
+                                  <div
+                                    className={`flex items-start justify-between gap-4 ${(question.type === "mcq" || question.type === "true_false" || question.type === "truefalse") ? "flex-row" : ""}`}
+                                    style={{ lineHeight: "1.7" }}
                                   >
-                                    <span
+                                    <p
+                                      className="text-gray-800 flex-1 min-w-0"
                                       style={{
                                         fontSize: "14px",
-                                        fontWeight: "bold",
+                                        fontWeight: "normal",
                                       }}
                                     >
-                                      ({question.questionNumber}){" "}
-                                    </span>
-                                    {question.question}
-                                  </p>
+                                      <span
+                                        style={{
+                                          fontSize: "14px",
+                                          fontWeight: "bold",
+                                        }}
+                                      >
+                                        ({question.questionNumber}){" "}
+                                      </span>
+                                      {question.question}
+                                    </p>
+                                    {question.type === "mcq" && (
+                                      <div
+                                        className="flex-shrink-0 rounded border-2 border-gray-500 bg-white"
+                                        style={{ width: "28px", height: "22px", minWidth: "28px", minHeight: "22px" }}
+                                      />
+                                    )}
+                                    {(question.type === "true_false" || question.type === "truefalse") && (
+                                      <div
+                                        className="flex-shrink-0 rounded border-2 border-gray-500 bg-white"
+                                        style={{ width: "52px", height: "24px", minWidth: "52px", minHeight: "24px" }}
+                                      />
+                                    )}
+                                  </div>
 
                                   {question.type === "mcq" &&
                                     question.options && (
                                       <div
-                                        className={`ml-6 mt-2 grid ${getMcqLayout(
-                                          question.options
-                                        )} gap-2`}
+                                        className="ml-6 mt-2 grid grid-cols-2 gap-x-6 gap-y-2"
+                                        style={{ gridAutoRows: "minmax(1.2em, auto)" }}
                                       >
                                         {question.options.map(
                                           (option, optIndex) => (
-                                            <p
+                                            <div
                                               key={optIndex}
-                                              className="text-gray-700"
+                                              className="flex gap-1.5 min-w-0 break-words"
                                               style={{
                                                 fontSize: "13px",
                                                 fontWeight: "normal",
+                                                color: "#374151",
                                               }}
                                             >
                                               <span
+                                                className="flex-shrink-0"
                                                 style={{
                                                   fontSize: "13px",
                                                   fontWeight: "500",
@@ -1835,9 +2020,10 @@ const CustomPaper = () => {
                                                 {String.fromCharCode(
                                                   97 + optIndex
                                                 )}
-                                                )
-                                              </span>{" "}
+                                                ){" "}
+                                              </span>
                                               <span
+                                                className="min-w-0 break-words"
                                                 style={{
                                                   fontSize: "13px",
                                                   fontWeight: "normal",
@@ -1845,11 +2031,174 @@ const CustomPaper = () => {
                                               >
                                                 {option}
                                               </span>
-                                            </p>
+                                            </div>
                                           )
                                         )}
                                       </div>
                                     )}
+
+                                  {/* Passage: show sub-questions below the passage text */}
+                                  {question.type === "passage" &&
+                                    question.options && (() => {
+                                      try {
+                                        const passageQuestions =
+                                          typeof question.options === "string"
+                                            ? JSON.parse(question.options)
+                                            : question.options;
+                                        if (
+                                          Array.isArray(passageQuestions) &&
+                                          passageQuestions.length > 0
+                                        ) {
+                                          return (
+                                            <div
+                                              className="ml-6 mt-3 space-y-2"
+                                              style={{
+                                                fontSize: "14px",
+                                                fontWeight: "normal",
+                                                color: "#374151",
+                                              }}
+                                            >
+                                              {passageQuestions.map(
+                                                (pq, pqIdx) => (
+                                                  <p
+                                                    key={pqIdx}
+                                                    className="text-gray-800"
+                                                    style={{
+                                                      fontSize: "14px",
+                                                      lineHeight: "1.7",
+                                                    }}
+                                                  >
+                                                    <span
+                                                      style={{
+                                                        fontWeight: "600",
+                                                      }}
+                                                    >
+                                                      (
+                                                      {String.fromCharCode(
+                                                        97 + pqIdx
+                                                      )}
+                                                      ){" "}
+                                                    </span>
+                                                    {typeof pq === "object" && pq !== null && "question" in pq
+                                                      ? pq.question
+                                                      : String(pq)}
+                                                  </p>
+                                                )
+                                              )}
+                                            </div>
+                                          );
+                                        }
+                                      } catch (e) {
+                                        console.error("Error parsing passage questions:", e);
+                                      }
+                                      return null;
+                                    })()}
+
+                                  {/* Match the following: render table (Column A, Column B, Answer) like in template */}
+                                  {question.type === "match" &&
+                                    question.options && (() => {
+                                      try {
+                                        const matchData =
+                                          typeof question.options === "string"
+                                            ? JSON.parse(question.options)
+                                            : question.options;
+                                        const leftItems = matchData.left || [];
+                                        const rightItems = matchData.right || [];
+                                        const maxLength = Math.max(
+                                          leftItems.length,
+                                          rightItems.length
+                                        );
+                                        if (
+                                          leftItems.length > 0 ||
+                                          rightItems.length > 0
+                                        ) {
+                                          return (
+                                            <div className="ml-6 mt-3 overflow-x-auto">
+                                              <table
+                                                className="w-full border-collapse"
+                                                style={{
+                                                  fontSize: "14px",
+                                                  border: "1px solid #374151",
+                                                }}
+                                              >
+                                                <thead>
+                                                  <tr>
+                                                    <th
+                                                      className="px-3 py-2 text-left font-semibold text-gray-700"
+                                                      style={{
+                                                        border: "1px solid #374151",
+                                                        backgroundColor: "#f3f4f6",
+                                                      }}
+                                                    >
+                                                      A
+                                                    </th>
+                                                    <th
+                                                      className="px-3 py-2 text-left font-semibold text-gray-700"
+                                                      style={{
+                                                        border: "1px solid #374151",
+                                                        backgroundColor: "#f3f4f6",
+                                                      }}
+                                                    >
+                                                      B
+                                                    </th>
+                                                    <th
+                                                      className="px-3 py-2 text-left font-semibold text-gray-700"
+                                                      style={{
+                                                        border: "1px solid #374151",
+                                                        backgroundColor: "#f3f4f6",
+                                                      }}
+                                                    >
+                                                      Answer
+                                                    </th>
+                                                  </tr>
+                                                </thead>
+                                                <tbody>
+                                                  {Array.from({
+                                                    length: maxLength,
+                                                  }).map((_, idx) => (
+                                                    <tr key={idx}>
+                                                      <td
+                                                        className="px-3 py-2 text-gray-800"
+                                                        style={{
+                                                          border: "1px solid #374151",
+                                                        }}
+                                                      >
+                                                        {idx + 1}. {leftItems[idx] || ""}
+                                                      </td>
+                                                      <td
+                                                        className="px-3 py-2 text-gray-800"
+                                                        style={{
+                                                          border: "1px solid #374151",
+                                                        }}
+                                                      >
+                                                        {String.fromCharCode(
+                                                          97 + idx
+                                                        )}
+                                                        . {rightItems[idx] || ""}
+                                                      </td>
+                                                      <td
+                                                        className="px-3 py-2 text-gray-800 font-mono"
+                                                        style={{
+                                                          border: "1px solid #374151",
+                                                        }}
+                                                      >
+                                                        ({idx + 1}) (_____)
+                                                      </td>
+                                                    </tr>
+                                                  ))}
+                                                </tbody>
+                                              </table>
+                                            </div>
+                                          );
+                                        }
+                                      } catch (e) {
+                                        console.error(
+                                          "Error parsing match data:",
+                                          e
+                                        );
+                                      }
+                                      return null;
+                                    })()}
 
                                   {question.image_url && (
                                     <div className="mt-3 ml-6">

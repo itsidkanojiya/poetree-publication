@@ -9,22 +9,37 @@ import {
   Sparkles,
   ArrowRight,
   XCircle,
+  ListChecks,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import apiClient from "../../services/apiClient";
 import Toast from "../Common/Toast";
 import { usePaper } from "../../context/PaperContext";
 import { useUserTeaching } from "../../context/UserTeachingContext";
+import { getDashboard } from "../../services/dashboardService";
+
+const QUESTION_TYPE_LABELS = {
+  mcq: "MCQ",
+  short: "Short",
+  long: "Long",
+  blank: "Fill in Blanks",
+  onetwo: "One or Two",
+  true_false: "True/False",
+  truefalse: "True/False",
+  passage: "Passage",
+  match: "Match",
+};
 
 const Overview = () => {
   const navigate = useNavigate();
   const { papers } = usePaper();
   const { contextSelection } = useUserTeaching();
+  const [dashboardData, setDashboardData] = useState(null);
+  const [statsLoading, setStatsLoading] = useState(true);
+  const [dashboardFailed, setDashboardFailed] = useState(false);
   const [worksheets, setWorksheets] = useState([]);
   const [answerSheets, setAnswerSheets] = useState([]);
-  const [statsLoading, setStatsLoading] = useState(true);
   const [approvedSubjectIds, setApprovedSubjectIds] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState({
     show: false,
     message: "",
@@ -34,23 +49,24 @@ const Overview = () => {
   const allPapers = Array.isArray(papers) ? papers : papers?.papers || [];
 
   const stats = useMemo(() => {
-    if (!contextSelection) {
-      return { papers: 0, worksheets: 0, answerSheets: 0 };
+    if (dashboardData && !dashboardFailed) {
+      return {
+        papers: dashboardData.papers_count ?? 0,
+        worksheets: dashboardData.worksheets_count ?? 0,
+        answerSheets: dashboardData.answer_sheets_count ?? 0,
+      };
     }
-    const papersFiltered = allPapers.filter((paper) => {
-      const subjectMatch =
-        (paper.subject_id != null && String(paper.subject_id) === String(contextSelection.subject_id)) ||
-        (paper.subject != null && contextSelection.subject_name && paper.subject === contextSelection.subject_name);
-      const titleMatch =
-        paper.subject_title_id == null ||
-        contextSelection.subject_title_id == null ||
-        String(paper.subject_title_id) === String(contextSelection.subject_title_id);
-      const standardMatch =
-        paper.standard == null ||
-        contextSelection.standard == null ||
-        Number(paper.standard) === Number(contextSelection.standard);
-      return subjectMatch && titleMatch && standardMatch;
-    });
+    // Question Papers: always show total count (all user's saved papers)
+    const papersCount = allPapers.length;
+
+    // Worksheets & Answer Sheets: filter by context when context is selected
+    if (!contextSelection) {
+      return {
+        papers: papersCount,
+        worksheets: worksheets.length,
+        answerSheets: answerSheets.length,
+      };
+    }
     const worksheetsFiltered = worksheets.filter((ws) => {
       const subjectMatch = !contextSelection.subject_name || ws.subject === contextSelection.subject_name;
       const standardMatch =
@@ -68,117 +84,103 @@ const Overview = () => {
       return subjectMatch && titleMatch && standardMatch;
     });
     return {
-      papers: papersFiltered.length,
+      papers: papersCount,
       worksheets: worksheetsFiltered.length,
       answerSheets: answerSheetsFiltered.length,
     };
-  }, [contextSelection, allPapers, worksheets, answerSheets]);
+  }, [dashboardData, dashboardFailed, contextSelection, allPapers, worksheets, answerSheets]);
 
   useEffect(() => {
     let cancelled = false;
-    const fetchWorksheetsAndSheets = async () => {
+    const fetchDashboard = async () => {
       setStatsLoading(true);
+      setDashboardFailed(false);
       try {
-        const [wsRes, asRes] = await Promise.all([
-          apiClient.get("/worksheets"),
-          apiClient.get("/answersheets"),
-        ]);
-        if (!cancelled) {
-          setWorksheets(Array.isArray(wsRes?.data) ? wsRes.data : []);
-          setAnswerSheets(Array.isArray(asRes?.data) ? asRes.data : []);
-        }
+        const context = contextSelection
+          ? {
+              subject_id: contextSelection.subject_id,
+              subject_title_id: contextSelection.subject_title_id,
+              standard: contextSelection.standard,
+              board_id: contextSelection.board_id,
+            }
+          : {};
+        const data = await getDashboard(context);
+        if (!cancelled && data) setDashboardData(data);
       } catch (err) {
         if (!cancelled) {
-          setWorksheets([]);
-          setAnswerSheets([]);
+          setDashboardFailed(true);
+          setDashboardData(null);
         }
       } finally {
         if (!cancelled) setStatsLoading(false);
       }
     };
-    fetchWorksheetsAndSheets();
+    fetchDashboard();
     return () => { cancelled = true; };
-  }, []);
+  }, [
+    contextSelection?.subject_id,
+    contextSelection?.subject_title_id,
+    contextSelection?.standard,
+    contextSelection?.board_id,
+  ]);
 
-  // Fetch approved subjects on component mount
+  // Fallback: when dashboard API is not implemented, fetch worksheets, answer sheets, approved subjects
   useEffect(() => {
-    const fetchApprovedSubjects = async () => {
+    if (!dashboardFailed) return;
+    let cancelled = false;
+    const fetchFallback = async () => {
       try {
-        const response = await apiClient.get("/auth/my-selections/approved");
-        const responseData = response.data;
-
-        // Extract unique subject IDs from approved selections
-        const subjectIds = new Set();
-
-        // Handle new response structure: { approved_selections: { subjects: [], subject_titles: [] } }
-        if (responseData?.approved_selections) {
-          const { subjects, subject_titles } = responseData.approved_selections;
-
-          // Extract subject IDs from subjects array
-          if (Array.isArray(subjects)) {
-            subjects.forEach((item) => {
-              if (item.subject_id) {
-                subjectIds.add(item.subject_id);
-              }
-              // Also check nested subject object
-              if (item.subject?.subject_id) {
-                subjectIds.add(item.subject.subject_id);
-              }
+        const [wsRes, asRes, approvedRes] = await Promise.all([
+          apiClient.get("/worksheets"),
+          apiClient.get("/answersheets"),
+          apiClient.get("/auth/my-selections/approved"),
+        ]);
+        if (!cancelled) {
+          setWorksheets(Array.isArray(wsRes?.data) ? wsRes.data : []);
+          setAnswerSheets(Array.isArray(asRes?.data) ? asRes.data : []);
+          const res = approvedRes?.data;
+          const ids = new Set();
+          if (res?.approved_selections) {
+            [].concat(res.approved_selections.subjects || [], res.approved_selections.subject_titles || []).forEach((item) => {
+              const id = item.subject_id || item.subject?.subject_id;
+              if (id) ids.add(id);
             });
           }
-
-          // Extract subject IDs from subject_titles array
-          if (Array.isArray(subject_titles)) {
-            subject_titles.forEach((item) => {
-              if (item.subject_id) {
-                subjectIds.add(item.subject_id);
-              }
-              // Also check nested subject object
-              if (item.subject?.subject_id) {
-                subjectIds.add(item.subject.subject_id);
-              }
-            });
-          }
+          setApprovedSubjectIds(Array.from(ids));
         }
-        // Handle old response structure: { data: [...] } or direct array
-        else if (responseData?.data && Array.isArray(responseData.data)) {
-          responseData.data.forEach((request) => {
-            if (request.subjects && Array.isArray(request.subjects)) {
-              request.subjects.forEach((subject) => {
-                if (subject.subject_id) {
-                  subjectIds.add(subject.subject_id);
-                }
-              });
-            }
-          });
+      } catch (e) {
+        if (!cancelled) {
+          setWorksheets([]);
+          setAnswerSheets([]);
+          setApprovedSubjectIds([]);
         }
-        // Handle direct array response
-        else if (Array.isArray(responseData)) {
-          responseData.forEach((request) => {
-            if (request.subjects && Array.isArray(request.subjects)) {
-              request.subjects.forEach((subject) => {
-                if (subject.subject_id) {
-                  subjectIds.add(subject.subject_id);
-                }
-              });
-            }
-          });
-        }
-
-        setApprovedSubjectIds(Array.from(subjectIds));
-      } catch (error) {
-        console.error("Error fetching approved subjects:", error);
-        setApprovedSubjectIds([]);
-      } finally {
-        setLoading(false);
       }
     };
+    fetchFallback();
+    return () => { cancelled = true; };
+  }, [dashboardFailed]);
 
-    fetchApprovedSubjects();
-  }, []);
+  const hasApprovedSubjects =
+    dashboardData?.has_approved_subjects ?? (approvedSubjectIds.length > 0);
+
+  const questionCountsByType = useMemo(() => {
+    const raw = dashboardData?.question_counts_by_type;
+    if (!raw || typeof raw !== "object") return null;
+    const order = ["mcq", "short", "long", "blank", "onetwo", "true_false", "truefalse", "passage", "match"];
+    const out = [];
+    const seen = new Set();
+    order.forEach((key) => {
+      const norm = key === "truefalse" ? "true_false" : key;
+      if (seen.has(norm)) return;
+      seen.add(norm);
+      if (key === "truefalse" && raw.true_false != null) return;
+      out.push({ key: norm, label: QUESTION_TYPE_LABELS[key] || key, count: Number(raw[key]) || 0 });
+    });
+    return out.length ? out : null;
+  }, [dashboardData?.question_counts_by_type]);
 
   const handlePrebuildNavigate = () => {
-    if (approvedSubjectIds.length === 0) {
+    if (!hasApprovedSubjects) {
       setToast({
         show: true,
         message:
@@ -194,7 +196,7 @@ const Overview = () => {
   };
 
   const handleCustomNavigate = () => {
-    if (approvedSubjectIds.length === 0) {
+    if (!hasApprovedSubjects) {
       setToast({
         show: true,
         message:
@@ -255,7 +257,7 @@ const Overview = () => {
               </h3>
               <p className="text-gray-600 font-medium">Question Papers</p>
               <p className="text-xs text-gray-500 mt-2">
-                Total papers (for selected context)
+                Your saved papers
               </p>
             </div>
           </Link>
@@ -308,6 +310,32 @@ const Overview = () => {
             </div>
           </Link>
         </div>
+
+        {/* Questions by type (from dashboard API) */}
+        {questionCountsByType && questionCountsByType.length > 0 && (
+          <div className="mb-12">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg">
+                <ListChecks className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-gray-800">Questions by type</h2>
+                <p className="text-gray-600 text-sm">Available questions in your context</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-4 lg:grid-cols-4 gap-3">
+              {questionCountsByType.map(({ key, label, count }) => (
+                <div
+                  key={key}
+                  className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm hover:shadow-md transition-shadow"
+                >
+                  <p className="text-2xl font-bold text-gray-800">{count}</p>
+                  <p className="text-sm font-medium text-gray-600 truncate" title={label}>{label}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Exam Paper Builder Section */}
         <div className="mb-12">

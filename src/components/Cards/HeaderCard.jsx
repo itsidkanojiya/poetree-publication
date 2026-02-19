@@ -164,14 +164,14 @@ const HeaderCard = ({
           {/* Bottom section: Name and Subject on first row; Class, Date, Marks on second row */}
           <div className="flex flex-col gap-2 mt-3">
             {/* First row: Name and Subject */}
-            <div className="flex justify-between items-start text-sm">
-              <div>
-                <strong>Name:</strong>{" "}
-                <span className="border-b border-black border-dotted inline-block min-w-[200px]">
-                  {header.studentName || ""}
+            <div className="flex justify-between items-start text-sm gap-4">
+              <div className="flex-1 min-w-0 flex items-baseline gap-1">
+                <strong className="flex-shrink-0">Name:</strong>
+                <span className="border-b border-black border-dotted inline-block flex-1 min-w-[360px]">
+                  {header.studentName || "\u00A0"}
                 </span>
               </div>
-              <div>
+              <div className="flex-shrink-0">
                 <strong>Subject:</strong> {header.subject || "Maths"}
               </div>
             </div>

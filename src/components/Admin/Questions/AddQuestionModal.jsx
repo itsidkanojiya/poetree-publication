@@ -150,8 +150,9 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
       setLoading(true);
       const formDataToSend = new FormData();
 
-      // Add common fields
-      formDataToSend.append("type", formData.type);
+      // API expects "truefalse" for true/false questions (not "true&false")
+      const apiType = formData.type === "true&false" ? "truefalse" : formData.type;
+      formDataToSend.append("type", apiType);
       if (formData.board_id) formDataToSend.append("board_id", formData.board_id);
       if (formData.standard) formDataToSend.append("standard", formData.standard);
       formDataToSend.append("question", formData.question);
@@ -185,6 +186,8 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
           }
         });
         formDataToSend.append("answer", JSON.stringify(matchAnswer));
+      } else if (questionType === "true&false") {
+        formDataToSend.append("answer", formData.answer === "true" || formData.answer === "false" ? formData.answer : "");
       } else {
         formDataToSend.append("answer", formData.answer);
         if (formData.options) formDataToSend.append("options", formData.options);
@@ -632,7 +635,42 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
               </div>
             )}
 
-            {!["mcq", "passage", "match"].includes(questionType) && (
+            {questionType === "true&false" && (
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Correct answer
+                </label>
+                <div className="flex gap-6">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="answer"
+                      value="true"
+                      checked={formData.answer === "true"}
+                      onChange={handleChange}
+                      className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                    />
+                    <span className="font-medium text-gray-800">True</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="answer"
+                      value="false"
+                      checked={formData.answer === "false"}
+                      onChange={handleChange}
+                      className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                    />
+                    <span className="font-medium text-gray-800">False</span>
+                  </label>
+                </div>
+                {errors.answer && (
+                  <p className="mt-1 text-sm text-red-600">{errors.answer}</p>
+                )}
+              </div>
+            )}
+
+            {!["mcq", "passage", "match", "true&false"].includes(questionType) && (
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   Answer (Optional)

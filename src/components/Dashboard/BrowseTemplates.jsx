@@ -1,28 +1,27 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { FileText, Eye, Search, Filter } from "lucide-react";
+import { FileText, Eye, Search } from "lucide-react";
 import Toast from "../Common/Toast";
 import apiClient from "../../services/apiClient";
 import Loader from "../Common/loader/loader";
 import { getAllStandards } from "../../services/adminService";
+import { useUserTeaching } from "../../context/UserTeachingContext";
 
 const BrowseTemplates = () => {
   const navigate = useNavigate();
+  const { contextSelection } = useUserTeaching();
   const [templates, setTemplates] = useState([]);
   const [filteredTemplates, setFilteredTemplates] = useState([]);
   const [standards, setStandards] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filters, setFilters] = useState({
-    subject: "",
+    subject_id: "",
+    subject_title_id: "",
     standard: "",
-    board: "",
+    board_id: "",
   });
   const [toast, setToast] = useState({ show: false, message: "", type: "success" });
-
-  useEffect(() => {
-    fetchTemplates();
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -37,12 +36,20 @@ const BrowseTemplates = () => {
     return () => { cancelled = true; };
   }, []);
 
+  // Sync filters from teaching context (subject, subject title, std, board) so filter works
   useEffect(() => {
-    // Refetch templates when filters change (subject, standard, board)
-    if (filters.subject || filters.standard || filters.board) {
-      fetchTemplates();
-    }
-  }, [filters.subject, filters.standard, filters.board]);
+    if (!contextSelection) return;
+    setFilters({
+      subject_id: contextSelection.subject_id != null ? String(contextSelection.subject_id) : "",
+      subject_title_id: contextSelection.subject_title_id != null ? String(contextSelection.subject_title_id) : "",
+      standard: contextSelection.standard != null ? String(contextSelection.standard) : "",
+      board_id: contextSelection.board_id != null ? String(contextSelection.board_id) : "",
+    });
+  }, [contextSelection?.subject_id, contextSelection?.subject_title_id, contextSelection?.standard, contextSelection?.board_id]);
+
+  useEffect(() => {
+    fetchTemplates();
+  }, [filters.subject_id, filters.subject_title_id, filters.standard, filters.board_id]);
 
   useEffect(() => {
     filterTemplates();
@@ -52,9 +59,10 @@ const BrowseTemplates = () => {
     try {
       setLoading(true);
       const params = new URLSearchParams();
-      if (filters.subject) params.append("subject", filters.subject);
+      if (filters.subject_id) params.append("subject_id", filters.subject_id);
+      if (filters.subject_title_id) params.append("subject_title_id", filters.subject_title_id);
       if (filters.standard) params.append("standard", filters.standard);
-      if (filters.board) params.append("board", filters.board);
+      if (filters.board_id) params.append("board_id", filters.board_id);
       
       const queryString = params.toString();
       const url = `/papers/templates${queryString ? `?${queryString}` : ""}`;
@@ -163,9 +171,8 @@ const BrowseTemplates = () => {
               <select
                 value={filters.standard}
                 onChange={(e) => {
-                  setFilters({ ...filters, standard: e.target.value });
+                  setFilters((prev) => ({ ...prev, standard: e.target.value }));
                 }}
-                onBlur={fetchTemplates}
                 className="px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
               >
                 <option value="">All Standards</option>
@@ -205,12 +212,22 @@ const BrowseTemplates = () => {
 
                 <div className="space-y-2 mb-4">
                   <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-600">Subject:</span>
+                    <span className="font-semibold text-gray-800 truncate max-w-[180px]" title={template.subject}>{template.subject ?? "—"}</span>
+                  </div>
+                  {template.subject_title_name || template.subject_title ? (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-600">Subject Title:</span>
+                      <span className="font-semibold text-gray-800 truncate max-w-[180px]" title={template.subject_title_name || template.subject_title}>{template.subject_title_name || template.subject_title}</span>
+                    </div>
+                  ) : null}
+                  <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-600">Standard:</span>
                     <span className="font-semibold text-gray-800">{standards.find((st) => String(st.standard_id) === String(template.standard))?.name ?? template.standard ?? "—"}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-600">Board:</span>
-                    <span className="font-semibold text-gray-800">{template.board}</span>
+                    <span className="font-semibold text-gray-800">{template.board ?? "—"}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-600">Total Marks:</span>

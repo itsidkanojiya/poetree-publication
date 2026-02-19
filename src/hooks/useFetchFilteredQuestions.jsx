@@ -13,8 +13,9 @@ const useFetchFilteredQuestions = (questionType) => {
       setError(null);
 
       try {
+        const apiType = questionType === "true&false" ? "truefalse" : questionType;
         const response = await apiClient.get(
-          `/question?type=${questionType}`
+          `/question?type=${apiType}`
         );
         setFilteredQuestions(response.data);
       } catch (err) {

@@ -58,25 +58,24 @@ const SubjectRequests = () => {
       // API returns: { pending_selections: { subjects: [], subject_titles: [] } }
       if (pendingData && pendingData.pending_selections) {
         const pendingSelections = pendingData.pending_selections;
-        // Transform into array format expected by UI
-        const transformedPending = [
-          {
-            subjects: (pendingSelections.subjects || []).map((sub) => ({
-              subject_id: sub.subject_id || sub.subject?.subject_id,
-              subject_name: sub.subject?.subject_name || "Unknown Subject",
-            })),
-            subject_titles: (pendingSelections.subject_titles || []).map(
-              (st) => ({
-                subject_id: st.subject_id || st.subject?.subject_id,
-                subject_title_id:
-                  st.subject_title_id || st.subjectTitle?.subject_title_id,
-                title_name: st.subjectTitle?.title_name || "Unknown Title",
-                subject_name: st.subject?.subject_name || "Unknown Subject",
-              })
-            ),
-          },
-        ];
-        pendingData = transformedPending;
+        const pendingSubjects = (pendingSelections.subjects || []).map((sub) => ({
+          subject_id: sub.subject_id || sub.subject?.subject_id,
+          subject_name: sub.subject?.subject_name || "Unknown Subject",
+        }));
+        const pendingTitles = (pendingSelections.subject_titles || []).map(
+          (st) => ({
+            subject_id: st.subject_id || st.subject?.subject_id,
+            subject_title_id:
+              st.subject_title_id || st.subjectTitle?.subject_title_id,
+            title_name: st.subjectTitle?.title_name || "Unknown Title",
+            subject_name: st.subject?.subject_name || "Unknown Subject",
+          })
+        );
+        // Only add a request group when there is at least one pending item
+        pendingData =
+          pendingSubjects.length > 0 || pendingTitles.length > 0
+            ? [{ subjects: pendingSubjects, subject_titles: pendingTitles }]
+            : [];
       } else if (
         pendingData &&
         pendingData.data &&
