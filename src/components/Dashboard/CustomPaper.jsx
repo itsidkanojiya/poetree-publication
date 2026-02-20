@@ -1889,6 +1889,7 @@ const CustomPaper = () => {
                         printedTypes.add(section.type);
                       }
 
+                      const sectionTypeNormalized = normalizeQuestionType(section.type);
                       return (
                         <div key={sectionIndex}>
                           {shouldPrintTitle && (
@@ -1905,7 +1906,6 @@ const CustomPaper = () => {
                                   {sectionLetter}){" "}
                                   {(() => {
                                     // Get subject name from first question in section
-                                    // This determines the language for the section title
                                     const firstQuestion =
                                       section.selectedQuestions[0];
                                     if (
@@ -1917,25 +1917,16 @@ const CustomPaper = () => {
                                           firstQuestion.subject_id
                                         );
 
-                                      // Use language-specific title based on subject
-                                      // If subject is Mathematics, Science, etc. (English) -> English titles
-                                      // If subject is in Gujarati script -> Gujarati titles
-                                      // If subject is in Hindi script -> Hindi titles
                                       if (subjectName) {
                                         const title = getQuestionTypeTitle(
-                                          section.type,
+                                          sectionTypeNormalized,
                                           null,
                                           subjectName
                                         );
-                                        // Display title on one line (in a row)
-                                        return title;
+                                        return title || QUESTION_TYPE_CONFIG[sectionTypeNormalized]?.label || "";
                                       }
                                     }
-                                    // Fallback to English if subject name not available
-                                    const defaultTitle =
-                                      QUESTION_TYPE_CONFIG[section.type]
-                                        ?.label || "";
-                                    return defaultTitle;
+                                    return QUESTION_TYPE_CONFIG[sectionTypeNormalized]?.label || "";
                                   })()}
                                 </h3>
                                 <span
@@ -1946,7 +1937,7 @@ const CustomPaper = () => {
                                   }}
                                 >
                                   {section.selectedQuestions.length *
-                                    (marksPerType[section.type] || 0)}{" "}
+                                    (marksPerType[sectionTypeNormalized] || 0)}{" "}
                                   marks
                                 </span>
                               </div>
