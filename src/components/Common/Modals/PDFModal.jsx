@@ -1,22 +1,11 @@
 import { IoCloseOutline } from "react-icons/io5";
-import { useState } from "react";
 
 /**
- * PDF modal that shows the document inside the website using an iframe.
- * Keeps the user on-site (no new tab), avoids CORS issues from fetch-based viewers,
- * and avoids exposing the PDF URL in the address bar.
+ * PDF modal: tries to show the document in-page (iframe).
+ * If the server blocks embedding (X-Frame-Options), the iframe stays blank.
+ * We always show a fallback "Open in new tab" so the user is never stuck.
  */
 export default function PDFModal({ isOpen, onClose, pdfUrl, title }) {
-  const [iframeError, setIframeError] = useState(false);
-
-  const handleIframeLoad = () => {
-    setIframeError(false);
-  };
-
-  const handleIframeError = () => {
-    setIframeError(true);
-  };
-
   if (!pdfUrl) return null;
 
   return (
@@ -36,31 +25,27 @@ export default function PDFModal({ isOpen, onClose, pdfUrl, title }) {
       </div>
 
       <div className="flex-1 min-h-0 flex flex-col bg-gray-100">
-        {iframeError ? (
-          <div className="flex flex-col items-center justify-center flex-1 p-8 text-center">
-            <p className="text-red-600 font-medium mb-2">Could not load PDF here.</p>
-            <p className="text-gray-600 text-sm mb-4">
-              The document may be blocked from embedding. You can open it in a new tab.
-            </p>
-            <a
-              href={pdfUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-600 underline hover:no-underline"
-            >
-              Open in new tab
-            </a>
-          </div>
-        ) : (
-          <iframe
-            key={pdfUrl}
-            src={pdfUrl}
-            title={title}
-            className="w-full flex-1 min-h-0 border-0"
-            onLoad={handleIframeLoad}
-            onError={handleIframeError}
-          />
-        )}
+        {/* Iframe may render blank if server sends X-Frame-Options blocking embedding */}
+        <iframe
+          key={pdfUrl}
+          src={pdfUrl}
+          title={title}
+          className="w-full flex-1 min-h-0 border-0"
+        />
+        {/* Fallback: always visible so user is never stuck with a blank modal */}
+        <div className="shrink-0 border-t border-gray-200 bg-gray-50 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-gray-600">
+            If the document doesn’t appear above, the server may be blocking in-page viewing.
+          </p>
+          <a
+            href={pdfUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center justify-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Open in new tab
+          </a>
+        </div>
       </div>
     </div>
   );
