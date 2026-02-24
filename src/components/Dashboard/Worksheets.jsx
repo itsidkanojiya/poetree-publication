@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Eye, FileText } from "lucide-react";
+import PDFModal from "../Common/Modals/PDFModal";
 import apiClient from "../../services/apiClient";
 import Loader from "../Common/loader/loader";
 import { useUserTeaching } from "../../context/UserTeachingContext";
@@ -9,6 +10,9 @@ const Worksheets = () => {
   const [loading, setLoading] = useState(true);
   const [worksheets, setWorksheets] = useState([]);
   const [filteredWorksheets, setFilteredWorksheets] = useState([]);
+  const [selectedPDF, setSelectedPDF] = useState(null);
+  const [selectedTitle, setSelectedTitle] = useState("");
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -96,7 +100,9 @@ const Worksheets = () => {
                 key={sheet.worksheet_id}
                 onClick={() => {
                   if (sheet.worksheet_url) {
-                    window.open(sheet.worksheet_url, "_blank", "noopener,noreferrer");
+                    setSelectedPDF(sheet.worksheet_url);
+                    setSelectedTitle(sheet.subject_title || sheet.subject || "Worksheet");
+                    setIsModalOpen(true);
                   }
                 }}
                 className="group bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 cursor-pointer transform hover:-translate-y-2 overflow-hidden border border-gray-200"
@@ -121,7 +127,7 @@ const Worksheets = () => {
                     <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
                       <div className="text-white text-center">
                         <Eye className="w-12 h-12 mx-auto mb-2" />
-                        <p className="font-semibold">Open in new tab</p>
+                        <p className="font-semibold">View Worksheet</p>
                       </div>
                     </div>
                   </div>
@@ -159,6 +165,18 @@ const Worksheets = () => {
         )}
       </div>
 
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex justify-center items-center p-4">
+          <div className="bg-white w-full max-w-6xl h-[90vh] rounded-2xl overflow-hidden shadow-2xl flex flex-col">
+            <PDFModal
+              isOpen={isModalOpen}
+              onClose={() => setIsModalOpen(false)}
+              pdfUrl={selectedPDF}
+              title={selectedTitle}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };
