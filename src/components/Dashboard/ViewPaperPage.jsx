@@ -1,64 +1,55 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useLocation, useParams } from "react-router-dom";
 import parse from "html-react-parser";
-// import QuestionModal from "../Common/Modals/QuestionModel";
 import Button from "../Common/Buttons/Button";
 import { FileDown } from "lucide-react";
 import downloadPDF from "../../utils/downloadPdf";
+import { getPaperById } from "../../services/paperService";
+import Loader from "../Common/loader/loader";
 
 const ViewPaperPage = () => {
   const { id } = useParams();
   const location = useLocation();
-  const paperBody =
-    location.state?.paperBody || "<h1>No Content Available</h1>";
+  const initialBody = location.state?.paperBody || "";
+  const [content, setContent] = useState(() => {
+    const body = initialBody || "<h1>No Content Available</h1>";
+    const parsed = parse(body);
+    return Array.isArray(parsed) ? parsed : [parsed];
+  });
+  const [loading, setLoading] = useState(!initialBody && !!id);
 
-  // const parsedContent = parse(paperBody);
-  const [questionType, setQuestionType] = useState("");
-  const [content, setContent] = useState(
-    Array.isArray(parse(paperBody)) ? parse(paperBody) : [parse(paperBody)]
-  );
+  // Fetch full paper by id when body was not passed (e.g. from History View)
+  useEffect(() => {
+    if (!id || initialBody) return;
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const paper = await getPaperById(id);
+        if (cancelled) return;
+        const body = paper?.body ?? paper?.paper_body ?? "";
+        const html = body || "<p>No content for this paper.</p>";
+        const parsed = parse(html);
+        setContent(Array.isArray(parsed) ? parsed : [parsed]);
+      } catch (err) {
+        if (!cancelled) setContent([<p key="err">Failed to load paper.</p>]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, [id, initialBody]);
 
-  // const [selectedElement, setSelectedElement] = useState(null);
-  // const [isModalOpen, setIsModalOpen] = useState(false);
-  // const [selectedQuestionIndex, setSelectedQuestionIndex] = useState(null);
-  // const [selectedQuestion, setSelectedQuestion] = useState(null);
-
-  // const convertHTMLToQuestionArray = (htmlString) => {
-  //   const parser = new DOMParser();
-  //   const doc = parser.parseFromString(htmlString, "text/html");
-
-  //   const questionElements = doc.querySelectorAll("p[id]");
-
-  //   const questions = Array.from(questionElements).map((el, index) => ({
-  //     qIndex: index + 1,
-  //     question: el.innerHTML.trim(),
-  //     type: el.id,
-  //   }));
-
-  //   return questions;
-  // };
-
-  // const [questions, setQuestions] = useState(() =>
-  //   convertHTMLToQuestionArray(paperBody)
-  // );
-
-  // console.log(questions);
-
-  // const handleQuestionClick = (questions, event) => {
-  //   const clickedElement = event.target;
-  //   // console.log(clickedElement);
-
-  //   // Ensure clickedElement is a paragraph or expected tag
-  //   if (clickedElement.tagName === "P" || clickedElement.tagName === "DIV") {
-  //     setSelectedQuestionIndex(questions.qIndex);
-  //     setQuestionType(clickedElement.id);
-  //     setSelectedElement(clickedElement);
-  //     setIsModalOpen(true);
-  //   }
-  // };
+  const handleQuestionClick = () => {};
 
   return (
     <div className="w-full flex flex-col items-center min-h-screen py-10">
+      {loading ? (
+        <div className="flex items-center justify-center py-20">
+          <Loader />
+        </div>
+      ) : (
+        <>
       <Button
         text="Download"
         icon={FileDown}
@@ -73,26 +64,15 @@ const ViewPaperPage = () => {
           <div key={index} className="mb-6 border-b pb-4 last:border-none">
             <div
               className="cursor-pointer"
-              data-question-type={questionType}
-              onClick={(event) => handleQuestionClick(index, event)}
+              onClick={handleQuestionClick}
             >
               {section}
             </div>
           </div>
         ))}
       </div>
-
-      {/* {isModalOpen && (
-        <QuestionModal
-          questionType={questionType}
-          selectedQuestion={{
-            question_id: selectedQuestionIndex,
-            question: selectedElement.innerHTML,
-          }}
-          setLocalQuestions={setQuestions}
-          setIsModalOpen={setIsModalOpen}
-        />
-      )} */}
+        </>
+      )}
     </div>
   );
 };

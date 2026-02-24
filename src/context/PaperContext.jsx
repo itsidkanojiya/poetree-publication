@@ -40,17 +40,12 @@ export const PaperProvider = ({ children }) => {
 
   const deletePaper = async (id) => {
     try {
-      const response = await deletePaperById(id);
-  
-      if (response.success) {
-        setPapers((prevPapers) => ({
-          ...prevPapers,
-          papers: prevPapers.papers.filter((paper) => paper.id !== id),
-        }));
-        alert("Paper deleted successfully");
-      } else {
-        alert(response.message || "Failed to delete paper");
-      }
+      await deletePaperById(id);
+      setPapers((prev) => ({
+        ...prev,
+        papers: (prev.papers || []).filter((paper) => paper.id !== id),
+      }));
+      alert("Paper deleted successfully");
     } catch (error) {
       console.error(error);
       alert(error.message || "An error occurred while deleting the paper");

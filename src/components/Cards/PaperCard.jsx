@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Eye, Trash2, Edit, Calendar, FileText } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { API_ORIGIN } from "../../config/api";
+import { usePaper } from "../../context/PaperContext";
 
 const PaperCard = ({
   id,
@@ -17,10 +18,13 @@ const PaperCard = ({
   subject_title_id,
   subject_title_name,
   total_marks,
+  body,
   ...paper
 }) => {
   const navigate = useNavigate();
+  const { deletePaper } = usePaper();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const paperDate = created_at || date;
   const formattedDate = paperDate
@@ -50,8 +54,13 @@ const PaperCard = ({
   };
 
   const handleView = () => {
-    // Navigate to view paper
-    console.log("View paper:", id);
+    const htmlBody = body ?? paper.paper_body ?? paper.body ?? "";
+    navigate(`/dashboard/view/${id}`, {
+      state: {
+        paperBody: htmlBody,
+        paperData: { id, title, type, subject, ...paper },
+      },
+    });
   };
 
   const handleEdit = () => {
@@ -93,10 +102,17 @@ const PaperCard = ({
     }
   };
 
-  const handleDelete = () => {
-    // Delete paper logic
-    console.log("Delete paper:", id);
-    setShowDeleteConfirm(false);
+  const handleDelete = async () => {
+    if (!id) return;
+    setDeleting(true);
+    try {
+      await deletePaper(id);
+      setShowDeleteConfirm(false);
+    } catch (err) {
+      // deletePaper shows alert on error
+    } finally {
+      setDeleting(false);
+    }
   };
 
   return (
@@ -230,9 +246,10 @@ const PaperCard = ({
             <div className="flex gap-3">
               <button
                 onClick={handleDelete}
-                className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition"
+                disabled={deleting}
+                className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-semibold rounded-lg transition"
               >
-                Yes, Delete
+                {deleting ? "Deleting..." : "Yes, Delete"}
               </button>
               <button
                 onClick={() => setShowDeleteConfirm(false)}
