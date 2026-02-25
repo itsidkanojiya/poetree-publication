@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { Menu, X, LayoutDashboard, User, LogOut, LogIn, UserPlus } from "lucide-react";
+import { Menu, X, LayoutDashboard, User, LogOut, LogIn, UserPlus, Film } from "lucide-react";
 
 export const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -25,6 +25,14 @@ export const Navbar = () => {
         Dashboard
       </Link>
       <Link
+        to="/animations"
+        onClick={() => setIsMenuOpen(false)}
+        className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-medium transition"
+      >
+        <Film className="w-4 h-4" />
+        Animations
+      </Link>
+      <Link
         to="/dashboard/profile"
         onClick={() => setIsMenuOpen(false)}
         className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-medium transition"
@@ -43,6 +51,14 @@ export const Navbar = () => {
     </div>
   ) : (
     <div className="hidden md:flex items-center gap-3">
+      <Link
+        to="/animations"
+        onClick={() => setIsMenuOpen(false)}
+        className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-medium transition"
+      >
+        <Film className="w-4 h-4" />
+        Animations
+      </Link>
       <Link
         to="/auth/login"
         onClick={() => setIsMenuOpen(false)}
@@ -73,6 +89,14 @@ export const Navbar = () => {
         Dashboard
       </Link>
       <Link
+        to="/animations"
+        onClick={() => setIsMenuOpen(false)}
+        className="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-700 hover:bg-slate-100 font-medium"
+      >
+        <Film className="w-5 h-5" />
+        Animations
+      </Link>
+      <Link
         to="/dashboard/profile"
         onClick={() => setIsMenuOpen(false)}
         className="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-700 hover:bg-slate-100 font-medium"
@@ -91,6 +115,14 @@ export const Navbar = () => {
     </div>
   ) : (
     <div className="flex flex-col gap-1 py-2">
+      <Link
+        to="/animations"
+        onClick={() => setIsMenuOpen(false)}
+        className="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-700 hover:bg-slate-100 font-medium"
+      >
+        <Film className="w-5 h-5" />
+        Animations
+      </Link>
       <Link
         to="/auth/login"
         onClick={() => setIsMenuOpen(false)}

@@ -1,5 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
+import { motion } from "framer-motion";
 import { Navbar } from "../components/Navbar";
 import Footer from "../components/Footer";
 import { BROCHURE_PDF_URL } from "../config/api";
@@ -14,6 +15,8 @@ import {
   CheckCircle2,
   Sparkles,
   FileDown,
+  Play,
+  Film,
 } from "lucide-react";
 
 const Home = () => {
@@ -161,6 +164,58 @@ const Home = () => {
               <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
+        </div>
+      </section>
+
+      {/* Animations - Watch without login */}
+      <section className="py-20 px-6 bg-gradient-to-br from-violet-50 via-white to-fuchsia-50/50 overflow-hidden">
+        <div className="max-w-6xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-80px" }}
+            transition={{ duration: 0.5, ease: "easeOut" }}
+            className="text-center mb-14"
+          >
+            <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-violet-100 text-violet-700 text-sm font-semibold mb-6">
+              <Film className="w-4 h-4" />
+              Free to watch
+            </span>
+            <h2 className="text-3xl md:text-4xl font-bold text-slate-800 tracking-tight">
+              Learning animations & videos
+            </h2>
+            <p className="mt-4 text-slate-600 text-lg max-w-2xl mx-auto leading-relaxed">
+              Watch subject-wise educational videos and animations. No login required—open and play anytime.
+            </p>
+          </motion.div>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-60px" }}
+            transition={{ duration: 0.5, delay: 0.15, ease: "easeOut" }}
+            className="relative"
+          >
+            <Link
+              to="/animations"
+              className="group flex flex-col sm:flex-row items-center justify-center gap-6 sm:gap-8 p-8 sm:p-10 rounded-3xl bg-white border-2 border-violet-100 shadow-xl shadow-violet-500/10 hover:shadow-2xl hover:shadow-violet-500/20 hover:border-violet-200 transition-all duration-300 text-left"
+            >
+              <div className="flex-shrink-0 w-20 h-20 rounded-2xl bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform duration-300">
+                <Play className="w-10 h-10 text-white ml-1" fill="currentColor" />
+              </div>
+              <div className="flex-1 text-center sm:text-left">
+                <h3 className="text-xl sm:text-2xl font-bold text-slate-800 group-hover:text-violet-700 transition-colors">
+                  Watch animations
+                </h3>
+                <p className="mt-2 text-slate-600">
+                  Browse by subject, board & standard. Click any video to play in full screen.
+                </p>
+              </div>
+              <span className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-violet-500 text-white font-semibold group-hover:bg-violet-600 transition-colors">
+                Watch now
+                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              </span>
+            </Link>
+          </motion.div>
         </div>
       </section>
 

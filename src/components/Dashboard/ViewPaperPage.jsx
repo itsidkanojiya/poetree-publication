@@ -40,6 +40,68 @@ const getSectionTitle = (type) => {
   return titles[key] || QUESTION_TYPE_CONFIG[type]?.label || type;
 };
 
+// Same as CustomPaper: fixed page size for PDF (no header cut, multi-page)
+const PAGE_HEIGHT = 1123;
+const PAGE_WIDTH = 748;
+const HEADER_HEIGHT = 230;
+const CONTENT_PADDING = 120;
+
+function estQuestionHeight(q) {
+  const t = normalizeQuestionType(q.type);
+  let h = 28 + 18;
+  if (t === "mcq" && q.options) {
+    const opts = Array.isArray(q.options) ? q.options : [];
+    h += Math.ceil(opts.length / 2) * 32;
+  } else if (t === "passage" && q.options) {
+    try {
+      const pqs = typeof q.options === "string" ? JSON.parse(q.options) : q.options;
+      h += 120 + (Array.isArray(pqs) ? pqs.length * 34 : 0);
+    } catch {
+      h += 150;
+    }
+  } else if (t === "match" && q.options) {
+    try {
+      const m = typeof q.options === "string" ? JSON.parse(q.options) : q.options;
+      const rows = Math.max((m.left || []).length, (m.right || []).length);
+      h += 50 + rows * 42;
+    } catch {
+      h += 100;
+    }
+  } else if (q.image_url) {
+    h += 220;
+  }
+  return h;
+}
+
+function estSectionHeight(section) {
+  const sectionTitle = 32 + 24;
+  const questionsHeight = section.selectedQuestions.reduce((sum, q) => sum + estQuestionHeight(q), 0);
+  return sectionTitle + questionsHeight;
+}
+
+function buildPages(sections) {
+  if (!sections.length) return [];
+  const firstPageContentMax = PAGE_HEIGHT - HEADER_HEIGHT - CONTENT_PADDING;
+  const nextPageContentMax = PAGE_HEIGHT - CONTENT_PADDING;
+  const pages = [];
+  let current = [];
+  let currentHeight = 0;
+
+  for (const section of sections) {
+    const sectionH = estSectionHeight(section);
+    const limit = pages.length === 0 ? firstPageContentMax : nextPageContentMax;
+    if (current.length > 0 && currentHeight + sectionH > limit) {
+      pages.push(current);
+      current = [];
+      currentHeight = 0;
+    }
+    current.push(section);
+    currentHeight += sectionH;
+  }
+  if (current.length > 0) pages.push(current);
+  return pages;
+}
+
 function parseBodyToQuestionIds(body) {
   if (body == null || body === "") return null;
   const str = typeof body === "string" ? body.trim() : String(body);
@@ -186,27 +248,31 @@ const ViewPaperPage = () => {
   }
 
   const printedTypes = new Set();
-  let questionCounters = {};
+  const questionCounters = {};
+  const pages = buildPages(sections);
 
   return (
     <div className="w-full flex flex-col items-center min-h-screen py-10 bg-gradient-to-b from-slate-50 to-gray-100/50">
       <div className="space-y-8 flex flex-col items-center">
-        <div
-          id="pdf-content-0"
-          className="bg-white rounded-2xl shadow-2xl border-4 border-gray-200 overflow-hidden"
-          style={{ width: "748px", minHeight: "1000px" }}
-        >
-          <div className="p-8 flex flex-col min-h-0">
-            <div className="mb-6 pb-6 flex-shrink-0">
-              <HeaderCard
-                header={getHeader()}
-                disableHover={true}
-                disableStyles
-              />
-            </div>
-
-            <div className="flex-1 min-h-0 space-y-6">
-              {sections.map((section, sectionIndex) => {
+        {pages.map((pageSections, pageIndex) => (
+          <div
+            key={pageIndex}
+            id={`pdf-content-${pageIndex}`}
+            className="bg-white rounded-2xl shadow-2xl border-4 border-gray-200 overflow-hidden"
+            style={{ height: `${PAGE_HEIGHT}px`, width: `${PAGE_WIDTH}px` }}
+          >
+            <div className="p-8 h-full flex flex-col min-h-0">
+              {pageIndex === 0 && (
+                <div className="mb-6 pb-6 flex-shrink-0">
+                  <HeaderCard
+                    header={getHeader()}
+                    disableHover={true}
+                    disableStyles
+                  />
+                </div>
+              )}
+              <div className="flex-1 min-h-0 space-y-6">
+                {pageSections.map((section, sectionIndex) => {
                 const sectionType = normalizeQuestionType(section.type);
                 const shouldPrintTitle = !printedTypes.has(sectionType);
                 const sectionLetter = shouldPrintTitle
@@ -399,9 +465,10 @@ const ViewPaperPage = () => {
                   </div>
                 );
               })}
+              </div>
             </div>
           </div>
-        </div>
+        ))}
       </div>
 
       <div className="mt-8">

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Play, Film, X } from "lucide-react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { ArrowLeft, Play, Film, X, Filter } from "lucide-react";
 import { getAnimations } from "../services/adminService";
 import Loader from "../components/Common/loader/loader";
 import { useUserTeaching } from "../context/UserTeachingContext";
@@ -17,7 +17,9 @@ const getThumbnailFallbackUrl = (videoId) => {
 
 const Animations = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { contextSelection } = useUserTeaching();
+  const isPublicRoute = location.pathname === "/animations";
   const [animations, setAnimations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
@@ -82,11 +84,11 @@ const Animations = () => {
       <div className="max-w-7xl mx-auto">
         {/* Back */}
         <button
-          onClick={() => navigate("/dashboard")}
+          onClick={() => navigate(isPublicRoute ? "/" : "/dashboard")}
           className="flex items-center gap-2 text-gray-600 hover:text-purple-600 transition-colors group mb-6"
         >
           <ArrowLeft size={20} className="group-hover:-translate-x-1 transition-transform" />
-          <span className="font-medium">Back to Dashboard</span>
+          <span className="font-medium">{isPublicRoute ? "Back to Home" : "Back to Dashboard"}</span>
         </button>
 
         {/* Header */}
@@ -102,48 +104,70 @@ const Animations = () => {
           </div>
         </div>
 
-        {!loading && animations.length > 0 && (uniqueSubjects.length > 1 || uniqueTitles.length > 1 || uniqueBoards.length > 1 || uniqueStandards.length > 1) && (
-          <div className="flex flex-wrap gap-3 mb-6">
-            <select
-              value={filterSubjectId}
-              onChange={(e) => setFilterSubjectId(e.target.value)}
-              className="px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-purple-500 outline-none text-sm"
-            >
-              <option value="">All subjects</option>
-              {uniqueSubjects.map((s) => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
-            </select>
-            <select
-              value={filterSubjectTitleId}
-              onChange={(e) => setFilterSubjectTitleId(e.target.value)}
-              className="px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-purple-500 outline-none text-sm"
-            >
-              <option value="">All subject titles</option>
-              {uniqueTitles.map((t) => (
-                <option key={t.id} value={t.id}>{t.name}</option>
-              ))}
-            </select>
-            <select
-              value={filterBoardId}
-              onChange={(e) => setFilterBoardId(e.target.value)}
-              className="px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-purple-500 outline-none text-sm"
-            >
-              <option value="">All boards</option>
-              {uniqueBoards.map((b) => (
-                <option key={b.id} value={b.id}>{b.name}</option>
-              ))}
-            </select>
-            <select
-              value={filterStandardId}
-              onChange={(e) => setFilterStandardId(e.target.value)}
-              className="px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-purple-500 outline-none text-sm"
-            >
-              <option value="">All standards</option>
-              {uniqueStandards.map((s) => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
-            </select>
+        {!loading && animations.length > 0 && (
+          <div className="mb-6">
+            <div className="flex flex-wrap items-center gap-3 mb-2">
+              <span className="inline-flex items-center gap-2 text-sm font-semibold text-gray-700">
+                <Filter className="w-4 h-4 text-purple-500" />
+                Filter by
+              </span>
+              {(filterSubjectId || filterSubjectTitleId || filterBoardId || filterStandardId) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFilterSubjectId("");
+                    setFilterSubjectTitleId("");
+                    setFilterBoardId("");
+                    setFilterStandardId("");
+                  }}
+                  className="text-sm text-purple-600 hover:text-purple-800 font-medium"
+                >
+                  Clear all
+                </button>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <select
+                value={filterSubjectId}
+                onChange={(e) => setFilterSubjectId(e.target.value)}
+                className="px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-purple-500 outline-none text-sm bg-white min-w-[140px]"
+              >
+                <option value="">All subjects</option>
+                {uniqueSubjects.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+              <select
+                value={filterSubjectTitleId}
+                onChange={(e) => setFilterSubjectTitleId(e.target.value)}
+                className="px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-purple-500 outline-none text-sm bg-white min-w-[160px]"
+              >
+                <option value="">All subject titles</option>
+                {uniqueTitles.map((t) => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+              <select
+                value={filterBoardId}
+                onChange={(e) => setFilterBoardId(e.target.value)}
+                className="px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-purple-500 outline-none text-sm bg-white min-w-[140px]"
+              >
+                <option value="">All boards</option>
+                {uniqueBoards.map((b) => (
+                  <option key={b.id} value={b.id}>{b.name}</option>
+                ))}
+              </select>
+              <select
+                value={filterStandardId}
+                onChange={(e) => setFilterStandardId(e.target.value)}
+                className="px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-purple-500 outline-none text-sm bg-white min-w-[140px]"
+              >
+                <option value="">All standards</option>
+                {uniqueStandards.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+            </div>
           </div>
         )}
 

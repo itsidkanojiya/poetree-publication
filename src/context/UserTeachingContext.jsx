@@ -121,8 +121,17 @@ export const UserTeachingProvider = ({ children }) => {
   );
 };
 
+const defaultTeachingValue = {
+  contextSelection: null,
+  setContextSelection: () => {},
+  clearContext: () => {},
+  approvedSelections: { subjects: [], subject_titles: [] },
+  needsContextChoice: false,
+  setNeedsContextChoice: () => {},
+  loading: false,
+};
+
 export const useUserTeaching = () => {
   const ctx = useContext(UserTeachingContext);
-  if (!ctx) throw new Error("useUserTeaching must be used within UserTeachingProvider");
-  return ctx;
+  return ctx ?? defaultTeachingValue;
 };
