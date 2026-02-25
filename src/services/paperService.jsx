@@ -83,7 +83,12 @@ export const deletePaperById = async (id) => {
 export const getPaperById = async (id) => {
   try {
     const response = await apiClient.get(`/papers/${id}`);
-    return response.data;
+    const data = response.data;
+    // API may return { success, data: { ...paper } } — unwrap so callers get the paper object
+    if (data && typeof data === "object" && data.data != null && data.success !== undefined) {
+      return data.data;
+    }
+    return data;
   } catch (error) {
     console.error("Error fetching paper by ID:", error);
     throw error;

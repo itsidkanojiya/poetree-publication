@@ -391,8 +391,7 @@ const CustomizePaper = () => {
       if (paper.division) formData.append("division", paper.division);
       if (paper.subject_title_id)
         formData.append("subject_title_id", paper.subject_title_id);
-      // Add paper_title if provided (optional)
-      if (paper.paper_title) formData.append("paper_title", paper.paper_title);
+      formData.append("paper_title", paper.paper_title || "");
 
       // Add marks if available
       if (paper.marks_mcq !== undefined)

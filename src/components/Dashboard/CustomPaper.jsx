@@ -828,10 +828,7 @@ const CustomPaper = () => {
           type: "success",
         });
         
-        // Clear selected questions to prevent duplicate saves
-        setQuestionSections(INITIAL_QUESTION_SECTIONS);
-        localStorage.removeItem("questionSections");
-        localStorage.removeItem("marksPerType");
+        // Don't clear questions yet — PDF generation below needs them
       } catch (error) {
         setIsSaving(false);
         setToast({
@@ -885,6 +882,11 @@ const CustomPaper = () => {
 
       await Promise.all(promises);
       pdf.save("exam-paper.pdf");
+      
+      // Clear questions now that PDF is downloaded
+      setQuestionSections(INITIAL_QUESTION_SECTIONS);
+      localStorage.removeItem("questionSections");
+      localStorage.removeItem("marksPerType");
       
       // Show success message and redirect to history
       setToast({
@@ -959,8 +961,7 @@ const CustomPaper = () => {
           if (header.timing) formData.append("timing", header.timing);
           if (header.division) formData.append("division", header.division);
           if (header.subjectTitle) formData.append("subject_title_id", header.subjectTitle);
-          // Add paper_title (documentTitle) if provided (optional)
-          if (header.documentTitle) formData.append("paper_title", header.documentTitle);
+          formData.append("paper_title", header.documentTitle || "");
         }
         
         // Calculate and add marks for each question type
@@ -1062,13 +1063,12 @@ const CustomPaper = () => {
           type: "success",
         });
         
-        // Clear selected questions to prevent duplicate saves
-        setQuestionSections(INITIAL_QUESTION_SECTIONS);
-        localStorage.removeItem("questionSections");
-        localStorage.removeItem("marksPerType");
-        
         // Redirect to history after 1.5 seconds with refresh flag
+        // Clear questions only right before navigating so preview stays visible
         setTimeout(() => {
+          setQuestionSections(INITIAL_QUESTION_SECTIONS);
+          localStorage.removeItem("questionSections");
+          localStorage.removeItem("marksPerType");
           navigate("/dashboard/history", { state: { refresh: true } });
         }, 1500);
       } catch (error) {

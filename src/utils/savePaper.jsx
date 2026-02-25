@@ -27,9 +27,7 @@ export const savePaper = async (
     formData.append("type", type);
     
     // Add paper_title if provided (optional)
-    if (paperTitle) {
-      formData.append("paper_title", paperTitle);
-    }
+    formData.append("paper_title", paperTitle || "");
     
     // Add header data if provided, otherwise use defaults
     // Note: school_name, address, logo are now fetched from user table via user_id
@@ -49,8 +47,7 @@ export const savePaper = async (
       if (headerData.timing) formData.append("timing", headerData.timing);
       if (headerData.division) formData.append("division", headerData.division);
       if (headerData.subjectTitle) formData.append("subject_title_id", headerData.subjectTitle);
-      // Add paper_title (documentTitle) if provided (optional)
-      if (headerData.documentTitle) formData.append("paper_title", headerData.documentTitle);
+      formData.append("paper_title", headerData.documentTitle || "");
     } else {
       formData.append("standard", 0);
       formData.append("date", formattedDate);
