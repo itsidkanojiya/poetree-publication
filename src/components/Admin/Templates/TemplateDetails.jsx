@@ -523,7 +523,7 @@ const TemplateDetails = () => {
     return rows * COMPONENT_HEIGHTS.OPTION_ROW + 4; // Add small padding
   };
 
-  // Calculate passage question height
+  // Calculate passage question height (including MCQ sub-questions' option lines)
   const getPassageQuestionHeight = (question) => {
     let height = COMPONENT_HEIGHTS.QUESTION_TEXT;
 
@@ -534,7 +534,13 @@ const TemplateDetails = () => {
             ? JSON.parse(question.options)
             : question.options;
         if (Array.isArray(passageQuestions) && passageQuestions.length > 0) {
-          height += passageQuestions.length * COMPONENT_HEIGHTS.PASSAGE_NESTED;
+          passageQuestions.forEach((pq) => {
+            height += COMPONENT_HEIGHTS.PASSAGE_NESTED;
+            if (pq && pq.type === "mcq" && Array.isArray(pq.options)) {
+              const opts = pq.options.filter((o) => o != null && String(o).trim() !== "");
+              height += Math.max(0, opts.length * 22);
+            }
+          });
           height += 12; // Container padding
         }
       } catch (e) {
@@ -1019,19 +1025,37 @@ const TemplateDetails = () => {
                                           passageQuestions.length > 0
                                         ) {
                                           return (
-                                            <div className="pl-4 mt-2 space-y-1">
+                                            <div className="pl-4 mt-2 space-y-2">
                                               {passageQuestions.map(
-                                                (pq, pqIdx) => (
-                                                  <p
-                                                    key={pqIdx}
-                                                    className="text-gray-800 py-0.5 text-sm"
-                                                  >
-                                                    {String.fromCharCode(
-                                                      97 + pqIdx
-                                                    )}
-                                                    . {pq.question || pq}
-                                                  </p>
-                                                )
+                                                (pq, pqIdx) => {
+                                                  const isMcq = pq && pq.type === "mcq";
+                                                  const isBlank = pq && pq.type === "blank";
+                                                  const isTf = pq && (pq.type === "truefalse" || pq.type === "true&false");
+                                                  const questionText = pq.question ?? (typeof pq === "string" ? pq : "");
+                                                  const options = isMcq && Array.isArray(pq.options)
+                                                    ? pq.options.filter((o) => o != null && String(o).trim() !== "")
+                                                    : [];
+                                                  return (
+                                                    <div key={pqIdx}>
+                                                      <p className="text-gray-800 py-0.5 text-sm">
+                                                        {String.fromCharCode(97 + pqIdx)}. {questionText}
+                                                        {isBlank && <span className="inline-block mx-1 border-b border-gray-400 min-w-[60px]" aria-hidden />}
+                                                      </p>
+                                                      {isMcq && options.length > 0 && (
+                                                        <div className="pl-3 mt-0.5 space-y-0.5 text-sm text-gray-700">
+                                                          {options.map((opt, optIdx) => (
+                                                            <div key={optIdx}>
+                                                              ({String.fromCharCode(65 + optIdx)}) {typeof opt === "object" ? (opt.text || opt.label || JSON.stringify(opt)) : opt}
+                                                            </div>
+                                                          ))}
+                                                        </div>
+                                                      )}
+                                                      {isTf && (
+                                                        <div className="pl-3 mt-0.5 text-sm text-gray-600">(T) (F)</div>
+                                                      )}
+                                                    </div>
+                                                  );
+                                                }
                                               )}
                                             </div>
                                           );

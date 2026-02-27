@@ -26,7 +26,8 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
   const [toast, setToast] = useState({ show: false, message: "", type: "error" });
 
   // For Passage and Match types
-  const [passageQuestions, setPassageQuestions] = useState([{ question: "", answer: "" }]);
+  // Passage: each item is { type: "short", question, answer } or { type: "mcq", question, options: string[], answer: "1" }
+  const [passageQuestions, setPassageQuestions] = useState([{ type: "short", question: "", answer: "" }]);
   const [matchPairs, setMatchPairs] = useState({ left: [""], right: [""] });
 
   // For MCQ: option list (frontend only); formData.options/answer still sent as JSON array + 1-based index
@@ -94,11 +95,34 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
       image: null,
     });
 
-    // Handle Passage type
+    // Handle Passage type (support short, mcq, blank, truefalse; backward compat: no type = short)
     if (questionType === "passage" && question.options) {
       try {
         const parsed = Array.isArray(question.options) ? question.options : JSON.parse(question.options);
-        setPassageQuestions(parsed);
+        const normalized = (Array.isArray(parsed) ? parsed : []).map((pq) => {
+          if (pq && pq.type === "mcq") {
+            const opts = Array.isArray(pq.options) ? pq.options : [];
+            return {
+              type: "mcq",
+              question: pq.question || "",
+              options: opts.length ? opts : ["", "", "", ""],
+              answer: pq.answer != null ? String(pq.answer) : "1",
+            };
+          }
+          if (pq && pq.type === "blank") {
+            return { type: "blank", question: (pq.question != null ? pq.question : ""), answer: (pq.answer != null ? pq.answer : "") };
+          }
+          if (pq && (pq.type === "truefalse" || pq.type === "true&false")) {
+            const ans = pq.answer === "true" || pq.answer === "false" ? pq.answer : "true";
+            return { type: "truefalse", question: (pq.question != null ? pq.question : ""), answer: ans };
+          }
+          return {
+            type: "short",
+            question: (pq && pq.question) != null ? pq.question : "",
+            answer: (pq && pq.answer) != null ? pq.answer : "",
+          };
+        });
+        setPassageQuestions(normalized.length ? normalized : [{ type: "short", question: "", answer: "" }]);
       } catch (e) {
         console.error("Error parsing passage questions:", e);
       }
@@ -168,13 +192,28 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
         formDataToSend.append("options", JSON.stringify(optionsArray));
         formDataToSend.append("answer", formData.answer);
       } else if (questionType === "passage") {
-        formDataToSend.append("options", JSON.stringify(passageQuestions));
-        formDataToSend.append("answer", JSON.stringify(
-          passageQuestions.reduce((acc, q, idx) => {
-            acc[`q${idx + 1}`] = q.answer;
-            return acc;
-          }, {})
-        ));
+        const optionsToSend = passageQuestions.map((pq) => {
+          if (pq.type === "mcq") {
+            const opts = (pq.options || []).map((o) => (o && o.trim()) || "").filter(Boolean);
+            return { type: "mcq", question: pq.question || "", options: opts, answer: pq.answer != null ? String(pq.answer) : "1" };
+          }
+          if (pq.type === "blank") {
+            return { type: "blank", question: pq.question || "", answer: pq.answer != null ? pq.answer : "" };
+          }
+          if (pq.type === "truefalse") {
+            return { type: "truefalse", question: pq.question || "", answer: pq.answer === "true" || pq.answer === "false" ? pq.answer : "true" };
+          }
+          return { type: "short", question: pq.question || "", answer: pq.answer != null ? pq.answer : "" };
+        });
+        formDataToSend.append("options", JSON.stringify(optionsToSend));
+        const answerObj = passageQuestions.reduce((acc, q, idx) => {
+          let val = q.answer != null ? q.answer : "";
+          if (q.type === "mcq") val = q.answer != null ? String(q.answer) : "1";
+          if (q.type === "truefalse") val = q.answer === "true" || q.answer === "false" ? q.answer : "true";
+          acc[`q${idx + 1}`] = val;
+          return acc;
+        }, {});
+        formDataToSend.append("answer", JSON.stringify(answerObj));
       } else if (questionType === "match") {
         formDataToSend.append("options", JSON.stringify(matchPairs));
         // Match answer format: {"A": "1", "B": "2"}
@@ -232,12 +271,33 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
         if (idx < 1 || idx > validOptions.length) newErrors.answer = "Correct answer must be one of the options";
       }
     }
+    if (questionType === "passage") {
+      if (!passageQuestions.length) newErrors.passageQuestions = "At least one sub-question is required";
+      passageQuestions.forEach((pq, idx) => {
+        if (!(pq.question && String(pq.question).trim())) newErrors[`passageQ${idx}`] = "Question text is required";
+        if (pq.type === "mcq") {
+          const opts = (pq.options || []).map((o) => (o && o.trim()) || "").filter(Boolean);
+          if (opts.length === 0) newErrors[`passageMcq${idx}`] = "MCQ must have at least one option";
+        }
+        if (pq.type === "truefalse" && pq.answer !== "true" && pq.answer !== "false") {
+          newErrors[`passageTf${idx}`] = "Select True or False";
+        }
+      });
+    }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const addPassageQuestion = () => {
-    setPassageQuestions([...passageQuestions, { question: "", answer: "" }]);
+  const addPassageQuestion = (subType = "short") => {
+    if (subType === "mcq") {
+      setPassageQuestions([...passageQuestions, { type: "mcq", question: "", options: ["", "", "", ""], answer: "1" }]);
+    } else if (subType === "blank") {
+      setPassageQuestions([...passageQuestions, { type: "blank", question: "", answer: "" }]);
+    } else if (subType === "truefalse") {
+      setPassageQuestions([...passageQuestions, { type: "truefalse", question: "", answer: "true" }]);
+    } else {
+      setPassageQuestions([...passageQuestions, { type: "short", question: "", answer: "" }]);
+    }
   };
 
   const removePassageQuestion = (index) => {
@@ -246,7 +306,59 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
 
   const updatePassageQuestion = (index, field, value) => {
     const updated = [...passageQuestions];
-    updated[index][field] = value;
+    if (!updated[index]) return;
+    updated[index] = { ...updated[index], [field]: value };
+    setPassageQuestions(updated);
+  };
+
+  const setPassageQuestionType = (index, newType) => {
+    const updated = [...passageQuestions];
+    const prev = updated[index];
+    if (newType === "mcq") {
+      updated[index] = {
+        type: "mcq",
+        question: (prev && prev.question) || "",
+        options: Array.isArray(prev?.options) && prev.options.length ? prev.options : ["", "", "", ""],
+        answer: "1",
+      };
+    } else if (newType === "blank") {
+      updated[index] = { type: "blank", question: (prev && prev.question) || "", answer: (prev && prev.answer) != null ? prev.answer : "" };
+    } else if (newType === "truefalse") {
+      updated[index] = { type: "truefalse", question: (prev && prev.question) || "", answer: (prev && prev.answer) === "false" ? "false" : "true" };
+    } else {
+      updated[index] = { type: "short", question: (prev && prev.question) || "", answer: (prev && prev.answer) != null ? prev.answer : "" };
+    }
+    setPassageQuestions(updated);
+  };
+
+  const updatePassageMcqOption = (pqIndex, optIndex, value) => {
+    const updated = [...passageQuestions];
+    const pq = updated[pqIndex];
+    if (!pq || pq.type !== "mcq" || !Array.isArray(pq.options)) return;
+    const opts = [...pq.options];
+    opts[optIndex] = value;
+    updated[pqIndex] = { ...pq, options: opts };
+    setPassageQuestions(updated);
+  };
+
+  const addPassageMcqOption = (pqIndex) => {
+    const updated = [...passageQuestions];
+    const pq = updated[pqIndex];
+    if (!pq || pq.type !== "mcq" || !Array.isArray(pq.options) || pq.options.length >= 6) return;
+    updated[pqIndex] = { ...pq, options: [...pq.options, ""] };
+    setPassageQuestions(updated);
+  };
+
+  const removePassageMcqOption = (pqIndex, optIndex) => {
+    const updated = [...passageQuestions];
+    const pq = updated[pqIndex];
+    if (!pq || pq.type !== "mcq" || !Array.isArray(pq.options)) return;
+    const opts = pq.options.filter((_, i) => i !== optIndex);
+    let answer = pq.answer != null ? String(pq.answer) : "1";
+    const num = parseInt(answer, 10);
+    if (num === optIndex + 1) answer = "1";
+    else if (num > optIndex + 1) answer = String(num - 1);
+    updated[pqIndex] = { ...pq, options: opts.length ? opts : [""], answer };
     setPassageQuestions(updated);
   };
 
@@ -518,46 +630,179 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
             {questionType === "passage" && (
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Passage Questions <span className="text-red-500">*</span>
+                  Passage sub-questions <span className="text-red-500">*</span>
                 </label>
+                <p className="text-sm text-gray-500 mb-3">Add sub-questions: Short answer, MCQ, Fill in the blank, or True / False.</p>
+                {errors.passageQuestions && (
+                  <p className="text-sm text-red-600 mb-2">{errors.passageQuestions}</p>
+                )}
                 {passageQuestions.map((pq, index) => (
-                  <div key={index} className="mb-4 p-4 bg-gray-50 rounded-lg">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="font-medium text-gray-700">Question {index + 1}</span>
-                      {passageQuestions.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => removePassageQuestion(index)}
-                          className="p-1 text-red-600 hover:bg-red-50 rounded"
+                  <div key={index} className="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+                      <span className="font-medium text-gray-700">Sub-question {index + 1}</span>
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={pq.type || "short"}
+                          onChange={(e) => setPassageQuestionType(index, e.target.value)}
+                          className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm font-medium bg-white"
                         >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
+                          <option value="short">Short answer</option>
+                          <option value="mcq">MCQ</option>
+                          <option value="blank">Fill in the blank</option>
+                          <option value="truefalse">True / False</option>
+                        </select>
+                        {passageQuestions.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removePassageQuestion(index)}
+                            className="p-1 text-red-600 hover:bg-red-50 rounded"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
                     </div>
                     <input
                       type="text"
-                      value={pq.question}
+                      value={pq.question || ""}
                       onChange={(e) => updatePassageQuestion(index, "question", e.target.value)}
-                      placeholder="Question"
-                      className="w-full mb-2 px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500"
+                      placeholder="Question text"
+                      className={`w-full mb-2 px-4 py-2 border-2 rounded-lg focus:border-blue-500 ${errors[`passageQ${index}`] ? "border-red-300" : "border-gray-200"}`}
                     />
-                    <input
-                      type="text"
-                      value={pq.answer}
-                      onChange={(e) => updatePassageQuestion(index, "answer", e.target.value)}
-                      placeholder="Answer"
-                      className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500"
-                    />
+                    {errors[`passageQ${index}`] && (
+                      <p className="text-sm text-red-600 mb-1">{errors[`passageQ${index}`]}</p>
+                    )}
+                    {errors[`passageMcq${index}`] && (
+                      <p className="text-sm text-red-600 mb-1">{errors[`passageMcq${index}`]}</p>
+                    )}
+                    {errors[`passageTf${index}`] && (
+                      <p className="text-sm text-red-600 mb-1">{errors[`passageTf${index}`]}</p>
+                    )}
+                    {pq.type === "mcq" ? (
+                      <>
+                        <div className="mt-2 mb-1 text-sm font-medium text-gray-700">Options (select correct answer below)</div>
+                        {(pq.options || ["", "", "", ""]).map((opt, optIdx) => (
+                          <div key={optIdx} className="flex gap-2 mb-2">
+                            <span className="flex-shrink-0 w-6 text-sm text-gray-500 pt-2">{String.fromCharCode(65 + optIdx)}.</span>
+                            <input
+                              type="text"
+                              value={opt}
+                              onChange={(e) => updatePassageMcqOption(index, optIdx, e.target.value)}
+                              placeholder={`Option ${optIdx + 1}`}
+                              className="flex-1 px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => removePassageMcqOption(index, optIdx)}
+                              disabled={!(pq.options && pq.options.length > 1)}
+                              className="p-2 text-red-600 hover:bg-red-50 rounded disabled:opacity-40"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ))}
+                        {(pq.options || []).length < 6 && (
+                          <button
+                            type="button"
+                            onClick={() => addPassageMcqOption(index)}
+                            className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 font-medium mb-2"
+                          >
+                            <Plus className="w-4 h-4" /> Add option
+                          </button>
+                        )}
+                        <div className="mt-2">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Correct answer</label>
+                          <select
+                            value={pq.answer != null ? String(pq.answer) : "1"}
+                            onChange={(e) => updatePassageQuestion(index, "answer", e.target.value)}
+                            className="px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500"
+                          >
+                            {(pq.options || []).filter((o) => (o && o.trim()) !== "").map((_, i) => (
+                              <option key={i} value={String(i + 1)}>Option {i + 1}</option>
+                            ))}
+                            {(!pq.options || pq.options.every((o) => !(o && o.trim()))) && (
+                              <option value="1">Option 1 (add options above)</option>
+                            )}
+                          </select>
+                        </div>
+                      </>
+                    ) : pq.type === "blank" ? (
+                      <input
+                        type="text"
+                        value={pq.answer != null ? pq.answer : ""}
+                        onChange={(e) => updatePassageQuestion(index, "answer", e.target.value)}
+                        placeholder="Correct word(s) for the blank"
+                        className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500"
+                      />
+                    ) : pq.type === "truefalse" ? (
+                      <div className="mt-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Correct answer</label>
+                        <div className="flex gap-6">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              checked={pq.answer === "true"}
+                              onChange={() => updatePassageQuestion(index, "answer", "true")}
+                              className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                            />
+                            <span className="font-medium text-gray-800">True</span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              checked={pq.answer === "false"}
+                              onChange={() => updatePassageQuestion(index, "answer", "false")}
+                              className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                            />
+                            <span className="font-medium text-gray-800">False</span>
+                          </label>
+                        </div>
+                      </div>
+                    ) : (
+                      <input
+                        type="text"
+                        value={pq.answer != null ? pq.answer : ""}
+                        onChange={(e) => updatePassageQuestion(index, "answer", e.target.value)}
+                        placeholder="Answer (optional)"
+                        className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500"
+                      />
+                    )}
                   </div>
                 ))}
-                <button
-                  type="button"
-                  onClick={addPassageQuestion}
-                  className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition"
-                >
-                  <Plus className="w-4 h-4" />
-                  Add Question
-                </button>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => addPassageQuestion("short")}
+                    className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition text-sm font-medium"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add short answer
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => addPassageQuestion("mcq")}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition text-sm font-medium"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add MCQ
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => addPassageQuestion("blank")}
+                    className="flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-700 rounded-lg hover:bg-amber-100 transition text-sm font-medium"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add fill in the blank
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => addPassageQuestion("truefalse")}
+                    className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 rounded-lg hover:bg-emerald-100 transition text-sm font-medium"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add True / False
+                  </button>
+                </div>
               </div>
             )}
 

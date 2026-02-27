@@ -220,7 +220,7 @@ const getMcqOptionsHeight = (options) => {
   return rows * COMPONENT_HEIGHTS.OPTION;
 };
 
-// Estimate height for passage question (passage text + sub-questions)
+// Estimate height for passage question (passage text + sub-questions; MCQ sub-questions add option lines)
 const getPassageQuestionHeight = (question) => {
   let h = COMPONENT_HEIGHTS.QUESTION;
   const passageText = question.question || "";
@@ -230,7 +230,13 @@ const getPassageQuestionHeight = (question) => {
     try {
       const arr = typeof question.options === "string" ? JSON.parse(question.options) : question.options;
       if (Array.isArray(arr) && arr.length > 0) {
-        h += arr.length * COMPONENT_HEIGHTS.PASSAGE_SUB_Q;
+        arr.forEach((pq) => {
+          h += COMPONENT_HEIGHTS.PASSAGE_SUB_Q;
+          if (pq && pq.type === "mcq" && Array.isArray(pq.options)) {
+            const opts = pq.options.filter((o) => o != null && String(o).trim() !== "");
+            h += Math.max(0, opts.length * 22);
+          }
+        });
       }
     } catch (_) {}
   }
@@ -2028,7 +2034,7 @@ const CustomPaper = () => {
                                       </div>
                                     )}
 
-                                  {/* Passage: show sub-questions below the passage text */}
+                                  {/* Passage: show sub-questions (short or MCQ) below the passage text */}
                                   {question.type === "passage" &&
                                     question.options && (() => {
                                       try {
@@ -2042,7 +2048,7 @@ const CustomPaper = () => {
                                         ) {
                                           return (
                                             <div
-                                              className="ml-6 mt-3 space-y-2"
+                                              className="ml-6 mt-3 space-y-3"
                                               style={{
                                                 fontSize: "14px",
                                                 fontWeight: "normal",
@@ -2050,31 +2056,104 @@ const CustomPaper = () => {
                                               }}
                                             >
                                               {passageQuestions.map(
-                                                (pq, pqIdx) => (
-                                                  <p
-                                                    key={pqIdx}
-                                                    className="text-gray-800"
-                                                    style={{
-                                                      fontSize: "14px",
-                                                      lineHeight: "1.7",
-                                                    }}
-                                                  >
-                                                    <span
-                                                      style={{
-                                                        fontWeight: "600",
-                                                      }}
-                                                    >
-                                                      (
-                                                      {String.fromCharCode(
-                                                        97 + pqIdx
-                                                      )}
-                                                      ){" "}
-                                                    </span>
-                                                    {typeof pq === "object" && pq !== null && "question" in pq
+                                                (pq, pqIdx) => {
+                                                  const isMcq = pq && pq.type === "mcq";
+                                                  const isBlank = pq && pq.type === "blank";
+                                                  const isTf = pq && (pq.type === "truefalse" || pq.type === "true&false");
+                                                  const questionText =
+                                                    typeof pq === "object" && pq !== null && "question" in pq
                                                       ? pq.question
-                                                      : String(pq)}
-                                                  </p>
-                                                )
+                                                      : String(pq);
+                                                  const options =
+                                                    isMcq && Array.isArray(pq.options)
+                                                      ? pq.options.filter(
+                                                          (o) =>
+                                                            o != null && String(o).trim() !== ""
+                                                        )
+                                                      : [];
+                                                  return (
+                                                    <div key={pqIdx}>
+                                                      <p
+                                                        className="text-gray-800"
+                                                        style={{
+                                                          fontSize: "14px",
+                                                          lineHeight: "1.7",
+                                                        }}
+                                                      >
+                                                        <span
+                                                          style={{
+                                                            fontWeight: "600",
+                                                          }}
+                                                        >
+                                                          (
+                                                          {String.fromCharCode(
+                                                            97 + pqIdx
+                                                          )}
+                                                          ){" "}
+                                                        </span>
+                                                        {questionText}
+                                                        {isBlank && (
+                                                          <span
+                                                            className="inline-block mx-1 border-b-2 border-gray-400 min-w-[80px]"
+                                                            style={{ height: "1.2em" }}
+                                                            aria-hidden
+                                                          />
+                                                        )}
+                                                      </p>
+                                                      {isMcq &&
+                                                        options.length > 0 && (
+                                                          <div
+                                                            className="ml-4 mt-1 space-y-1"
+                                                            style={{
+                                                              fontSize: "13px",
+                                                            }}
+                                                          >
+                                                            {options.map(
+                                                              (opt, optIdx) => (
+                                                                <div
+                                                                  key={optIdx}
+                                                                  className="flex gap-2"
+                                                                >
+                                                                  <span
+                                                                    style={{
+                                                                      fontWeight:
+                                                                        "500",
+                                                                    }}
+                                                                  >
+                                                                    (
+                                                                    {String.fromCharCode(
+                                                                      65 +
+                                                                        optIdx
+                                                                    )}
+                                                                    )
+                                                                  </span>
+                                                                  <span>
+                                                                    {typeof opt ===
+                                                                    "object"
+                                                                      ? opt.text ||
+                                                                        opt.label ||
+                                                                        JSON.stringify(
+                                                                          opt
+                                                                        )
+                                                                      : opt}
+                                                                  </span>
+                                                                </div>
+                                                              )
+                                                            )}
+                                                          </div>
+                                                        )}
+                                                      {isTf && (
+                                                        <div
+                                                          className="ml-4 mt-1 flex gap-4"
+                                                          style={{ fontSize: "13px" }}
+                                                        >
+                                                          <span>(T)</span>
+                                                          <span>(F)</span>
+                                                        </div>
+                                                      )}
+                                                    </div>
+                                                  );
+                                                }
                                               )}
                                             </div>
                                           );

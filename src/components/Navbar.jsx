@@ -1,12 +1,48 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
 import { useAuth } from "../context/AuthContext";
 import { Menu, X, LayoutDashboard, User, LogOut, LogIn, UserPlus, Film } from "lucide-react";
 
+const navLinkVariants = {
+  rest: {},
+  hover: {},
+};
+const underlineVariants = {
+  rest: { scaleX: 0 },
+  hover: { scaleX: 1 },
+};
+
+const NavLink = ({ to, onClick, children, className = "" }) => (
+  <motion.div
+    className="relative inline-block"
+    initial="rest"
+    whileHover="hover"
+    variants={navLinkVariants}
+  >
+    <Link to={to} onClick={onClick} className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium transition-colors ${className}`}>
+      {children}
+    </Link>
+    <motion.span
+      className="absolute bottom-1.5 left-4 right-4 h-0.5 bg-slate-900 rounded-full origin-left pointer-events-none"
+      variants={underlineVariants}
+      transition={{ duration: 0.2, ease: "easeOut" }}
+      style={{ transformOrigin: "left" }}
+    />
+  </motion.div>
+);
+
 export const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 20);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   const handleLogout = () => {
     logout();
@@ -16,30 +52,18 @@ export const Navbar = () => {
 
   const desktopNav = user ? (
     <div className="hidden md:flex items-center gap-2">
-      <Link
-        to="/dashboard"
-        onClick={() => setIsMenuOpen(false)}
-        className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-medium transition"
-      >
+      <NavLink to="/dashboard" onClick={() => setIsMenuOpen(false)} className="text-slate-600 hover:text-slate-900 hover:bg-slate-100">
         <LayoutDashboard className="w-4 h-4" />
         Dashboard
-      </Link>
-      <Link
-        to="/animations"
-        onClick={() => setIsMenuOpen(false)}
-        className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-medium transition"
-      >
+      </NavLink>
+      <NavLink to="/animations" onClick={() => setIsMenuOpen(false)} className="text-slate-600 hover:text-slate-900 hover:bg-slate-100">
         <Film className="w-4 h-4" />
         Animations
-      </Link>
-      <Link
-        to="/dashboard/profile"
-        onClick={() => setIsMenuOpen(false)}
-        className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-medium transition"
-      >
+      </NavLink>
+      <NavLink to="/dashboard/profile" onClick={() => setIsMenuOpen(false)} className="text-slate-600 hover:text-slate-900 hover:bg-slate-100">
         <User className="w-4 h-4" />
         Profile
-      </Link>
+      </NavLink>
       <button
         type="button"
         onClick={handleLogout}
@@ -51,22 +75,14 @@ export const Navbar = () => {
     </div>
   ) : (
     <div className="hidden md:flex items-center gap-3">
-      <Link
-        to="/animations"
-        onClick={() => setIsMenuOpen(false)}
-        className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-medium transition"
-      >
+      <NavLink to="/animations" onClick={() => setIsMenuOpen(false)} className="text-slate-600 hover:text-slate-900 hover:bg-slate-100">
         <Film className="w-4 h-4" />
         Animations
-      </Link>
-      <Link
-        to="/auth/login"
-        onClick={() => setIsMenuOpen(false)}
-        className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-medium transition"
-      >
+      </NavLink>
+      <NavLink to="/auth/login" onClick={() => setIsMenuOpen(false)} className="text-slate-600 hover:text-slate-900 hover:bg-slate-100">
         <LogIn className="w-4 h-4" />
         Login
-      </Link>
+      </NavLink>
       <Link
         to="/auth/register"
         onClick={() => setIsMenuOpen(false)}
@@ -143,7 +159,12 @@ export const Navbar = () => {
   );
 
   return (
-    <header className="sticky top-0 z-50 w-full bg-white/95 backdrop-blur-sm border-b border-slate-200/80 shadow-sm">
+    <motion.header
+      className={`sticky top-0 z-50 w-full border-b transition-colors duration-300 ${
+        scrolled ? "bg-white/98 backdrop-blur-md border-slate-200 shadow-sm" : "bg-white/95 backdrop-blur-sm border-slate-200/80"
+      }`}
+      initial={false}
+    >
       <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
@@ -187,6 +208,6 @@ export const Navbar = () => {
           </div>
         )}
       </nav>
-    </header>
+    </motion.header>
   );
 };
