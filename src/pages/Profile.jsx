@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import apiClient from "../services/apiClient";
+import { getProfile, updateWorksheetWatermarkOpacity } from "../services/authService";
 import {
   User,
   Mail,
@@ -16,22 +17,75 @@ import {
   Edit,
   GraduationCap,
   Image,
+  FileText,
 } from "lucide-react";
 import Loader from "../components/Common/loader/loader";
+
+const DEFAULT_WATERMARK_OPACITY = 0.3;
 
 const Profile = () => {
   const [user, setUser] = useState(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [watermarkOpacity, setWatermarkOpacity] = useState(DEFAULT_WATERMARK_OPACITY);
+  const [watermarkSaving, setWatermarkSaving] = useState(false);
+  const [watermarkError, setWatermarkError] = useState(null);
+  const saveTimeoutRef = useRef(null);
   const navigate = useNavigate();
 
   useEffect(() => {
     const storedUser = JSON.parse(localStorage.getItem("user"));
-    if (storedUser) {
-      setUser(storedUser);
-    } else {
-      navigate("auth/login");
+    if (!storedUser) {
+      navigate("/auth/login");
+      return;
     }
+    setUser(storedUser);
+    setWatermarkOpacity(
+      typeof storedUser.worksheet_watermark_opacity === "number"
+        ? storedUser.worksheet_watermark_opacity
+        : DEFAULT_WATERMARK_OPACITY
+    );
+    loadProfile();
   }, [navigate]);
+
+  const loadProfile = useCallback(async () => {
+    try {
+      setProfileLoading(true);
+      const response = await getProfile();
+      const userData = response?.user ?? response?.data ?? response;
+      if (userData) {
+        setUser(userData);
+        const opacity = userData.worksheet_watermark_opacity ?? DEFAULT_WATERMARK_OPACITY;
+        setWatermarkOpacity(typeof opacity === "number" ? opacity : DEFAULT_WATERMARK_OPACITY);
+        const currentStored = JSON.parse(localStorage.getItem("user") || "{}");
+        localStorage.setItem("user", JSON.stringify({ ...currentStored, ...userData }));
+      }
+    } catch {
+      // Keep existing user state from localStorage
+    } finally {
+      setProfileLoading(false);
+    }
+  }, []);
+
+  const handleWatermarkSliderChange = (e) => {
+    const value = Number(e.target.value) / 100;
+    setWatermarkOpacity(value);
+    setWatermarkError(null);
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(async () => {
+      try {
+        setWatermarkSaving(true);
+        await updateWorksheetWatermarkOpacity(value);
+        setUser((prev) => (prev ? { ...prev, worksheet_watermark_opacity: value } : null));
+        const stored = JSON.parse(localStorage.getItem("user") || "{}");
+        localStorage.setItem("user", JSON.stringify({ ...stored, worksheet_watermark_opacity: value }));
+      } catch {
+        setWatermarkError("Could not save watermark opacity.");
+      } finally {
+        setWatermarkSaving(false);
+      }
+    }, 500);
+  };
 
   const handleDeleteAccount = async () => {
     try {
@@ -229,6 +283,78 @@ const Profile = () => {
                       <p className="font-semibold text-gray-800">
                         {user.school_address_pincode || "Not provided"}
                       </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Worksheet appearance (header & watermark preview) */}
+              <div className="md:col-span-2 bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl p-6 border border-amber-200">
+                <div className="flex items-center gap-2 mb-4">
+                  <FileText className="w-5 h-5 text-amber-600" />
+                  <h3 className="text-lg font-bold text-gray-800">
+                    Worksheet appearance
+                  </h3>
+                </div>
+                <p className="text-sm text-gray-600 mb-4">
+                  This opacity is used for the watermark on your downloaded worksheets.
+                </p>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Watermark opacity
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={Math.round(watermarkOpacity * 100)}
+                      onChange={handleWatermarkSliderChange}
+                      className="flex-1 h-2 bg-amber-200 rounded-lg appearance-none cursor-pointer accent-amber-600"
+                      aria-label="Watermark opacity"
+                    />
+                    <span className="text-sm font-semibold text-gray-700 w-10">
+                      {Math.round(watermarkOpacity * 100)}%
+                    </span>
+                  </div>
+                  {watermarkSaving && (
+                    <p className="text-xs text-amber-700 mt-1">Saving…</p>
+                  )}
+                  {watermarkError && (
+                    <p className="text-sm text-red-600 mt-1">{watermarkError}</p>
+                  )}
+                </div>
+                {/* Preview: header mock + watermark mock */}
+                <div className="mt-4">
+                  <p className="text-xs font-medium text-gray-600 mb-2">Preview</p>
+                  <div className="relative bg-white rounded-lg border-2 border-amber-200 overflow-hidden shadow-inner aspect-[3/2] max-h-44">
+                    {/* Header mock */}
+                    <div className="flex items-center gap-3 px-3 py-2 bg-amber-50/80 border-b border-amber-200">
+                      {(user.worksheet_preview?.logo_url || user.logo || user.logo_url) && (
+                        <img
+                          src={user.worksheet_preview?.logo_url || user.logo || user.logo_url}
+                          alt="School logo"
+                          className="h-8 w-auto max-w-[80px] object-contain"
+                        />
+                      )}
+                      <span className="text-sm font-semibold text-gray-800 truncate flex-1">
+                        {user.worksheet_preview?.school_name || user.school_name || "Your School"}
+                      </span>
+                    </div>
+                    {/* Watermark mock */}
+                    <div
+                      className="absolute inset-0 flex items-center justify-center pointer-events-none"
+                      aria-hidden
+                    >
+                      <span
+                        className="text-lg font-bold text-gray-400 whitespace-nowrap"
+                        style={{
+                          opacity: watermarkOpacity,
+                          transform: "rotate(-25deg)",
+                        }}
+                      >
+                        {user.worksheet_preview?.school_name || user.school_name || "Your School"}
+                      </span>
                     </div>
                   </div>
                 </div>

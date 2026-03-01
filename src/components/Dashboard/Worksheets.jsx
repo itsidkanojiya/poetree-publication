@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Eye, FileText } from "lucide-react";
 import PDFModal from "../Common/Modals/PDFModal";
 import apiClient from "../../services/apiClient";
+import { getPersonalizedWorksheetPdfBlob } from "../../services/worksheetService";
 import Loader from "../Common/loader/loader";
 import { useUserTeaching } from "../../context/UserTeachingContext";
 
@@ -10,9 +11,12 @@ const Worksheets = () => {
   const [loading, setLoading] = useState(true);
   const [worksheets, setWorksheets] = useState([]);
   const [filteredWorksheets, setFilteredWorksheets] = useState([]);
+  const [selectedSheet, setSelectedSheet] = useState(null);
   const [selectedPDF, setSelectedPDF] = useState(null);
-  const [selectedTitle, setSelectedTitle] = useState("");
+  const [loadingPersonalized, setLoadingPersonalized] = useState(false);
+  const [errorPersonalized, setErrorPersonalized] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const blobUrlRef = useRef(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -56,6 +60,75 @@ const Worksheets = () => {
     setFilteredWorksheets(filtered);
   }, [contextSelection, worksheets]);
 
+  // When modal opens with a selected sheet, fetch personalized PDF (or fallback to original URL)
+  useEffect(() => {
+    if (!isModalOpen || !selectedSheet?.worksheet_id) return;
+
+    const worksheetId = selectedSheet.worksheet_id ?? selectedSheet.id;
+    setLoadingPersonalized(true);
+    setErrorPersonalized(null);
+
+    getPersonalizedWorksheetPdfBlob(worksheetId, { action: "view" })
+      .then((blob) => {
+        if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
+        const url = URL.createObjectURL(blob);
+        blobUrlRef.current = url;
+        setSelectedPDF(url);
+      })
+      .catch(async () => {
+        setErrorPersonalized("Personalized preview unavailable. Showing original.");
+        const fallbackUrl = selectedSheet.worksheet_url;
+        if (fallbackUrl) {
+          try {
+            const res = await apiClient.get(fallbackUrl, { responseType: "blob" });
+            if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
+            const url = URL.createObjectURL(res.data);
+            blobUrlRef.current = url;
+            setSelectedPDF(url);
+          } catch {
+            setSelectedPDF(fallbackUrl);
+          }
+        } else {
+          setSelectedPDF(null);
+        }
+      })
+      .finally(() => {
+        setLoadingPersonalized(false);
+      });
+
+    return () => {
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
+      }
+    };
+  }, [isModalOpen, selectedSheet?.worksheet_id ?? selectedSheet?.id]);
+
+  const handleCloseModal = () => {
+    if (blobUrlRef.current) {
+      URL.revokeObjectURL(blobUrlRef.current);
+      blobUrlRef.current = null;
+    }
+    setSelectedSheet(null);
+    setSelectedPDF(null);
+    setErrorPersonalized(null);
+    setIsModalOpen(false);
+  };
+
+  const handleDownload = async (worksheetId) => {
+    try {
+      const blob = await getPersonalizedWorksheetPdfBlob(worksheetId, { action: "download" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `worksheet-${worksheetId}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Download failed:", err);
+    }
+  };
+
   return (
     <div className="min-h-screen p-8">
       <div className="max-w-7xl mx-auto">
@@ -97,11 +170,11 @@ const Worksheets = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {filteredWorksheets.map((sheet) => (
               <div
-                key={sheet.worksheet_id}
+                key={sheet.worksheet_id ?? sheet.id}
                 onClick={() => {
-                  if (sheet.worksheet_url) {
-                    setSelectedPDF(sheet.worksheet_url);
-                    setSelectedTitle(sheet.subject_title || sheet.subject || "Worksheet");
+                  if (sheet.worksheet_id != null || sheet.worksheet_url) {
+                    setSelectedPDF(null);
+                    setSelectedSheet(sheet);
                     setIsModalOpen(true);
                   }
                 }}
@@ -170,9 +243,13 @@ const Worksheets = () => {
           <div className="bg-white w-full max-w-6xl h-[90vh] rounded-2xl overflow-hidden shadow-2xl flex flex-col">
             <PDFModal
               isOpen={isModalOpen}
-              onClose={() => setIsModalOpen(false)}
+              onClose={handleCloseModal}
               pdfUrl={selectedPDF}
-              title={selectedTitle}
+              title={selectedSheet?.subject_title || selectedSheet?.subject || "Worksheet"}
+              loading={loadingPersonalized}
+              errorMessage={errorPersonalized}
+              worksheetId={selectedSheet?.worksheet_id ?? selectedSheet?.id}
+              onDownload={handleDownload}
             />
           </div>
         </div>

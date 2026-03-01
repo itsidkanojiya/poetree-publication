@@ -87,3 +87,15 @@ export const updateProfile = async (profileData) => {
     throw error;
   }
 };
+
+/**
+ * Update worksheet watermark opacity (0–1). Used for personalized worksheet PDFs.
+ * Sends JSON body; backend stores and uses this when generating worksheet PDFs.
+ */
+export const updateWorksheetWatermarkOpacity = async (value) => {
+  const clamped = Math.min(1, Math.max(0, Number(value)));
+  const response = await apiClient.put("/auth/profile", {
+    worksheet_watermark_opacity: clamped,
+  });
+  return response.data;
+};
