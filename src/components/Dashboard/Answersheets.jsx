@@ -97,12 +97,17 @@ const Answersheets = () => {
           </div>
         ) : filteredAnswerSheets.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredAnswerSheets.map((sheet) => (
+            {filteredAnswerSheets.map((sheet) => {
+              const pdfUrl = sheet.answersheet_url ?? sheet.worksheet_url;
+              const coverUrl = sheet.answersheet_coverlink ?? sheet.worksheet_coverlink;
+              const hasValidCover = coverUrl && !coverUrl.endsWith("/null") && coverUrl !== "null";
+
+              return (
               <div
-                key={sheet.worksheet_id}
+                key={sheet.answer_sheet_id ?? sheet.worksheet_id ?? sheet.subject_title}
                 onClick={() => {
-                  if (sheet.worksheet_url) {
-                    setSelectedPDF(sheet.worksheet_url);
+                  if (pdfUrl) {
+                    setSelectedPDF(pdfUrl);
                     setSelectedTitle(sheet.subject_title || sheet.subject || "Answer Sheet");
                     setIsModalOpen(true);
                   }
@@ -116,14 +121,23 @@ const Answersheets = () => {
 
                 {/* Image Container */}
                 <div className="relative p-4">
-                  <div className="relative rounded-xl overflow-hidden shadow-md">
+                  <div className="relative rounded-xl overflow-hidden shadow-md bg-gray-100 min-h-[12rem] flex items-center justify-center">
+                    {hasValidCover ? (
                     <img
-                      src={sheet.worksheet_coverlink}
+                      src={coverUrl}
                       className="w-full h-48 object-cover"
                       alt={`Answer sheet cover for ${
                         sheet.subject_title || sheet.subject
                       }`}
                     />
+                    ) : (
+                      <div className="w-full h-48 flex flex-col items-center justify-center text-gray-400 gap-2">
+                        <ClipboardCheck className="w-12 h-12" />
+                        <span className="text-sm font-medium px-2 text-center">
+                          {sheet.subject_title || sheet.subject || "Answer Sheet"}
+                        </span>
+                      </div>
+                    )}
 
                     {/* Overlay on Hover */}
                     <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
@@ -152,7 +166,8 @@ const Answersheets = () => {
                   </p>
                 </div>
               </div>
-            ))}
+            );
+            })}
           </div>
         ) : (
           <div className="text-center py-20">

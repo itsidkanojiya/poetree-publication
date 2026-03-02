@@ -847,46 +847,41 @@ const CustomPaper = () => {
       }
     }
     
-    // Generate and download PDF
+    // Generate and download PDF (sequential so page order is correct)
     try {
       const pdf = new jsPDF("p", "mm", "a4");
       const pages = pagesRef.current.children;
-      let promises = [];
 
-      Array.from(pages).forEach((page, index) => {
-        let images = Array.from(page.querySelectorAll("img"));
-        let loadPromises = images.map(
-          (img) =>
-            new Promise((resolve) => {
-              if (img.complete) resolve();
-              else img.onload = () => resolve();
-            })
+      for (let index = 0; index < pages.length; index++) {
+        const page = pages[index];
+        const images = Array.from(page.querySelectorAll("img"));
+        await Promise.all(
+          images.map(
+            (img) =>
+              new Promise((resolve) => {
+                if (img.complete) resolve();
+                else img.onload = () => resolve();
+              })
+          )
         );
-
-        let capturePromise = Promise.all(loadPromises).then(() => {
-          return html2canvas(page, {
-            scale: 2.5,
-            useCORS: true,
-            allowTaint: false,
-            logging: false,
-            backgroundColor: "#ffffff",
-            ignoreElements: (element) => element.classList.contains("no-print"),
-          }).then((canvas) => {
-            const imgData = canvas.toDataURL("image/png", 1.0);
-            const imgWidth = 210;
-            const imgHeight = (canvas.height * imgWidth) / canvas.width;
-            const maxHeight = 297;
-            const finalHeight = imgHeight > maxHeight ? maxHeight : imgHeight;
-
-            if (index > 0) pdf.addPage();
-            pdf.addImage(imgData, "PNG", 0, 0, imgWidth, finalHeight);
-          });
+        const canvas = await html2canvas(page, {
+          scale: 2.5,
+          useCORS: true,
+          allowTaint: false,
+          logging: false,
+          backgroundColor: "#ffffff",
+          ignoreElements: (element) => element.classList.contains("no-print"),
         });
+        const imgData = canvas.toDataURL("image/png", 1.0);
+        const imgWidth = 210;
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+        const maxHeight = 297;
+        const finalHeight = imgHeight > maxHeight ? maxHeight : imgHeight;
 
-        promises.push(capturePromise);
-      });
+        if (index > 0) pdf.addPage();
+        pdf.addImage(imgData, "PNG", 0, 0, imgWidth, finalHeight);
+      }
 
-      await Promise.all(promises);
       pdf.save("exam-paper.pdf");
       
       // Clear questions now that PDF is downloaded
