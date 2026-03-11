@@ -16,6 +16,13 @@ import {
   Eye,
   CheckCircle,
   XCircle,
+  Info,
+  Mail,
+  User,
+  Phone,
+  School,
+  MapPin,
+  X,
 } from "lucide-react";
 import Toast from "../Common/Toast";
 import Loader from "../Common/loader/loader";
@@ -31,6 +38,7 @@ const TeacherManagement = () => {
   const [showSelectionsModal, setShowSelectionsModal] = useState(false);
   const [userSelections, setUserSelections] = useState(null);
   const [loadingSelections, setLoadingSelections] = useState(false);
+  const [detailTeacher, setDetailTeacher] = useState(null);
 
   useEffect(() => {
     fetchTeachers();
@@ -271,6 +279,13 @@ const TeacherManagement = () => {
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center justify-center gap-2">
+                          <button
+                            onClick={() => setDetailTeacher(teacher)}
+                            className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition"
+                            title="View details"
+                          >
+                            <Info size={18} />
+                          </button>
                           {activeTab === 0 && (
                             <>
                               <button
@@ -444,6 +459,124 @@ const TeacherManagement = () => {
                   </div>
                 </>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* User details popup */}
+      {detailTeacher && (
+        <div
+          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+          onClick={() => setDetailTeacher(null)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+              <h2 className="text-xl font-bold text-gray-800">User details</h2>
+              <button
+                type="button"
+                onClick={() => setDetailTeacher(null)}
+                className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="flex items-center gap-3 pb-4 border-b border-gray-100">
+                <div className="p-3 bg-indigo-100 rounded-full">
+                  <User className="w-6 h-6 text-indigo-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-800">{detailTeacher.name || "N/A"}</h3>
+                  <p className="text-sm text-gray-500">
+                    {detailTeacher.is_verified === 1 || detailTeacher.is_verified === true
+                      ? "Active"
+                      : "Pending"}
+                  </p>
+                </div>
+              </div>
+              <div className="space-y-3">
+                <div className="flex items-start gap-3">
+                  <Mail className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-xs font-medium text-gray-500">Email</p>
+                    <p className="text-gray-800">{detailTeacher.email || "—"}</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <User className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-xs font-medium text-gray-500">Username</p>
+                    <p className="text-gray-800">{detailTeacher.username || "—"}</p>
+                  </div>
+                </div>
+                {(detailTeacher.phone_number || detailTeacher.phone || detailTeacher.mobile) && (
+                  <div className="flex items-start gap-3">
+                    <Phone className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
+                    <div>
+                      <p className="text-xs font-medium text-gray-500">Mobile</p>
+                      <p className="text-gray-800">
+                        {detailTeacher.phone_number ||
+                          detailTeacher.phone ||
+                          detailTeacher.mobile}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                {(detailTeacher.school_name || detailTeacher.school) && (
+                  <div className="flex items-start gap-3">
+                    <School className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
+                    <div>
+                      <p className="text-xs font-medium text-gray-500">School</p>
+                      <p className="text-gray-800">
+                        {detailTeacher.school_name || detailTeacher.school}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                {(detailTeacher.school_principal_name || detailTeacher.principal_name) && (
+                  <div className="flex items-start gap-3">
+                    <User className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
+                    <div>
+                      <p className="text-xs font-medium text-gray-500">Principal name</p>
+                      <p className="text-gray-800">
+                        {detailTeacher.school_principal_name ||
+                          detailTeacher.principal_name}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                {(detailTeacher.address ||
+                  detailTeacher.school_address_city ||
+                  detailTeacher.school_address_state ||
+                  detailTeacher.school_address_pincode) && (
+                  <div className="flex items-start gap-3">
+                    <MapPin className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
+                    <div>
+                      <p className="text-xs font-medium text-gray-500">Address</p>
+                      <p className="text-gray-800">
+                        {detailTeacher.address ||
+                          [
+                            detailTeacher.school_address_city,
+                            detailTeacher.school_address_state,
+                            detailTeacher.school_address_pincode,
+                          ]
+                            .filter(Boolean)
+                            .join(", ") ||
+                          "—"}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                <div className="flex items-start gap-3">
+                  <span className="text-xs font-medium text-gray-500 w-4 shrink-0">ID</span>
+                  <p className="text-gray-800">{detailTeacher.id}</p>
+                </div>
+              </div>
             </div>
           </div>
         </div>

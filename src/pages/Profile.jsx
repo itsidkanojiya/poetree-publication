@@ -324,22 +324,43 @@ const Profile = () => {
                     <p className="text-sm text-red-600 mt-1">{watermarkError}</p>
                   )}
                 </div>
-                {/* Preview: header mock + watermark mock */}
+                {/* Preview: worksheet header (same style as paper header) + watermark mock */}
                 <div className="mt-4">
                   <p className="text-xs font-medium text-gray-600 mb-2">Preview</p>
-                  <div className="relative bg-white rounded-lg border-2 border-amber-200 overflow-hidden shadow-inner aspect-[3/2] max-h-44">
-                    {/* Header mock */}
-                    <div className="flex items-center gap-3 px-3 py-2 bg-amber-50/80 border-b border-amber-200">
-                      {(user.worksheet_preview?.logo_url || user.logo || user.logo_url) && (
+                  <div className="relative bg-gray-100 rounded-lg overflow-hidden shadow-inner aspect-[3/2] max-h-44 p-1">
+                    {/* Worksheet header mock: white bg, black border, like paper header */}
+                    <div className="bg-white border-2 border-black rounded p-2 flex items-center justify-center gap-2">
+                      {(user.worksheet_preview?.logo_url || user.logo || user.logo_url) ? (
                         <img
                           src={user.worksheet_preview?.logo_url || user.logo || user.logo_url}
                           alt="School logo"
-                          className="h-8 w-auto max-w-[80px] object-contain"
+                          className="h-8 w-8 object-contain flex-shrink-0 border border-gray-300 rounded"
                         />
+                      ) : (
+                        <div className="h-8 w-8 flex items-center justify-center bg-gray-700 text-white text-xs font-bold rounded flex-shrink-0">
+                          {(user.worksheet_preview?.school_name || user.school_name || "Y")
+                            .split(" ")
+                            .map((w) => w[0])
+                            .join("")
+                            .substring(0, 2)
+                            .toUpperCase()}
+                        </div>
                       )}
-                      <span className="text-sm font-semibold text-gray-800 truncate flex-1">
-                        {user.worksheet_preview?.school_name || user.school_name || "Your School"}
-                      </span>
+                      <div className="flex flex-col items-center text-center min-w-0 flex-1">
+                        <span className="text-xs font-bold text-gray-900 uppercase leading-tight block">
+                          {user.worksheet_preview?.school_name || user.school_name || "Your School"}
+                        </span>
+                        {(user.address ||
+                          user.school_address_city ||
+                          (user.school_address_city && user.school_address_state)) && (
+                          <span className="text-[10px] text-gray-600 mt-0.5 block">
+                            {user.address ||
+                              (user.school_address_city && user.school_address_state
+                                ? `${user.school_address_city}, ${user.school_address_state}`
+                                : user.school_address_city || "")}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     {/* Watermark mock */}
                     <div

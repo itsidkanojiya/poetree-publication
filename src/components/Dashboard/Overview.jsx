@@ -14,6 +14,7 @@ import {
 import { Link, useNavigate } from "react-router-dom";
 import apiClient from "../../services/apiClient";
 import Toast from "../Common/Toast";
+import { useAuth } from "../../context/AuthContext";
 import { usePaper } from "../../context/PaperContext";
 import { useUserTeaching } from "../../context/UserTeachingContext";
 import { getDashboard } from "../../services/dashboardService";
@@ -32,8 +33,14 @@ const QUESTION_TYPE_LABELS = {
 
 const Overview = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { papers } = usePaper();
   const { contextSelection } = useUserTeaching();
+
+  const displayName = (() => {
+    const u = user || (typeof localStorage !== "undefined" ? JSON.parse(localStorage.getItem("user") || "null") : null);
+    return u?.name || u?.username || "there";
+  })();
   const [dashboardData, setDashboardData] = useState(null);
   const [statsLoading, setStatsLoading] = useState(true);
   const [dashboardFailed, setDashboardFailed] = useState(false);
@@ -229,7 +236,7 @@ const Overview = () => {
             <p className="text-gray-600">Good evening,</p>
           </div>
           <h1 className="text-5xl font-extrabold bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent">
-            Siddharth Kanojiya!
+            {displayName}!
           </h1>
           <p className="text-gray-600 mt-2">
             Welcome back to your exam paper builder dashboard
