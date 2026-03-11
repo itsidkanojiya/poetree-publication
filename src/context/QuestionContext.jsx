@@ -42,6 +42,12 @@ export const QuestionProvider = ({ children }) => {
           ? filters.marks.join(',') 
           : filters.marks);
       }
+      if (filters.chapter_id != null && filters.chapter_id !== '') {
+        const cid = Array.isArray(filters.chapter_id) 
+          ? filters.chapter_id.join(',') 
+          : String(filters.chapter_id);
+        if (cid) params.append('chapter_id', cid);
+      }
 
       const queryString = params.toString();
       const url = queryString ? `/question?${queryString}` : '/question';

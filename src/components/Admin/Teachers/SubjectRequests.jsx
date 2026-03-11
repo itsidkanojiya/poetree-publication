@@ -3,6 +3,7 @@ import {
   getSubjectRequests,
   approveUserSelections,
   rejectSubjectRequest,
+  removeUserApprovedSelections,
 } from "../../../services/adminService";
 import {
   CheckCircle,
@@ -14,6 +15,7 @@ import {
   Phone,
   School,
   X,
+  Trash2,
 } from "lucide-react";
 import Toast from "../../Common/Toast";
 import Loader from "../../Common/loader/loader";
@@ -32,6 +34,8 @@ const SubjectRequests = () => {
   });
   const [actionLoadingKey, setActionLoadingKey] = useState(null);
   const [expandedUserId, setExpandedUserId] = useState(null);
+  const [confirmRemove, setConfirmRemove] = useState(null);
+  const [removingId, setRemovingId] = useState(null);
 
   useEffect(() => {
     fetchRequests();
@@ -179,6 +183,51 @@ const SubjectRequests = () => {
     if (request.status === "approved") return "approved";
     if (request.status === "rejected") return "rejected";
     return "pending";
+  };
+
+  const getSubjectRowId = (s) =>
+    s.id ?? s.user_subject_id ?? s.user_subjects_id ?? s.user_subjects?.id ?? s.UserSubject?.id;
+  const getTitleRowId = (t) =>
+    t.id ?? t.user_subject_title_id ?? t.user_subject_titles_id ?? t.user_subject_titles?.id ?? t.UserSubjectTitle?.id;
+
+  const handleRemoveApprovedClick = (userId, type, item) => {
+    const rowId = type === "subject" ? getSubjectRowId(item) : getTitleRowId(item);
+    if (userId == null) return;
+    if (rowId == null) {
+      setToast({
+        show: true,
+        message: "Cannot remove: backend did not return row id. Ensure GET /api/admin/subject-requests includes 'id' for each approved item.",
+        type: "error",
+      });
+      return;
+    }
+    setConfirmRemove({ type, userId, rowId, name: type === "subject" ? (item.subject_name || "this subject") : (item.subject_title_name || item.title_name || "this title") });
+  };
+
+  const handleRemoveConfirm = async () => {
+    if (!confirmRemove) return;
+    const { type, userId, rowId } = confirmRemove;
+    setConfirmRemove(null);
+    setDetailModal(null);
+    setRemovingId(`${type}-${userId}-${rowId}`);
+    try {
+      if (type === "subject") {
+        await removeUserApprovedSelections(userId, { user_subject_ids: [Number(rowId)] });
+        setToast({ show: true, message: "Approved subject removed.", type: "success" });
+      } else {
+        await removeUserApprovedSelections(userId, { user_subject_title_ids: [Number(rowId)] });
+        setToast({ show: true, message: "Approved subject title removed.", type: "success" });
+      }
+      fetchRequests();
+    } catch (err) {
+      setToast({
+        show: true,
+        message: err.response?.data?.message || "Failed to remove selection",
+        type: "error",
+      });
+    } finally {
+      setRemovingId(null);
+    }
   };
 
   if (loading) {
@@ -454,9 +503,23 @@ const SubjectRequests = () => {
                                 </>
                               )}
                               {status === "approved" && (
-                                <span className="px-3 py-1 rounded-full bg-green-100 text-green-700 text-sm font-medium">
-                                  Approved
-                                </span>
+                                <>
+                                  <span className="px-3 py-1 rounded-full bg-green-100 text-green-700 text-sm font-medium">
+                                    Approved
+                                  </span>
+                                  <button
+                                    type="button"
+                                    disabled={!!removingId}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleRemoveApprovedClick(user.id, "subject", subject);
+                                    }}
+                                    className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition disabled:opacity-50"
+                                    title="Remove from approved"
+                                  >
+                                    <Trash2 className="w-5 h-5" />
+                                  </button>
+                                </>
                               )}
                               {status === "rejected" && (
                                 <span className="px-3 py-1 rounded-full bg-red-100 text-red-700 text-sm font-medium">
@@ -630,8 +693,55 @@ const SubjectRequests = () => {
                           : "Pending"}
                     </span>
                   </div>
+                  {getRequestStatus(detailModal.item) === "approved" && (
+                    <div className="mt-4 pt-4 border-t border-gray-200">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleRemoveApprovedClick(
+                            detailModal.user?.id,
+                            detailModal.requestType,
+                            detailModal.item,
+                          );
+                        }}
+                        disabled={!!removingId}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-red-50 text-red-700 rounded-xl font-medium hover:bg-red-100 transition disabled:opacity-50"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Remove from approved
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm remove modal */}
+      {confirmRemove && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6">
+            <h4 className="text-lg font-bold text-gray-800 mb-2">Remove approved selection?</h4>
+            <p className="text-gray-600 text-sm mb-6">
+              Remove &ldquo;{confirmRemove.name}&rdquo; from this teacher&apos;s selections. They can request it again later.
+            </p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setConfirmRemove(null)}
+                className="flex-1 px-4 py-3 bg-gray-200 text-gray-800 rounded-xl font-medium hover:bg-gray-300 transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleRemoveConfirm}
+                className="flex-1 px-4 py-3 bg-red-600 text-white rounded-xl font-medium hover:bg-red-700 transition"
+              >
+                Remove
+              </button>
             </div>
           </div>
         </div>

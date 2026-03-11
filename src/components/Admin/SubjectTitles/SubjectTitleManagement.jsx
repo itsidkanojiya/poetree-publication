@@ -7,10 +7,11 @@ import {
   addSubjectTitle,
   deleteSubjectTitle,
 } from "../../../services/adminService";
-import { Plus, Trash2, Search, BookOpen } from "lucide-react";
+import { Plus, Trash2, Search, BookOpen, List } from "lucide-react";
 import Toast from "../../Common/Toast";
 import Loader from "../../Common/loader/loader";
 import AddSubjectTitleModal from "./AddSubjectTitleModal";
+import ManageChaptersModal from "./ManageChaptersModal";
 
 /** Get standard display: names from title.standards or map title.standard IDs to names via standards list */
 const getStandardDisplay = (title, standardsList) => {
@@ -43,6 +44,7 @@ const SubjectTitleManagement = () => {
   const [toast, setToast] = useState({ show: false, message: "", type: "success" });
   const [selectedTitle, setSelectedTitle] = useState(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [chaptersTitle, setChaptersTitle] = useState(null);
 
   useEffect(() => {
     fetchData();
@@ -218,16 +220,26 @@ const SubjectTitleManagement = () => {
                       {getStandardDisplay(title, standards)}
                     </td>
                     <td className="px-6 py-4 text-sm">
-                      <button
-                        onClick={() => {
-                          setSelectedTitle(title);
-                          setShowDeleteModal(true);
-                        }}
-                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
-                        title="Delete"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setChaptersTitle(title)}
+                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition flex items-center gap-1"
+                          title="Manage chapters"
+                        >
+                          <List className="w-4 h-4" />
+                          <span className="text-xs font-medium">Chapters</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            setSelectedTitle(title);
+                            setShowDeleteModal(true);
+                          }}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
+                          title="Delete"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -245,6 +257,15 @@ const SubjectTitleManagement = () => {
           boards={boards}
           onClose={() => setShowAddModal(false)}
           onSave={handleAdd}
+        />
+      )}
+
+      {/* Manage Chapters Modal */}
+      {chaptersTitle && (
+        <ManageChaptersModal
+          subjectTitleId={chaptersTitle.subject_title_id}
+          titleName={chaptersTitle.title_name}
+          onClose={() => setChaptersTitle(null)}
         />
       )}
 

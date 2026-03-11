@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import apiClient from "../services/apiClient";
+import { removeApprovedSelections } from "../services/userService";
 import Toast from "../components/Common/Toast";
 import {
   CheckCircle2,
@@ -29,6 +30,7 @@ const SubjectRequests = () => {
   const [newRequestSubjects, setNewRequestSubjects] = useState([]);
   const [activeTab, setActiveTab] = useState("view"); // "view" or "create"
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [removingId, setRemovingId] = useState(null); // "subject-{id}" | "title-{id}" while removing
 
   // Fetch all data
   useEffect(() => {
@@ -86,17 +88,19 @@ const SubjectRequests = () => {
         pendingData = [];
       }
 
-      // Transform approved data structure (same format)
+      // Transform approved data structure (preserve row id for remove)
       if (approvedData && approvedData.approved_selections) {
         const approvedSelections = approvedData.approved_selections;
         const transformedApproved = [
           {
             subjects: (approvedSelections.subjects || []).map((sub) => ({
+              id: sub.id ?? sub.user_subject_id ?? sub.user_subjects_id,
               subject_id: sub.subject_id || sub.subject?.subject_id,
               subject_name: sub.subject?.subject_name || "Unknown Subject",
             })),
             subject_titles: (approvedSelections.subject_titles || []).map(
               (st) => ({
+                id: st.id ?? st.user_subject_title_id ?? st.user_subject_titles_id,
                 subject_id: st.subject_id || st.subject?.subject_id,
                 subject_title_id:
                   st.subject_title_id || st.subjectTitle?.subject_title_id,
@@ -302,6 +306,46 @@ const SubjectRequests = () => {
         type: "error",
       });
       setIsSubmitting(false);
+    }
+  };
+
+  const handleRemoveApprovedSubject = async (rowId) => {
+    if (rowId == null) return;
+    if (!window.confirm("Remove this approved subject from your selections? You can request it again later.")) return;
+    const key = `subject-${rowId}`;
+    setRemovingId(key);
+    try {
+      await removeApprovedSelections({ user_subject_ids: [Number(rowId)] });
+      setToast({ show: true, message: "Subject removed from your selections.", type: "success" });
+      fetchAllData();
+    } catch (err) {
+      setToast({
+        show: true,
+        message: err.response?.data?.message || "Failed to remove selection.",
+        type: "error",
+      });
+    } finally {
+      setRemovingId(null);
+    }
+  };
+
+  const handleRemoveApprovedSubjectTitle = async (rowId) => {
+    if (rowId == null) return;
+    if (!window.confirm("Remove this approved subject title from your selections? You can request it again later.")) return;
+    const key = `title-${rowId}`;
+    setRemovingId(key);
+    try {
+      await removeApprovedSelections({ user_subject_title_ids: [Number(rowId)] });
+      setToast({ show: true, message: "Subject title removed from your selections.", type: "success" });
+      fetchAllData();
+    } catch (err) {
+      setToast({
+        show: true,
+        message: err.response?.data?.message || "Failed to remove selection.",
+        type: "error",
+      });
+    } finally {
+      setRemovingId(null);
     }
   };
 
@@ -547,15 +591,34 @@ const SubjectRequests = () => {
                                 Subjects ({request.subjects.length}):
                               </p>
                               <div className="flex flex-wrap gap-2">
-                                {request.subjects.map((sub, idx) => (
-                                  <span
-                                    key={idx}
-                                    className="px-3 py-2 bg-white text-gray-800 text-sm font-semibold rounded-lg border-2 border-green-400 shadow-sm hover:shadow-md transition-shadow"
-                                  >
-                                    {sub.subject_name ||
-                                      `Subject ${sub.subject_id}`}
-                                  </span>
-                                ))}
+                                {request.subjects.map((sub, idx) => {
+                                  const removeKey = sub.id != null ? `subject-${sub.id}` : null;
+                                  const isRemoving = removeKey && removingId === removeKey;
+                                  return (
+                                    <span
+                                      key={sub.id ?? idx}
+                                      className="inline-flex items-center gap-1 px-3 py-2 bg-white text-gray-800 text-sm font-semibold rounded-lg border-2 border-green-400 shadow-sm hover:shadow-md transition-shadow"
+                                    >
+                                      {sub.subject_name ||
+                                        `Subject ${sub.subject_id}`}
+                                      {removeKey && (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleRemoveApprovedSubject(sub.id)}
+                                          disabled={!!removingId}
+                                          className="p-0.5 rounded hover:bg-red-100 text-gray-500 hover:text-red-600 transition disabled:opacity-50"
+                                          title="Remove from approved selections"
+                                        >
+                                          {isRemoving ? (
+                                            <RefreshCw size={14} className="animate-spin" />
+                                          ) : (
+                                            <X size={14} />
+                                          )}
+                                        </button>
+                                      )}
+                                    </span>
+                                  );
+                                })}
                               </div>
                             </div>
                           )}
@@ -572,26 +635,45 @@ const SubjectRequests = () => {
                                 ):
                               </p>
                               <div className="flex flex-wrap gap-2">
-                                {request.subject_titles.map((st, idx) => (
-                                  <span
-                                    key={idx}
-                                    className="px-3 py-2 bg-white text-gray-800 text-sm font-medium rounded-lg border-2 border-green-400 shadow-sm hover:shadow-md transition-shadow"
-                                    title={`${st.subject_name || "Subject"} - ${
-                                      st.title_name || "Title"
-                                    }`}
-                                  >
-                                    <span className="font-bold text-green-700">
-                                      {st.subject_name || "Subject"}
+                                {request.subject_titles.map((st, idx) => {
+                                  const removeKey = st.id != null ? `title-${st.id}` : null;
+                                  const isRemoving = removeKey && removingId === removeKey;
+                                  return (
+                                    <span
+                                      key={st.id ?? idx}
+                                      className="inline-flex items-center gap-1 px-3 py-2 bg-white text-gray-800 text-sm font-medium rounded-lg border-2 border-green-400 shadow-sm hover:shadow-md transition-shadow"
+                                      title={`${st.subject_name || "Subject"} - ${
+                                        st.title_name || "Title"
+                                      }`}
+                                    >
+                                      <span className="font-bold text-green-700">
+                                        {st.subject_name || "Subject"}
+                                      </span>
+                                      <span className="mx-1 text-gray-400">
+                                        •
+                                      </span>
+                                      <span>
+                                        {st.title_name ||
+                                          `Title ${st.subject_title_id}`}
+                                      </span>
+                                      {removeKey && (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleRemoveApprovedSubjectTitle(st.id)}
+                                          disabled={!!removingId}
+                                          className="p-0.5 rounded hover:bg-red-100 text-gray-500 hover:text-red-600 transition disabled:opacity-50"
+                                          title="Remove from approved selections"
+                                        >
+                                          {isRemoving ? (
+                                            <RefreshCw size={14} className="animate-spin" />
+                                          ) : (
+                                            <X size={14} />
+                                          )}
+                                        </button>
+                                      )}
                                     </span>
-                                    <span className="mx-1 text-gray-400">
-                                      •
-                                    </span>
-                                    <span>
-                                      {st.title_name ||
-                                        `Title ${st.subject_title_id}`}
-                                    </span>
-                                  </span>
-                                ))}
+                                  );
+                                })}
                               </div>
                             </div>
                           )}

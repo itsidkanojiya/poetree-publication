@@ -17,6 +17,7 @@ import {
   getSubjectTitlesBySubjectAndContext,
   getQuestionsByType,
   getAllStandards,
+  getChaptersBySubjectTitle,
 } from "../../../services/adminService";
 import { getProfile } from "../../../services/authService";
 import Toast from "../../Common/Toast";
@@ -89,6 +90,7 @@ const CreateTemplate = () => {
 
   const [subjects, setSubjects] = useState([]);
   const [subjectTitles, setSubjectTitles] = useState([]);
+  const [chapters, setChapters] = useState([]);
   const [boards, setBoards] = useState([]);
   const [standards, setStandards] = useState([]);
   const [availableQuestions, setAvailableQuestions] = useState({});
@@ -102,6 +104,7 @@ const CreateTemplate = () => {
     standard: "",
     subject_id: "",
     subject_title_id: "",
+    chapter_id: "",
     board_id: "",
     total_marks: "",
     marks_mcq: "",
@@ -141,10 +144,26 @@ const CreateTemplate = () => {
     } else {
       setSubjectTitles([]);
       if (!formData.subject_id || !formData.standard || !formData.board_id) {
-        setFormData((prev) => ({ ...prev, subject_title_id: "" }));
+        setFormData((prev) => ({ ...prev, subject_title_id: "", chapter_id: "" }));
       }
     }
   }, [formData.subject_id, formData.standard, formData.board_id]);
+
+  useEffect(() => {
+    if (!formData.subject_title_id) {
+      setChapters([]);
+      return;
+    }
+    let cancelled = false;
+    getChaptersBySubjectTitle(formData.subject_title_id)
+      .then((list) => {
+        if (!cancelled) setChapters(Array.isArray(list) ? list : []);
+      })
+      .catch((err) => {
+        if (!cancelled) console.error("Error fetching chapters:", err);
+      });
+    return () => { cancelled = true; };
+  }, [formData.subject_title_id]);
 
   useEffect(() => {
     if (currentQuestionType) {
@@ -205,9 +224,11 @@ const CreateTemplate = () => {
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     if (name === "subject_id") {
-      setFormData((prev) => ({ ...prev, subject_id: value, standard: "", board_id: "", subject_title_id: "" }));
+      setFormData((prev) => ({ ...prev, subject_id: value, standard: "", board_id: "", subject_title_id: "", chapter_id: "" }));
     } else if (name === "standard" || name === "board_id") {
-      setFormData((prev) => ({ ...prev, [name]: value, subject_title_id: "" }));
+      setFormData((prev) => ({ ...prev, [name]: value, subject_title_id: "", chapter_id: "" }));
+    } else if (name === "subject_title_id") {
+      setFormData((prev) => ({ ...prev, [name]: value, chapter_id: "" }));
     } else {
       setFormData((prev) => ({ ...prev, [name]: value }));
     }
@@ -476,6 +497,7 @@ const CreateTemplate = () => {
         standard: parseInt(formData.standard, 10),
         subject_id: parseInt(formData.subject_id),
         subject_title_id: parseInt(formData.subject_title_id),
+        ...(formData.chapter_id ? { chapter_id: parseInt(formData.chapter_id, 10) } : {}),
         board_id: parseInt(formData.board_id),
         subject: selectedSubject?.subject_name || "NA",
         board: selectedBoard?.board_name || "NA",
@@ -745,6 +767,25 @@ const CreateTemplate = () => {
             {subjectTitles.map((st) => (
               <option key={st.subject_title_id} value={st.subject_title_id}>
                 {st.title_name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="md:col-span-2">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Chapter (Optional)
+          </label>
+          <select
+            name="chapter_id"
+            value={formData.chapter_id}
+            onChange={handleInputChange}
+            disabled={!formData.subject_title_id}
+            className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none disabled:bg-gray-100"
+          >
+            <option value="">No chapter</option>
+            {chapters.map((ch) => (
+              <option key={ch.chapter_id} value={ch.chapter_id}>
+                {ch.chapter_name}
               </option>
             ))}
           </select>

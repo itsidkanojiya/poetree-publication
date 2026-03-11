@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { X, Plus, Trash2 } from "lucide-react";
-import { addQuestion, editQuestion, getAllSubjects, getAllBoards, getSubjectTitlesBySubjectAndContext, getAllStandards } from "../../../services/adminService";
+import { addQuestion, editQuestion, getAllSubjects, getAllBoards, getSubjectTitlesBySubjectAndContext, getAllStandards, getChaptersBySubjectTitle, createChapter } from "../../../services/adminService";
 import Toast from "../../Common/Toast";
 
 const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
@@ -14,6 +14,7 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
     solution: "",
     subject_id: "",
     subject_title_id: "",
+    chapter_id: "",
     marks: "",
     image: null,
   });
@@ -21,6 +22,10 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
   const [boards, setBoards] = useState([]);
   const [standards, setStandards] = useState([]);
   const [subjectTitles, setSubjectTitles] = useState([]);
+  const [chapters, setChapters] = useState([]);
+  const [showAddChapter, setShowAddChapter] = useState(false);
+  const [newChapterName, setNewChapterName] = useState("");
+  const [addingChapter, setAddingChapter] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [toast, setToast] = useState({ show: false, message: "", type: "error" });
@@ -62,6 +67,23 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
     return () => { cancelled = true; };
   }, [formData.subject_id, formData.standard, formData.board_id]);
 
+  // Fetch chapters when subject title is selected
+  useEffect(() => {
+    if (!formData.subject_title_id) {
+      setChapters([]);
+      return;
+    }
+    let cancelled = false;
+    getChaptersBySubjectTitle(formData.subject_title_id)
+      .then((list) => {
+        if (!cancelled) setChapters(Array.isArray(list) ? list : []);
+      })
+      .catch((err) => {
+        if (!cancelled) console.error("Error fetching chapters:", err);
+      });
+    return () => { cancelled = true; };
+  }, [formData.subject_title_id]);
+
   const fetchInitialData = async () => {
     try {
       const [subjectsData, boardsData, standardsData] = await Promise.all([
@@ -91,6 +113,7 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
       solution: question.solution || "",
       subject_id: question.subject_id || "",
       subject_title_id: question.subject_title_id || "",
+      chapter_id: question.chapter_id ?? question.chapter?.chapter_id ?? "",
       marks: question.marks || "",
       image: null,
     });
@@ -155,9 +178,11 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
     if (name === "image") {
       setFormData((prev) => ({ ...prev, image: files[0] || null }));
     } else if (name === "subject_id") {
-      setFormData((prev) => ({ ...prev, subject_id: value, subject_title_id: "" }));
+      setFormData((prev) => ({ ...prev, subject_id: value, subject_title_id: "", chapter_id: "" }));
     } else if (name === "standard" || name === "board_id") {
-      setFormData((prev) => ({ ...prev, [name]: value, subject_title_id: "" }));
+      setFormData((prev) => ({ ...prev, [name]: value, subject_title_id: "", chapter_id: "" }));
+    } else if (name === "subject_title_id") {
+      setFormData((prev) => ({ ...prev, [name]: value, chapter_id: "" }));
     } else {
       setFormData((prev) => ({ ...prev, [name]: value }));
     }
@@ -183,6 +208,7 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
       if (formData.solution) formDataToSend.append("solution", formData.solution);
       if (formData.subject_id) formDataToSend.append("subject_id", formData.subject_id);
       if (formData.subject_title_id) formDataToSend.append("subject_title_id", formData.subject_title_id);
+      if (formData.chapter_id) formDataToSend.append("chapter_id", formData.chapter_id);
       if (formData.marks) formDataToSend.append("marks", formData.marks);
       if (formData.image) formDataToSend.append("image", formData.image);
 
@@ -260,6 +286,7 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
     if (!formData.standard) newErrors.standard = "Standard is required";
     if (!formData.board_id) newErrors.board_id = "Board is required";
     if (!formData.subject_title_id) newErrors.subject_title_id = "Subject Title is required";
+    if (!formData.chapter_id) newErrors.chapter_id = "Chapter is required";
     if (!formData.question.trim()) newErrors.question = "Question is required";
     // Answer is optional for all question types — user can add a question without an answer
     if (questionType === "mcq") {
@@ -514,6 +541,92 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
                     </option>
                   ))}
                 </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Chapter <span className="text-red-500">*</span>
+                </label>
+                <div className="flex gap-2">
+                  <select
+                    name="chapter_id"
+                    value={formData.chapter_id}
+                    onChange={handleChange}
+                    className={`w-full px-4 py-3 border-2 rounded-lg focus:ring-2 focus:ring-blue-200 transition outline-none disabled:bg-gray-100 ${
+                      errors.chapter_id ? "border-red-300" : "border-gray-200 focus:border-blue-500"
+                    }`}
+                    required
+                    disabled={!formData.subject_title_id}
+                  >
+                    <option value="">
+                      {formData.subject_title_id ? "Select Chapter" : "Select subject title first"}
+                    </option>
+                    {chapters.map((ch) => (
+                      <option key={ch.chapter_id} value={ch.chapter_id}>
+                        {ch.chapter_name}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddChapter(true)}
+                    disabled={!formData.subject_title_id}
+                    className="shrink-0 px-3 py-3 border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition text-sm font-medium text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Add chapter"
+                  >
+                    <Plus className="w-5 h-5" />
+                  </button>
+                </div>
+                {showAddChapter && (
+                  <div className="mt-2 flex gap-2 items-center">
+                    <input
+                      type="text"
+                      value={newChapterName}
+                      onChange={(e) => setNewChapterName(e.target.value)}
+                      placeholder="New chapter name (max 200 chars)"
+                      maxLength={200}
+                      className="flex-1 px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none"
+                    />
+                    <button
+                      type="button"
+                      disabled={!newChapterName.trim() || addingChapter}
+                      onClick={async () => {
+                        if (!newChapterName.trim() || !formData.subject_title_id) return;
+                        setAddingChapter(true);
+                        try {
+                          const res = await createChapter({
+                            chapter_name: newChapterName.trim(),
+                            subject_title_id: Number(formData.subject_title_id),
+                          });
+                          const created = res?.chapter || res;
+                          if (created?.chapter_id) {
+                            setChapters((prev) => [...prev, { chapter_id: created.chapter_id, chapter_name: created.chapter_name, subject_title_id: created.subject_title_id }]);
+                            setFormData((prev) => ({ ...prev, chapter_id: String(created.chapter_id) }));
+                            setNewChapterName("");
+                            setShowAddChapter(false);
+                          }
+                        } catch (err) {
+                          setToast({ show: true, message: err.response?.data?.message || "Failed to create chapter", type: "error" });
+                        } finally {
+                          setAddingChapter(false);
+                        }
+                      }}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-medium"
+                    >
+                      {addingChapter ? "..." : "Add"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setShowAddChapter(false); setNewChapterName(""); }}
+                      className="px-3 py-2 text-gray-600 hover:bg-gray-100 rounded-lg text-sm"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+                {errors.chapter_id && (
+                  <p className="mt-1 text-sm text-red-600">{errors.chapter_id}</p>
+                )}
               </div>
 
               <div>

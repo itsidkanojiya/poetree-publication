@@ -179,6 +179,31 @@ export const rejectSubjectRequest = async (requestId, type) => {
   }
 };
 
+/**
+ * Remove a user's approved subject/subject-title selections (admin only).
+ * POST /api/admin/users/:userId/selections/remove
+ * Body: { user_subject_ids?: number[], user_subject_title_ids?: number[] }
+ * Uses row ids from user_subjects and user_subject_titles for that user.
+ */
+export const removeUserApprovedSelections = async (
+  userId,
+  { user_subject_ids = [], user_subject_title_ids = [] }
+) => {
+  const sid = Array.isArray(user_subject_ids) ? user_subject_ids : [];
+  const tid = Array.isArray(user_subject_title_ids) ? user_subject_title_ids : [];
+  if (sid.length === 0 && tid.length === 0) {
+    throw new Error("At least one of user_subject_ids or user_subject_title_ids must be non-empty");
+  }
+  const response = await apiClient.post(
+    `/admin/users/${userId}/selections/remove`,
+    {
+      ...(sid.length > 0 ? { user_subject_ids: sid } : {}),
+      ...(tid.length > 0 ? { user_subject_title_ids: tid } : {}),
+    }
+  );
+  return response.data;
+};
+
 // ==================== SUBJECT & SUBJECT TITLE ====================
 
 /**
@@ -286,6 +311,57 @@ export const deleteSubjectTitle = async (id) => {
     return response.data;
   } catch (error) {
     console.error("Error deleting subject title:", error);
+    throw error;
+  }
+};
+
+// ==================== CHAPTERS ====================
+
+/**
+ * List chapters by subject title
+ * GET /api/chapters?subject_title_id=:id
+ */
+export const getChaptersBySubjectTitle = async (subjectTitleId) => {
+  try {
+    const response = await apiClient.get("/chapters", {
+      params: { subject_title_id: Number(subjectTitleId) },
+    });
+    const data = response.data;
+    return Array.isArray(data?.chapters) ? data.chapters : data || [];
+  } catch (error) {
+    console.error("Error fetching chapters:", error);
+    throw error;
+  }
+};
+
+/**
+ * Create chapter
+ * POST /api/chapters
+ * Body: { chapter_name: string, subject_title_id: number }
+ */
+export const createChapter = async ({ chapter_name, subject_title_id }) => {
+  try {
+    const response = await apiClient.post("/chapters", {
+      chapter_name: String(chapter_name).trim(),
+      subject_title_id: Number(subject_title_id),
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error creating chapter:", error);
+    throw error;
+  }
+};
+
+/**
+ * Delete a chapter
+ * DELETE /api/chapters/:chapterId
+ */
+export const deleteChapter = async (chapterId) => {
+  try {
+    const response = await apiClient.delete(`/chapters/${Number(chapterId)}`);
+    return response.data;
+  } catch (error) {
+    console.error("Error deleting chapter:", error);
     throw error;
   }
 };
@@ -455,13 +531,22 @@ export const deleteAnimation = async (id) => {
 // ==================== QUESTION MANAGEMENT ====================
 
 /**
- * Get questions by type
- * GET /api/question?type={type}
+ * Get questions by type (and optional filters including chapter_id)
+ * GET /api/question?type={type}&chapter_id=1
  */
-export const getQuestionsByType = async (type) => {
+export const getQuestionsByType = async (type, filters = {}) => {
   try {
     const apiType = type === "true&false" ? "truefalse" : type;
-    const response = await apiClient.get(`/question?type=${apiType}`);
+    const params = new URLSearchParams();
+    params.append("type", apiType);
+    if (filters.chapter_id != null && filters.chapter_id !== "") {
+      const cid = Array.isArray(filters.chapter_id)
+        ? filters.chapter_id.join(",")
+        : String(filters.chapter_id);
+      if (cid) params.append("chapter_id", cid);
+    }
+    const query = params.toString();
+    const response = await apiClient.get(`/question?${query}`);
     // Handle both array and object response formats
     return response.data?.questions || response.data || [];
   } catch (error) {
@@ -539,10 +624,17 @@ export const getQuestionAnalysis = async () => {
 /**
  * Get all answer sheets
  * GET /api/answersheets
+ * @param {Object} filters - Optional { chapter_id: number }
  */
-export const getAllAnswerSheets = async () => {
+export const getAllAnswerSheets = async (filters = {}) => {
   try {
-    const response = await apiClient.get("/answersheets");
+    const params = new URLSearchParams();
+    if (filters.chapter_id != null && filters.chapter_id !== "") {
+      params.append("chapter_id", String(filters.chapter_id));
+    }
+    const query = params.toString();
+    const url = query ? `/answersheets?${query}` : "/answersheets";
+    const response = await apiClient.get(url);
     return response.data;
   } catch (error) {
     console.error("Error fetching answer sheets:", error);
@@ -587,10 +679,17 @@ export const deleteAnswerSheet = async (id) => {
 /**
  * Get all worksheets
  * GET /api/worksheets
+ * @param {Object} filters - Optional { chapter_id: number }
  */
-export const getAllWorksheets = async () => {
+export const getAllWorksheets = async (filters = {}) => {
   try {
-    const response = await apiClient.get("/worksheets");
+    const params = new URLSearchParams();
+    if (filters.chapter_id != null && filters.chapter_id !== "") {
+      params.append("chapter_id", String(filters.chapter_id));
+    }
+    const query = params.toString();
+    const url = query ? `/worksheets?${query}` : "/worksheets";
+    const response = await apiClient.get(url);
     return response.data;
   } catch (error) {
     console.error("Error fetching worksheets:", error);
@@ -669,6 +768,9 @@ export const createTemplate = async (templateData) => {
     formData.append("standard", String(templateData.standard || 0));
     formData.append("subject_id", String(templateData.subject_id || ""));
     formData.append("subject_title_id", String(templateData.subject_title_id || ""));
+    if (templateData.chapter_id != null && templateData.chapter_id !== "") {
+      formData.append("chapter_id", String(templateData.chapter_id));
+    }
     formData.append("board_id", String(templateData.board_id || ""));
     formData.append("subject", templateData.subject || "NA");
     formData.append("board", templateData.board || "NA");

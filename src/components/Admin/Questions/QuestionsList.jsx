@@ -7,6 +7,7 @@ import {
   getAllBoards,
   getAllSubjectTitles,
   getAllStandards,
+  getChaptersBySubjectTitle,
 } from "../../../services/adminService";
 import { Plus, Trash2, Search, Edit, Upload, Download, Eye, X } from "lucide-react";
 import Toast from "../../Common/Toast";
@@ -22,11 +23,13 @@ const QuestionsList = ({ questionType }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterSubjectId, setFilterSubjectId] = useState("");
   const [filterSubjectTitleId, setFilterSubjectTitleId] = useState("");
+  const [filterChapterId, setFilterChapterId] = useState("");
   const [filterBoardId, setFilterBoardId] = useState("");
   const [subjects, setSubjects] = useState([]);
   const [boards, setBoards] = useState([]);
   const [standards, setStandards] = useState([]);
   const [subjectTitles, setSubjectTitles] = useState([]);
+  const [chapters, setChapters] = useState([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
   const [selectedQuestion, setSelectedQuestion] = useState(null);
@@ -45,7 +48,7 @@ const QuestionsList = ({ questionType }) => {
 
   useEffect(() => {
     fetchQuestions();
-  }, [questionType]);
+  }, [questionType, filterChapterId]);
 
   useEffect(() => {
     const fetchFilters = async () => {
@@ -70,12 +73,31 @@ const QuestionsList = ({ questionType }) => {
 
   useEffect(() => {
     filterQuestions();
-  }, [questions, searchTerm, filterSubjectId, filterSubjectTitleId, filterBoardId]);
+  }, [questions, searchTerm, filterSubjectId, filterSubjectTitleId, filterChapterId, filterBoardId]);
+
+  // Fetch chapters when subject title filter is set (for chapter filter dropdown)
+  useEffect(() => {
+    if (!filterSubjectTitleId) {
+      setChapters([]);
+      return;
+    }
+    let cancelled = false;
+    getChaptersBySubjectTitle(filterSubjectTitleId)
+      .then((list) => {
+        if (!cancelled) setChapters(Array.isArray(list) ? list : []);
+      })
+      .catch((err) => {
+        if (!cancelled) console.error("Error fetching chapters:", err);
+      });
+    return () => { cancelled = true; };
+  }, [filterSubjectTitleId]);
 
   const fetchQuestions = async () => {
     try {
       setLoading(true);
-      const data = await getQuestionsByType(questionType);
+      const filters = {};
+      if (filterChapterId) filters.chapter_id = filterChapterId;
+      const data = await getQuestionsByType(questionType, filters);
       setQuestions(Array.isArray(data) ? data : []);
     } catch (error) {
       setToast({
@@ -119,6 +141,10 @@ const QuestionsList = ({ questionType }) => {
     if (filterSubjectTitleId) {
       const tid = Number(filterSubjectTitleId);
       filtered = filtered.filter((q) => Number(q.subject_title_id) === tid);
+    }
+    if (filterChapterId) {
+      const cid = Number(filterChapterId);
+      filtered = filtered.filter((q) => Number(q.chapter_id) === cid);
     }
     if (filterBoardId) {
       const bid = Number(filterBoardId);
@@ -301,7 +327,10 @@ const QuestionsList = ({ questionType }) => {
             </select>
             <select
               value={filterSubjectTitleId}
-              onChange={(e) => setFilterSubjectTitleId(e.target.value)}
+              onChange={(e) => {
+                setFilterSubjectTitleId(e.target.value);
+                setFilterChapterId("");
+              }}
               className="px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-white min-w-[140px]"
               title="Filter by Subject Title"
             >
@@ -309,6 +338,20 @@ const QuestionsList = ({ questionType }) => {
               {subjectTitles.map((st) => (
                 <option key={st.subject_title_id} value={st.subject_title_id}>
                   {st.title_name ?? st.subject_title_name ?? `ID ${st.subject_title_id}`}
+                </option>
+              ))}
+            </select>
+            <select
+              value={filterChapterId}
+              onChange={(e) => setFilterChapterId(e.target.value)}
+              disabled={!filterSubjectTitleId}
+              className="px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-white min-w-[130px] disabled:bg-gray-100"
+              title="Filter by Chapter (select subject title first)"
+            >
+              <option value="">{filterSubjectTitleId ? "Chapter: All" : "Chapter: —"}</option>
+              {chapters.map((ch) => (
+                <option key={ch.chapter_id} value={ch.chapter_id}>
+                  {ch.chapter_name}
                 </option>
               ))}
             </select>
@@ -377,6 +420,7 @@ const QuestionsList = ({ questionType }) => {
                 <th className="px-6 py-4 text-left text-sm font-semibold">Question</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold">Answer</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold">Subject</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold">Chapter</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold">Standard</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold">Marks</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold">Actions</th>
@@ -385,7 +429,7 @@ const QuestionsList = ({ questionType }) => {
             <tbody className="divide-y divide-gray-200">
               {filteredQuestions.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan="7" className="px-6 py-8 text-center text-gray-500">
                     No questions found
                   </td>
                 </tr>
@@ -406,6 +450,9 @@ const QuestionsList = ({ questionType }) => {
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">
                       {getSubjectName(question.subject) || "N/A"}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-600">
+                      {question.chapter?.chapter_name ?? question.chapter_name ?? (question.chapter_id ? `ID ${question.chapter_id}` : "—")}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">
                       {getStandardName(question.standard) || "N/A"}

@@ -3,12 +3,15 @@ import {
   getSubjectRequests,
   approveUserSelections,
   rejectSubjectRequest,
+  removeUserApprovedSelections,
 } from "../../services/adminService";
 import {
   BookOpen,
   CheckCircle,
   XCircle,
   Users,
+  X,
+  RefreshCw,
 } from "lucide-react";
 import Toast from "../Common/Toast";
 import Loader from "../Common/loader/loader";
@@ -19,6 +22,8 @@ const AdminSubjectRequests = () => {
   const [error, setError] = useState(null);
   const [toast, setToast] = useState(null);
   const [expandedUser, setExpandedUser] = useState(null);
+  const [removingId, setRemovingId] = useState(null);
+  const [confirmRemove, setConfirmRemove] = useState(null);
 
   useEffect(() => {
     fetchRequests();
@@ -93,6 +98,80 @@ const AdminSubjectRequests = () => {
         message: err.response?.data?.message || "Failed to reject request",
         type: "error",
       });
+    }
+  };
+
+  const getSubjectRowId = (subject) =>
+    subject.id ??
+    subject.user_subject_id ??
+    subject.user_subjects_id ??
+    subject.user_subjects?.id ??
+    subject.UserSubject?.id;
+  const getTitleRowId = (title) =>
+    title.id ??
+    title.user_subject_title_id ??
+    title.user_subject_titles_id ??
+    title.user_subject_titles?.id ??
+    title.UserSubjectTitle?.id;
+
+  const handleRemoveApprovedSubjectClick = (userId, subject) => {
+    const rowId = getSubjectRowId(subject);
+    if (userId == null) return;
+    if (rowId == null) {
+      setToast({
+        message: "Cannot remove: backend did not return row id. Ensure GET /api/admin/subject-requests includes 'id' for each approved subject.",
+        type: "error",
+      });
+      return;
+    }
+    setConfirmRemove({
+      type: "subject",
+      userId,
+      rowId,
+      name: subject.subject_name || "this subject",
+    });
+  };
+
+  const handleRemoveApprovedSubjectTitleClick = (title, userId) => {
+    const rowId = getTitleRowId(title);
+    if (userId == null) return;
+    if (rowId == null) {
+      setToast({
+        message: "Cannot remove: backend did not return row id. Ensure GET /api/admin/subject-requests includes 'id' for each approved subject title.",
+        type: "error",
+      });
+      return;
+    }
+    setConfirmRemove({
+      type: "subject_title",
+      userId,
+      rowId,
+      name: title.subject_title_name || title.subject_title_name || "this subject title",
+    });
+  };
+
+  const handleRemoveConfirm = async () => {
+    if (!confirmRemove) return;
+    const { type, userId, rowId } = confirmRemove;
+    setConfirmRemove(null);
+    const key = type === "subject" ? `subject-${userId}-${rowId}` : `title-${userId}-${rowId}`;
+    setRemovingId(key);
+    try {
+      if (type === "subject") {
+        await removeUserApprovedSelections(userId, { user_subject_ids: [Number(rowId)] });
+        setToast({ message: "Approved subject removed.", type: "success" });
+      } else {
+        await removeUserApprovedSelections(userId, { user_subject_title_ids: [Number(rowId)] });
+        setToast({ message: "Approved subject title removed.", type: "success" });
+      }
+      fetchRequests();
+    } catch (err) {
+      setToast({
+        message: err.response?.data?.message || "Failed to remove selection",
+        type: "error",
+      });
+    } finally {
+      setRemovingId(null);
     }
   };
 
@@ -279,19 +358,39 @@ const AdminSubjectRequests = () => {
                             </div>
                             <div className="space-y-2">
                               {requestGroup.requests.subjects.approved.map(
-                                (subject, idx) => (
-                                  <div
-                                    key={idx}
-                                    className="p-4 bg-green-50 border border-green-200 rounded-lg"
-                                  >
-                                    <p className="font-medium text-gray-800">
-                                      {subject.subject_name || "N/A"}
-                                    </p>
-                                    <p className="text-sm text-gray-600">
-                                      Standard: {subject.standard || "N/A"}
-                                    </p>
-                                  </div>
-                                )
+                                (subject, idx) => {
+                                  const rowId = getSubjectRowId(subject);
+                                  const key = rowId != null ? `subject-${requestGroup.user?.id}-${rowId}` : null;
+                                  const isRemoving = key && removingId === key;
+                                  return (
+                                    <div
+                                      key={subject.id ?? subject.subject_id ?? idx}
+                                      className="flex items-center justify-between p-4 bg-green-50 border border-green-200 rounded-lg"
+                                    >
+                                      <div>
+                                        <p className="font-medium text-gray-800">
+                                          {subject.subject_name || "N/A"}
+                                        </p>
+                                        <p className="text-sm text-gray-600">
+                                          Standard: {subject.standard || "N/A"}
+                                        </p>
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleRemoveApprovedSubjectClick(requestGroup.user?.id, subject)}
+                                        disabled={!!removingId}
+                                        className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition disabled:opacity-50"
+                                        title={rowId != null ? "Remove from approved selections" : "Remove (requires backend to return row id)"}
+                                      >
+                                        {isRemoving ? (
+                                          <RefreshCw size={18} className="animate-spin" />
+                                        ) : (
+                                          <X size={18} />
+                                        )}
+                                      </button>
+                                    </div>
+                                  );
+                                }
                               )}
                             </div>
                           </div>
@@ -393,20 +492,40 @@ const AdminSubjectRequests = () => {
                             </div>
                             <div className="space-y-2">
                               {requestGroup.requests.subject_titles.approved.map(
-                                (title, idx) => (
-                                  <div
-                                    key={idx}
-                                    className="p-4 bg-green-50 border border-green-200 rounded-lg"
-                                  >
-                                    <p className="font-medium text-gray-800">
-                                      {title.subject_title_name || "N/A"}
-                                    </p>
-                                    <p className="text-sm text-gray-600">
-                                      Subject: {title.subject_name || "N/A"} | Standard:{" "}
-                                      {title.standard || "N/A"}
-                                    </p>
-                                  </div>
-                                )
+                                (title, idx) => {
+                                  const rowId = getTitleRowId(title);
+                                  const key = rowId != null ? `title-${requestGroup.user?.id}-${rowId}` : null;
+                                  const isRemoving = key && removingId === key;
+                                  return (
+                                    <div
+                                      key={title.id ?? title.subject_title_id ?? idx}
+                                      className="flex items-center justify-between p-4 bg-green-50 border border-green-200 rounded-lg"
+                                    >
+                                      <div>
+                                        <p className="font-medium text-gray-800">
+                                          {title.subject_title_name || "N/A"}
+                                        </p>
+                                        <p className="text-sm text-gray-600">
+                                          Subject: {title.subject_name || "N/A"} | Standard:{" "}
+                                          {title.standard || "N/A"}
+                                        </p>
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleRemoveApprovedSubjectTitleClick(title, requestGroup.user?.id)}
+                                        disabled={!!removingId}
+                                        className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition disabled:opacity-50"
+                                        title={rowId != null ? "Remove from approved selections" : "Remove (requires backend to return row id)"}
+                                      >
+                                        {isRemoving ? (
+                                          <RefreshCw size={18} className="animate-spin" />
+                                        ) : (
+                                          <X size={18} />
+                                        )}
+                                      </button>
+                                    </div>
+                                  );
+                                }
                               )}
                             </div>
                           </div>
@@ -447,6 +566,34 @@ const AdminSubjectRequests = () => {
           )}
         </div>
       </div>
+
+      {/* Custom confirm modal for removing approved selection */}
+      {confirmRemove && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[100]">
+          <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full mx-4 p-6">
+            <h4 className="text-lg font-bold text-gray-800 mb-2">Remove approved selection?</h4>
+            <p className="text-gray-600 text-sm mb-6">
+              Remove &ldquo;{confirmRemove.name}&rdquo; from this user&apos;s selections. They can request it again later.
+            </p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setConfirmRemove(null)}
+                className="flex-1 px-4 py-3 bg-gray-200 text-gray-800 rounded-xl font-medium hover:bg-gray-300 transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleRemoveConfirm}
+                className="flex-1 px-4 py-3 bg-red-600 text-white rounded-xl font-medium hover:bg-red-700 transition"
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

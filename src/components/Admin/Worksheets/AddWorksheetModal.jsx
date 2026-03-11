@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { X } from "lucide-react";
-import { addWorksheet, getAllSubjects, getAllBoards, getSubjectTitlesBySubjectAndContext, getAllStandards } from "../../../services/adminService";
+import { addWorksheet, getAllSubjects, getAllBoards, getSubjectTitlesBySubjectAndContext, getAllStandards, getChaptersBySubjectTitle } from "../../../services/adminService";
 import Toast from "../../Common/Toast";
 
 const AddWorksheetModal = ({ onClose, onSuccess }) => {
@@ -8,6 +8,7 @@ const AddWorksheetModal = ({ onClose, onSuccess }) => {
     standard: "",
     subject_id: "",
     subject_title_id: "",
+    chapter_id: "",
     board_id: "",
     worksheet_url: null,
     worksheet_coverlink: null,
@@ -16,6 +17,7 @@ const AddWorksheetModal = ({ onClose, onSuccess }) => {
   const [boards, setBoards] = useState([]);
   const [standards, setStandards] = useState([]);
   const [subjectTitles, setSubjectTitles] = useState([]);
+  const [chapters, setChapters] = useState([]);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [toast, setToast] = useState({ show: false, message: "", type: "error" });
@@ -65,16 +67,34 @@ const AddWorksheetModal = ({ onClose, onSuccess }) => {
     }
   }, [formData.subject_id, formData.standard, formData.board_id]);
 
+  useEffect(() => {
+    if (!formData.subject_title_id) {
+      setChapters([]);
+      return;
+    }
+    let cancelled = false;
+    getChaptersBySubjectTitle(formData.subject_title_id)
+      .then((list) => {
+        if (!cancelled) setChapters(Array.isArray(list) ? list : []);
+      })
+      .catch((err) => {
+        if (!cancelled) console.error("Error fetching chapters:", err);
+      });
+    return () => { cancelled = true; };
+  }, [formData.subject_title_id]);
+
   const handleChange = (e) => {
     const { name, value, files } = e.target;
     if (name === "worksheet_url" || name === "worksheet_coverlink") {
       setFormData((prev) => ({ ...prev, [name]: files[0] || null }));
     } else if (name === "subject_id") {
-      setFormData((prev) => ({ ...prev, subject_id: value, subject_title_id: "", standard: "" }));
+      setFormData((prev) => ({ ...prev, subject_id: value, subject_title_id: "", chapter_id: "", standard: "" }));
     } else if (name === "standard") {
-      setFormData((prev) => ({ ...prev, standard: value, subject_title_id: "" }));
+      setFormData((prev) => ({ ...prev, standard: value, subject_title_id: "", chapter_id: "" }));
     } else if (name === "board_id") {
-      setFormData((prev) => ({ ...prev, board_id: value, subject_title_id: "" }));
+      setFormData((prev) => ({ ...prev, board_id: value, subject_title_id: "", chapter_id: "" }));
+    } else if (name === "subject_title_id") {
+      setFormData((prev) => ({ ...prev, [name]: value, chapter_id: "" }));
     } else {
       setFormData((prev) => ({ ...prev, [name]: value }));
     }
@@ -101,7 +121,10 @@ const AddWorksheetModal = ({ onClose, onSuccess }) => {
       formDataToSend.append("board_id", formData.board_id);
       formDataToSend.append("subject_title_id", formData.subject_title_id);
       formDataToSend.append("standard", formData.standard);
-      
+      if (formData.chapter_id) {
+        formDataToSend.append("chapter_id", formData.chapter_id);
+      }
+
       // Optional user_id
       if (userId) {
         formDataToSend.append("user_id", userId);
@@ -267,6 +290,26 @@ const AddWorksheetModal = ({ onClose, onSuccess }) => {
               {errors.subject_title_id && (
                 <p className="mt-1 text-sm text-red-600">{errors.subject_title_id}</p>
               )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Chapter (Optional)
+              </label>
+              <select
+                name="chapter_id"
+                value={formData.chapter_id}
+                onChange={handleChange}
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-200 transition outline-none disabled:bg-gray-100"
+                disabled={!formData.subject_title_id}
+              >
+                <option value="">No chapter</option>
+                {chapters.map((ch) => (
+                  <option key={ch.chapter_id} value={ch.chapter_id}>
+                    {ch.chapter_name}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div>

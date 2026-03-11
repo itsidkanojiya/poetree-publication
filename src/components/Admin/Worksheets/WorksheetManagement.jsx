@@ -2,8 +2,8 @@ import { useState, useEffect } from "react";
 import {
   getAllWorksheets,
   deleteWorksheet,
-  getAllSubjects,
-  getAllBoards,
+  getAllSubjectTitles,
+  getChaptersBySubjectTitle,
 } from "../../../services/adminService";
 import { Plus, Trash2, Search, FileText, Eye } from "lucide-react";
 import Toast from "../../Common/Toast";
@@ -15,6 +15,10 @@ const WorksheetManagement = () => {
   const [filteredWorksheets, setFilteredWorksheets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [filterSubjectTitleId, setFilterSubjectTitleId] = useState("");
+  const [filterChapterId, setFilterChapterId] = useState("");
+  const [subjectTitles, setSubjectTitles] = useState([]);
+  const [chapters, setChapters] = useState([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedWorksheet, setSelectedWorksheet] = useState(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -22,17 +26,48 @@ const WorksheetManagement = () => {
 
   useEffect(() => {
     fetchWorksheets();
-  }, []);
+  }, [filterChapterId]);
 
   useEffect(() => {
     filterWorksheets();
-  }, [worksheets, searchTerm]);
+  }, [worksheets, searchTerm, filterSubjectTitleId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    getAllSubjectTitles()
+      .then((data) => {
+        const list = Array.isArray(data) ? data : data?.subject_titles ?? data?.data ?? [];
+        if (!cancelled) setSubjectTitles(list);
+      })
+      .catch((err) => {
+        if (!cancelled) console.error("Error fetching subject titles:", err);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if (!filterSubjectTitleId) {
+      setChapters([]);
+      return;
+    }
+    let cancelled = false;
+    getChaptersBySubjectTitle(filterSubjectTitleId)
+      .then((list) => {
+        if (!cancelled) setChapters(Array.isArray(list) ? list : []);
+      })
+      .catch((err) => {
+        if (!cancelled) console.error("Error fetching chapters:", err);
+      });
+    return () => { cancelled = true; };
+  }, [filterSubjectTitleId]);
 
   const fetchWorksheets = async () => {
     try {
       setLoading(true);
-      const data = await getAllWorksheets();
-      setWorksheets(Array.isArray(data) ? data : []);
+      const filters = {};
+      if (filterChapterId) filters.chapter_id = filterChapterId;
+      const data = await getAllWorksheets(filters);
+      setWorksheets(Array.isArray(data) ? data : data?.worksheets ?? []);
     } catch (error) {
       setToast({
         show: true,
@@ -45,19 +80,22 @@ const WorksheetManagement = () => {
   };
 
   const filterWorksheets = () => {
-    if (!searchTerm) {
-      setFilteredWorksheets(worksheets);
-      return;
+    let filtered = worksheets;
+    if (filterSubjectTitleId) {
+      const tid = Number(filterSubjectTitleId);
+      filtered = filtered.filter((w) => Number(w.subject_title_id) === tid);
     }
-
-    const filtered = worksheets.filter(
-      (worksheet) =>
-        worksheet.subject?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        worksheet.subject_title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        worksheet.standard?.toString().includes(searchTerm) ||
-        worksheet.standard_name?.toString().includes(searchTerm) ||
-        worksheet.board?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    if (searchTerm) {
+      filtered = filtered.filter(
+        (worksheet) =>
+          worksheet.subject?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          worksheet.subject_title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          worksheet.standard?.toString().includes(searchTerm) ||
+          worksheet.standard_name?.toString().includes(searchTerm) ||
+          worksheet.board?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (worksheet.chapter?.chapter_name ?? worksheet.chapter_name ?? "")?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
     setFilteredWorksheets(filtered);
   };
 
@@ -117,13 +155,45 @@ const WorksheetManagement = () => {
         </button>
       </div>
 
-      {/* Search Bar */}
-      <div className="mb-6">
-        <div className="relative">
+      {/* Filters + Search */}
+      <div className="mb-6 flex flex-col sm:flex-row gap-3">
+        <div className="flex flex-wrap gap-2 shrink-0">
+          <select
+            value={filterSubjectTitleId}
+            onChange={(e) => {
+              setFilterSubjectTitleId(e.target.value);
+              setFilterChapterId("");
+            }}
+            className="px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-white min-w-[160px]"
+            title="Filter by Subject Title"
+          >
+            <option value="">Subject Title: All</option>
+            {subjectTitles.map((t) => (
+              <option key={t.subject_title_id ?? t.id} value={t.subject_title_id ?? t.id}>
+                {t.title_name ?? t.subject_title_name ?? t.name ?? `ID ${t.subject_title_id ?? t.id}`}
+              </option>
+            ))}
+          </select>
+          <select
+            value={filterChapterId}
+            onChange={(e) => setFilterChapterId(e.target.value)}
+            disabled={!filterSubjectTitleId}
+            className="px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-white min-w-[140px] disabled:bg-gray-100"
+            title="Filter by Chapter"
+          >
+            <option value="">Chapter: All</option>
+            {chapters.map((ch) => (
+              <option key={ch.chapter_id} value={ch.chapter_id}>
+                {ch.chapter_name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="relative flex-1 min-w-0">
           <Search className="absolute left-3 top-3.5 w-5 h-5 text-gray-400" />
           <input
             type="text"
-            placeholder="Search by subject, standard, or board..."
+            placeholder="Search by subject, standard, board, or chapter..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition outline-none"
@@ -168,6 +238,11 @@ const WorksheetManagement = () => {
                 {worksheet.subject_title && (
                   <p className="text-sm text-gray-600 mb-1">
                     {worksheet.subject_title}
+                  </p>
+                )}
+                {(worksheet.chapter?.chapter_name ?? worksheet.chapter_name) && (
+                  <p className="text-sm text-gray-500 mb-1">
+                    Chapter: {worksheet.chapter?.chapter_name ?? worksheet.chapter_name}
                   </p>
                 )}
                 <div className="flex items-center gap-4 text-sm text-gray-500 mb-4">

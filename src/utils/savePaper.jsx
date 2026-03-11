@@ -47,6 +47,8 @@ export const savePaper = async (
       if (headerData.timing) formData.append("timing", headerData.timing);
       if (headerData.division) formData.append("division", headerData.division);
       if (headerData.subjectTitle) formData.append("subject_title_id", headerData.subjectTitle);
+      const chapterId = headerData.chapterId ?? headerData.chapter_id;
+      if (chapterId != null && chapterId !== "") formData.append("chapter_id", String(chapterId));
       formData.append("paper_title", headerData.documentTitle || "");
     } else {
       formData.append("standard", 0);

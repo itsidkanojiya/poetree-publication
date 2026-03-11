@@ -23,3 +23,25 @@ export const getMyApprovedSelections = async () => {
     throw error;
   }
 };
+
+/**
+ * Remove approved subject and/or subject-title selections.
+ * POST /api/auth/my-selections/remove
+ * Body: { user_subject_ids?: number[], user_subject_title_ids?: number[] }
+ * At least one array must be non-empty. Uses row ids from user_subjects / user_subject_titles.
+ */
+export const removeApprovedSelections = async ({
+  user_subject_ids = [],
+  user_subject_title_ids = [],
+}) => {
+  const ids = Array.isArray(user_subject_ids) ? user_subject_ids : [];
+  const titleIds = Array.isArray(user_subject_title_ids) ? user_subject_title_ids : [];
+  if (ids.length === 0 && titleIds.length === 0) {
+    throw new Error("At least one of user_subject_ids or user_subject_title_ids must be non-empty");
+  }
+  const response = await apiClient.post("/auth/my-selections/remove", {
+    ...(ids.length > 0 ? { user_subject_ids: ids } : {}),
+    ...(titleIds.length > 0 ? { user_subject_title_ids: titleIds } : {}),
+  });
+  return response.data;
+};
