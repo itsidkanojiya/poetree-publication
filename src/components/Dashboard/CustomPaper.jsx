@@ -671,6 +671,10 @@ const CustomPaper = () => {
             : effectiveHeader.standard;
           params.append("standard", String(standardVal));
         }
+        const chapterId = effectiveHeader?.chapterId ?? effectiveHeader?.chapter_id;
+        if (chapterId != null && chapterId !== "") {
+          params.append("chapter_id", String(chapterId));
+        }
 
         const response = await apiClient.get(`/question?${params.toString()}`);
 
@@ -688,7 +692,7 @@ const CustomPaper = () => {
     };
 
     fetchFilteredQuestions();
-  }, [approvedSubjectIds, header?.board, header?.subjectTitle, header?.standard, paperHeader?.board, paperHeader?.subjectTitle, paperHeader?.standard]);
+  }, [approvedSubjectIds, header?.board, header?.subjectTitle, header?.standard, header?.chapterId, header?.chapter_id, paperHeader?.board, paperHeader?.subjectTitle, paperHeader?.standard, paperHeader?.chapterId, paperHeader?.chapter_id]);
 
   // When no question type is selected, show all questions in mixed order
   useEffect(() => {

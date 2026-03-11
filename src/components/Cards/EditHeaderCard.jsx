@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from "react";
 import { Upload, Image } from "lucide-react";
 import apiClient from "../../services/apiClient";
+import { getChaptersBySubjectTitle } from "../../services/adminService";
 
 const EditHeaderCard = ({ editedHeader, handleInputChange, lockContextFields = false }) => {
   const [approvedSubjects, setApprovedSubjects] = useState([]);
   const [approvedSubjectTitles, setApprovedSubjectTitles] = useState([]);
   const [boards, setBoards] = useState([]);
+  const [chapters, setChapters] = useState([]);
   const [loadingSubjects, setLoadingSubjects] = useState(true);
+  const [loadingChapters, setLoadingChapters] = useState(false);
 
   // Fetch boards
   useEffect(() => {
@@ -23,6 +26,33 @@ const EditHeaderCard = ({ editedHeader, handleInputChange, lockContextFields = f
 
     fetchBoards();
   }, []);
+
+  // Fetch chapters when subject title is selected (subjectTitleId defined below with fieldOrder)
+  useEffect(() => {
+    const stId = editedHeader?.subjectTitle != null && editedHeader?.subjectTitle !== ""
+      ? editedHeader.subjectTitle
+      : null;
+    if (!stId) {
+      setChapters([]);
+      return;
+    }
+    let cancelled = false;
+    setLoadingChapters(true);
+    getChaptersBySubjectTitle(stId)
+      .then((list) => {
+        if (!cancelled) setChapters(Array.isArray(list) ? list : []);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          console.error("Error fetching chapters:", err);
+          setChapters([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingChapters(false);
+      });
+    return () => { cancelled = true; };
+  }, [editedHeader?.subjectTitle]);
 
   // Fetch approved subjects
   useEffect(() => {
@@ -166,8 +196,13 @@ const EditHeaderCard = ({ editedHeader, handleInputChange, lockContextFields = f
     image: "School Logo",
     board: "Board",
     subjectTitle: "Subject Title",
+    chapterId: "Chapter",
     documentTitle: "Paper Title",
   };
+
+  const subjectTitleId = editedHeader?.subjectTitle != null && editedHeader?.subjectTitle !== ""
+    ? editedHeader.subjectTitle
+    : null;
 
   // Always include essential fields even if they don't exist in header
   const allFields = new Set(editedHeader ? Object.keys(editedHeader) : []);
@@ -178,12 +213,15 @@ const EditHeaderCard = ({ editedHeader, handleInputChange, lockContextFields = f
   essentialFields.forEach((field) => {
     if (!allFields.has(field)) allFields.add(field);
   });
+  // Show chapter when subject title is selected (optional classification)
+  if (subjectTitleId) allFields.add("chapterId");
 
   // Define field order for better UX
   // Note: image, schoolName, address, studentName, rollNo are excluded - they come from user profile or are not needed
   const fieldOrder = [
     "subject",
     "subjectTitle",
+    "chapterId",
     "board",
     "class",
     "documentTitle",
@@ -236,8 +274,8 @@ const EditHeaderCard = ({ editedHeader, handleInputChange, lockContextFields = f
         )
           return null;
 
-        // When context is set, only allow choosing the date; everything else comes from context
-        if (lockContextFields && key !== "date") {
+        // When context is set, only allow choosing the date and chapter; everything else comes from context
+        if (lockContextFields && key !== "date" && key !== "chapterId") {
           return null;
         }
 
@@ -462,6 +500,32 @@ const EditHeaderCard = ({ editedHeader, handleInputChange, lockContextFields = f
                       <option key={title.id} value={title.id}>
                         {title.name}{" "}
                         {title.subject_name ? `(${title.subject_name})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            ) : key === "chapterId" ? (
+              // Chapter: chapters for the current subject title; filter questions by chapter
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  {fieldLabels[key] || "Chapter"}
+                </label>
+                <p className="text-xs text-gray-500 mb-1.5">Chapters for your current subject title</p>
+                {loadingChapters ? (
+                  <div className="w-full border-2 border-gray-200 p-3 rounded-lg bg-gray-50 text-gray-500 text-sm">
+                    Loading chapters...
+                  </div>
+                ) : (
+                  <select
+                    value={editedHeader[key] ?? ""}
+                    onChange={(e) => handleInputChange(e, key)}
+                    className="w-full border-2 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 p-3 rounded-lg transition outline-none bg-white"
+                  >
+                    <option value="">All chapters (no filter)</option>
+                    {chapters.map((ch) => (
+                      <option key={ch.chapter_id} value={ch.chapter_id}>
+                        {ch.chapter_name}
                       </option>
                     ))}
                   </select>

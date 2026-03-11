@@ -58,6 +58,7 @@ const EditHeader = () => {
               subject: ctx?.subject_name ?? paper.subject ?? "",
               board: ctx?.board_id ?? ctx?.board_name ?? paper.board ?? "",
               subjectTitle: ctx?.subject_title_id ?? paper.subject_title_id ?? null,
+              chapterId: paper.chapter_id ?? paper.chapterId ?? "",
               documentTitle: paper.paper_title || "",
               class: classDisplay,
             };
@@ -79,6 +80,7 @@ const EditHeader = () => {
           subject: ctx?.subject_name ?? headerData.subject ?? "",
           board: ctx?.board_id ?? ctx?.board_name ?? headerData.board ?? "",
           subjectTitle: ctx?.subject_title_id ?? headerData.subjectTitle ?? null,
+          chapterId: headerData.chapterId ?? headerData.chapter_id ?? "",
           standard: ctx?.standard ?? headerData.standard ?? "",
           class: classDisplay,
         });
@@ -93,6 +95,7 @@ const EditHeader = () => {
           subject: ctx?.subject_name ?? header.subject ?? "",
           board: ctx?.board_id ?? ctx?.board_name ?? header.board ?? "",
           subjectTitle: ctx?.subject_title_id ?? header.subjectTitle ?? "",
+          chapterId: header.chapterId ?? header.chapter_id ?? "",
           standard: ctx?.standard ?? header.standard ?? "",
           class: classDisplay,
         });
@@ -106,6 +109,7 @@ const EditHeader = () => {
           address: userAddress,
           subject: ctx?.subject_name ?? "",
           subjectTitle: ctx?.subject_title_id ?? null,
+          chapterId: "",
           board: ctx?.board_id ?? "",
           class: classDisplay,
           documentTitle: "",
@@ -130,7 +134,11 @@ const EditHeader = () => {
     if (["schoolName", "address", "image"].includes(field)) {
       return;
     }
-    setEditedHeader({ ...editedHeader, [field]: e.target.value });
+    const value = e.target.value;
+    const next = { ...editedHeader, [field]: value };
+    // When subject title changes, clear chapter so it stays consistent with the new title
+    if (field === "subjectTitle") next.chapterId = "";
+    setEditedHeader(next);
   };
 
   const handleClear = () => {
