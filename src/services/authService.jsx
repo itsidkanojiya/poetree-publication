@@ -88,6 +88,8 @@ export const updateProfile = async (profileData) => {
   }
 };
 
+const WATERMARK_TYPES = ["none", "text", "image", "text_and_image"];
+
 /**
  * Update worksheet watermark opacity (0–1). Used for personalized worksheet PDFs.
  * Sends JSON body; backend stores and uses this when generating worksheet PDFs.
@@ -97,5 +99,40 @@ export const updateWorksheetWatermarkOpacity = async (value) => {
   const response = await apiClient.put("/auth/profile", {
     worksheet_watermark_opacity: clamped,
   });
+  return response.data;
+};
+
+/**
+ * Update worksheet watermark settings: type (none | text | image | text_and_image),
+ * optional custom text, and opacity (0–1). Sends JSON to PUT /auth/profile.
+ */
+export const updateWorksheetWatermarkSettings = async (payload) => {
+  const body = {};
+  if (payload.type != null) {
+    const type = String(payload.type).toLowerCase();
+    if (!WATERMARK_TYPES.includes(type)) {
+      throw new Error(`Invalid watermark type: ${payload.type}`);
+    }
+    body.worksheet_watermark_type = type;
+  }
+  if (payload.text !== undefined) {
+    body.worksheet_watermark_text =
+      payload.text == null ? "" : String(payload.text).trim().slice(0, 200);
+  }
+  if (payload.opacity != null) {
+    body.worksheet_watermark_opacity = Math.min(
+      1,
+      Math.max(0, Number(payload.opacity))
+    );
+  }
+  if (payload.rotation != null) {
+    const rot = Number(payload.rotation);
+    body.worksheet_watermark_rotation = Math.min(180, Math.max(-180, rot));
+  }
+  if (payload.bend != null) {
+    const bend = Number(payload.bend);
+    body.worksheet_watermark_bend = Math.min(20, Math.max(-20, bend));
+  }
+  const response = await apiClient.put("/auth/profile", body);
   return response.data;
 };
