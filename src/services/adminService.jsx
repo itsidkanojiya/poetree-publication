@@ -461,10 +461,16 @@ export const deleteStandard = async (id) => {
 /**
  * Get all animations (no auth – for user Animations page)
  * GET /api/animations
+ * @param {{ chapter_id?: number }} [params] - Optional filter by chapter_id
  */
-export const getAnimations = async () => {
+export const getAnimations = async (params = {}) => {
   try {
-    const response = await apiClient.get("/animations");
+    const query = new URLSearchParams();
+    if (params.chapter_id != null && params.chapter_id !== "") {
+      query.append("chapter_id", String(params.chapter_id));
+    }
+    const url = query.toString() ? `/animations?${query.toString()}` : "/animations";
+    const response = await apiClient.get(url);
     const data = response.data;
     const list = Array.isArray(data?.animations) ? data.animations : data;
     return list || [];

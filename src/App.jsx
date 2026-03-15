@@ -40,6 +40,10 @@ import AnimationsManagement from "./components/Admin/Animations/AnimationsManage
 import BrowseTemplates from "./components/Dashboard/BrowseTemplates";
 import ViewTemplate from "./components/Dashboard/ViewTemplate";
 import CustomizePaper from "./components/Dashboard/CustomizePaper";
+import QuizzesList from "./pages/QuizzesList";
+import CreateQuiz from "./pages/CreateQuiz";
+import QuizDetail from "./pages/QuizDetail";
+import EditQuiz from "./pages/EditQuiz";
 
 function App() {
   return (
@@ -73,6 +77,10 @@ function App() {
           <Route path="custompaper" element={<CustomPaper />} />
         </Route>
         <Route path="history" element={<History />} />
+        <Route path="quizzes" element={<QuizzesList />} />
+        <Route path="quizzes/new" element={<CreateQuiz />} />
+        <Route path="quizzes/:id" element={<QuizDetail />} />
+        <Route path="quizzes/:id/edit" element={<EditQuiz />} />
         <Route path="view/:id" element={<ViewPaperPage />} />
         <Route path="profile" element={<Profile />} />
         <Route path="edit-profile" element={<EditProfile />} />

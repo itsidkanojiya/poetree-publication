@@ -8,7 +8,8 @@ export const savePaper = async (
   headerData = null,
   marksPerType = null,
   questionSections = null,
-  paperTitle = null
+  paperTitle = null,
+  chapterIds = null
 ) => {
   try {
     if (!user || !user.id) {
@@ -63,6 +64,11 @@ export const savePaper = async (
       ? JSON.stringify(questionIds) 
       : questionIds; // Fallback if already a string
     formData.append("body", bodyContent);
+
+    // Chapter IDs from selected questions (chapters that have questions in this paper)
+    if (chapterIds && Array.isArray(chapterIds) && chapterIds.length > 0) {
+      formData.append("chapter_ids", JSON.stringify(chapterIds));
+    }
 
     // Calculate and add marks for each question type
     if (questionSections && marksPerType) {

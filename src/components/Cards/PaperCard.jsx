@@ -1,8 +1,9 @@
 import React, { useState } from "react";
-import { Eye, Trash2, Edit, Calendar, FileText } from "lucide-react";
+import { Eye, Trash2, Edit, Calendar, FileText, FileDown, ChevronDown } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { API_ORIGIN } from "../../config/api";
 import { usePaper } from "../../context/PaperContext";
+import { getQuizPaperPdf, getQuizAnswerKey, getQuizOmrSheet } from "../../services/quizService";
 
 const PaperCard = ({
   id,
@@ -25,6 +26,8 @@ const PaperCard = ({
   const { deletePaper } = usePaper();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
   const paperDate = created_at || date;
   const formattedDate = paperDate
@@ -54,6 +57,10 @@ const PaperCard = ({
   };
 
   const handleView = () => {
+    if (type === "quiz") {
+      navigate(`/dashboard/quizzes/${id}`);
+      return;
+    }
     const htmlBody = body ?? paper.paper_body ?? paper.body ?? "";
     navigate(`/dashboard/view/${id}`, {
       state: {
@@ -64,6 +71,10 @@ const PaperCard = ({
   };
 
   const handleEdit = () => {
+    if (type === "quiz") {
+      navigate(`/dashboard/quizzes/${id}/edit`);
+      return;
+    }
     // Navigate to edit header first, then to paper editing
     if (type === "custom") {
       // Navigate to edit header with paper data
@@ -121,7 +132,9 @@ const PaperCard = ({
         {/* Header with Type Badge */}
         <div
           className={`${
-            type === "custom"
+            type === "quiz"
+              ? "bg-gradient-to-r from-amber-500 to-orange-600"
+              : type === "custom"
               ? "bg-gradient-to-r from-green-500 to-emerald-600"
               : "bg-gradient-to-r from-blue-500 to-indigo-600"
           } text-white px-4 py-3 flex items-center justify-between`}
@@ -129,7 +142,7 @@ const PaperCard = ({
           <div className="flex items-center gap-2">
             <FileText className="w-5 h-5" />
             <span className="font-semibold">
-              {type === "custom" ? "Custom Paper" : "Pre-Built Paper"}
+              {type === "quiz" ? "Quiz" : type === "custom" ? "Custom Paper" : "Pre-Built Paper"}
             </span>
           </div>
           {paperDate && (
@@ -204,10 +217,10 @@ const PaperCard = ({
           )}
 
           {/* Action Buttons */}
-          <div className="flex gap-2 mt-4">
+          <div className="flex flex-wrap gap-2 mt-4">
             <button
               onClick={handleView}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 font-semibold rounded-lg transition"
+              className="flex-1 min-w-0 flex items-center justify-center gap-2 px-4 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 font-semibold rounded-lg transition"
             >
               <Eye className="w-4 h-4" />
               View
@@ -215,11 +228,83 @@ const PaperCard = ({
 
             <button
               onClick={handleEdit}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-green-100 hover:bg-green-200 text-green-700 font-semibold rounded-lg transition"
+              className="flex-1 min-w-0 flex items-center justify-center gap-2 px-4 py-2 bg-green-100 hover:bg-green-200 text-green-700 font-semibold rounded-lg transition"
             >
               <Edit className="w-4 h-4" />
               Edit
             </button>
+
+            {type === "quiz" && (
+              <div className="relative">
+                <button
+                  onClick={() => setExportOpen((o) => !o)}
+                  disabled={downloading}
+                  className="flex items-center justify-center gap-1 px-4 py-2 bg-amber-100 hover:bg-amber-200 text-amber-800 font-semibold rounded-lg transition disabled:opacity-50"
+                >
+                  <FileDown className="w-4 h-4" />
+                  Export
+                  <ChevronDown className="w-4 h-4" />
+                </button>
+                {exportOpen && (
+                  <>
+                    <div className="fixed inset-0 z-10" onClick={() => setExportOpen(false)} />
+                    <div className="absolute right-0 top-full mt-1 py-1 w-44 bg-white rounded-lg shadow-xl border border-gray-200 z-20">
+                      <button
+                        onClick={async () => {
+                          setDownloading(true);
+                          setExportOpen(false);
+                          try {
+                            await getQuizPaperPdf(id, "quiz-student.pdf");
+                          } catch (e) {
+                            alert(e.message || "Download failed");
+                          } finally {
+                            setDownloading(false);
+                          }
+                        }}
+                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                      >
+                        <FileText className="w-4 h-4" />
+                        Student PDF
+                      </button>
+                      <button
+                        onClick={async () => {
+                          setDownloading(true);
+                          setExportOpen(false);
+                          try {
+                            await getQuizAnswerKey(id, "quiz-answer-key.pdf");
+                          } catch (e) {
+                            alert(e.message || "Download failed");
+                          } finally {
+                            setDownloading(false);
+                          }
+                        }}
+                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                      >
+                        <FileText className="w-4 h-4" />
+                        Answer Key
+                      </button>
+                      <button
+                        onClick={async () => {
+                          setDownloading(true);
+                          setExportOpen(false);
+                          try {
+                            await getQuizOmrSheet(id, "quiz-omr-sheet.pdf");
+                          } catch (e) {
+                            alert(e.message || "Download failed");
+                          } finally {
+                            setDownloading(false);
+                          }
+                        }}
+                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                      >
+                        <FileText className="w-4 h-4" />
+                        OMR Sheet
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
 
             <button
               onClick={() => setShowDeleteConfirm(true)}

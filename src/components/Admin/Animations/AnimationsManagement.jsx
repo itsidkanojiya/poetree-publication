@@ -8,6 +8,7 @@ import {
   getAllBoards,
   getAllStandards,
   getAllSubjectTitles,
+  getChaptersBySubjectTitle,
 } from "../../../services/adminService";
 import { Plus, Trash2, Search, Pencil, Film } from "lucide-react";
 import Toast from "../../Common/Toast";
@@ -22,9 +23,12 @@ const AnimationFormModal = ({ animation, subjects, subjectTitles, boards, standa
     title: animation?.title ?? "",
     subject_id: animation?.subject_id ?? animation?.subject?.subject_id ?? "",
     subject_title_id: animation?.subject_title_id ?? animation?.subject_title?.subject_title_id ?? "",
+    chapter_id: animation?.chapter_id ?? animation?.chapter?.chapter_id ?? "",
     board_id: animation?.board_id ?? animation?.board?.board_id ?? "",
     standard_id: animation?.standard_id ?? animation?.standard?.standard_id ?? "",
   });
+  const [chapters, setChapters] = useState([]);
+  const [loadingChapters, setLoadingChapters] = useState(false);
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
 
@@ -39,11 +43,35 @@ const AnimationFormModal = ({ animation, subjects, subjectTitles, boards, standa
       const next = { ...prev, [name]: value };
       if (name === "subject_id") {
         next.subject_title_id = "";
+        next.chapter_id = "";
+      }
+      if (name === "subject_title_id") {
+        next.chapter_id = "";
       }
       return next;
     });
     if (errors[name]) setErrors((prev) => ({ ...prev, [name]: "" }));
   };
+
+  useEffect(() => {
+    if (!formData.subject_title_id) {
+      setChapters([]);
+      return;
+    }
+    let cancelled = false;
+    setLoadingChapters(true);
+    getChaptersBySubjectTitle(formData.subject_title_id)
+      .then((list) => {
+        if (!cancelled) setChapters(Array.isArray(list) ? list : []);
+      })
+      .catch(() => {
+        if (!cancelled) setChapters([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingChapters(false);
+      });
+    return () => { cancelled = true; };
+  }, [formData.subject_title_id]);
 
   const validate = () => {
     const newErrors = {};
@@ -68,6 +96,7 @@ const AnimationFormModal = ({ animation, subjects, subjectTitles, boards, standa
         board_id: Number(formData.board_id),
         standard_id: Number(formData.standard_id),
         ...(String(formData.title).trim() && { title: String(formData.title).trim() }),
+        chapter_id: formData.chapter_id != null && formData.chapter_id !== "" ? Number(formData.chapter_id) : null,
       };
       await onSave(body);
       onClose();
@@ -159,6 +188,28 @@ const AnimationFormModal = ({ animation, subjects, subjectTitles, boards, standa
               ))}
             </select>
             {errors.subject_title_id && <p className="mt-1 text-sm text-red-600">{errors.subject_title_id}</p>}
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Chapter (optional)</label>
+            <p className="text-xs text-gray-500 mb-1.5">Chapters for the selected subject title. Must belong to the animation’s subject title.</p>
+            <select
+              name="chapter_id"
+              value={formData.chapter_id}
+              onChange={handleChange}
+              disabled={!formData.subject_title_id}
+              className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 outline-none transition disabled:bg-gray-100"
+            >
+              <option value="">{formData.subject_title_id ? "All chapters / None" : "Select subject title first"}</option>
+              {loadingChapters ? (
+                <option value="">Loading chapters...</option>
+              ) : (
+                chapters.map((ch) => (
+                  <option key={ch.chapter_id} value={ch.chapter_id}>
+                    {ch.chapter_name}
+                  </option>
+                ))
+              )}
+            </select>
           </div>
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -354,6 +405,7 @@ const AnimationsManagement = () => {
                 <th className="px-6 py-4 text-left text-sm font-semibold">Title</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold">Subject</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold">Subject Title</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold">Chapter</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold">Board</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold">Standard</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold">Actions</th>
@@ -362,7 +414,7 @@ const AnimationsManagement = () => {
             <tbody className="divide-y divide-gray-200">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan="8" className="px-6 py-8 text-center text-gray-500">
                     No animations found
                   </td>
                 </tr>
@@ -384,6 +436,7 @@ const AnimationsManagement = () => {
                       <td className="px-6 py-4 text-sm font-medium text-gray-900">{a.title || "—"}</td>
                       <td className="px-6 py-4 text-sm text-gray-600">{a.subject?.subject_name ?? "—"}</td>
                       <td className="px-6 py-4 text-sm text-gray-600">{a.subject_title?.title_name ?? "—"}</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">{a.chapter?.chapter_name ?? "—"}</td>
                       <td className="px-6 py-4 text-sm text-gray-600">{a.board?.board_name ?? "—"}</td>
                       <td className="px-6 py-4 text-sm text-gray-600">{a.standard?.name ?? "—"}</td>
                       <td className="px-6 py-4 text-sm flex gap-2">

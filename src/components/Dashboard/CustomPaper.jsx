@@ -21,6 +21,7 @@ import usePdfContent from "../../hooks/usePdfContent";
 import HeaderCard from "../Cards/HeaderCard";
 import apiClient from "../../services/apiClient";
 import { getPaperById, updatePaper } from "../../services/paperService";
+import { getChaptersBySubjectTitle } from "../../services/adminService";
 import Toast from "../Common/Toast";
 import Loader from "../Common/loader/loader";
 
@@ -54,6 +55,18 @@ const INITIAL_QUESTION_SECTIONS = [
   { type: "passage", selectedQuestions: [] },
   { type: "match", selectedQuestions: [] },
 ];
+
+/** Collect unique chapter IDs from all selected questions (for chapter_ids when saving paper). */
+const getChapterIdsFromSections = (sections) => {
+  const ids = new Set();
+  (sections || []).forEach((section) => {
+    (section.selectedQuestions || []).forEach((q) => {
+      const cid = q.chapter_id ?? q.chapter?.chapter_id;
+      if (cid != null && cid !== "") ids.add(Number(cid));
+    });
+  });
+  return Array.from(ids);
+};
 
 // Map question types to section letters (A, B, C, D, E, F, G, H)
 const SECTION_LETTERS = {
@@ -325,6 +338,14 @@ const CustomPaper = () => {
   const [questionTypeDropdownOpen, setQuestionTypeDropdownOpen] = useState(false);
   const questionTypeDropdownRef = useRef(null);
 
+  const [paperChapterId, setPaperChapterId] = useState(() => {
+    const h = location.state?.header;
+    const cid = h?.chapterId ?? h?.chapter_id;
+    return (cid != null && cid !== "") ? String(cid) : "";
+  });
+  const [chapters, setChapters] = useState([]);
+  const [loadingChapters, setLoadingChapters] = useState(false);
+
   const [approvedSubjectIds, setApprovedSubjectIds] = useState([]);
   const [approvedSubjectsMap, setApprovedSubjectsMap] = useState(new Map()); // Store subject_id -> subject_name mapping
   const [filteredQuestions, setFilteredQuestions] = useState([]);
@@ -392,6 +413,11 @@ const CustomPaper = () => {
                 documentTitle: paper.paper_title || "",
                 class: paper.standard ? `Standard ${paper.standard}` : "",
               });
+              if (paper.chapter_id != null && paper.chapter_id !== "") {
+                setPaperChapterId(String(paper.chapter_id));
+              } else if (paper.chapterId != null && paper.chapterId !== "") {
+                setPaperChapterId(String(paper.chapterId));
+              }
             }
             
             // Load marks from paper response first (needed for calculating marks per question)
@@ -641,7 +667,32 @@ const CustomPaper = () => {
     fetchApprovedSubjects();
   }, []);
 
-  // Fetch questions filtered by approved subjects, board, and subject title from API
+  const effectiveHeaderForChapter = paperHeader || header;
+  const subjectTitleIdForChapters = effectiveHeaderForChapter?.subjectTitle != null && effectiveHeaderForChapter?.subjectTitle !== ""
+    ? effectiveHeaderForChapter.subjectTitle
+    : null;
+
+  useEffect(() => {
+    if (!subjectTitleIdForChapters) {
+      setChapters([]);
+      return;
+    }
+    let cancelled = false;
+    setLoadingChapters(true);
+    getChaptersBySubjectTitle(subjectTitleIdForChapters)
+      .then((list) => {
+        if (!cancelled) setChapters(Array.isArray(list) ? list : []);
+      })
+      .catch(() => {
+        if (!cancelled) setChapters([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingChapters(false);
+      });
+    return () => { cancelled = true; };
+  }, [subjectTitleIdForChapters]);
+
+  // Fetch questions filtered by approved subjects, board, subject title, and chapter from API
   useEffect(() => {
     // Don't fetch if approvedSubjectIds is empty (still loading or no approved subjects)
     if (approvedSubjectIds.length === 0) {
@@ -671,7 +722,7 @@ const CustomPaper = () => {
             : effectiveHeader.standard;
           params.append("standard", String(standardVal));
         }
-        const chapterId = effectiveHeader?.chapterId ?? effectiveHeader?.chapter_id;
+        const chapterId = paperChapterId != null && paperChapterId !== "" ? paperChapterId : (effectiveHeader?.chapterId ?? effectiveHeader?.chapter_id);
         if (chapterId != null && chapterId !== "") {
           params.append("chapter_id", String(chapterId));
         }
@@ -692,7 +743,7 @@ const CustomPaper = () => {
     };
 
     fetchFilteredQuestions();
-  }, [approvedSubjectIds, header?.board, header?.subjectTitle, header?.standard, header?.chapterId, header?.chapter_id, paperHeader?.board, paperHeader?.subjectTitle, paperHeader?.standard, paperHeader?.chapterId, paperHeader?.chapter_id]);
+  }, [approvedSubjectIds, paperChapterId, header?.board, header?.subjectTitle, header?.standard, header?.chapterId, header?.chapter_id, paperHeader?.board, paperHeader?.subjectTitle, paperHeader?.standard, paperHeader?.chapterId, paperHeader?.chapter_id]);
 
   // When no question type is selected, show all questions in mixed order
   useEffect(() => {
@@ -813,24 +864,27 @@ const CustomPaper = () => {
       
       try {
         setIsSaving(true);
-        // Get all selected question IDs
+        // Get all selected question IDs and chapter IDs from selected questions
         const allQuestionIds = [];
         questionSections.forEach((section) => {
           section.selectedQuestions.forEach((question) => {
             allQuestionIds.push(question.question_id);
           });
         });
+        const chapterIds = getChapterIdsFromSections(questionSections);
         
-        // Save paper with question IDs, header data, marks, and question sections
+        const headerToSave = { ...(paperHeader || header), chapterId: paperChapterId || (paperHeader || header)?.chapterId || (paperHeader || header)?.chapter_id || "" };
+        if (headerToSave.chapterId === "") delete headerToSave.chapterId;
         await savePaper(
           user, 
           allQuestionIds, 
           logoFile, 
           "custom", 
-          header,
+          headerToSave,
           marksPerType,
           questionSections,
-          header?.documentTitle || null
+          headerToSave?.documentTitle || null,
+          chapterIds
         );
         setIsSaved(true);
         setToast({
@@ -939,16 +993,20 @@ const CustomPaper = () => {
       try {
         const formData = new FormData();
         
-        // Get all selected question IDs
+        // Get all selected question IDs and chapter IDs from selected questions
         const allQuestionIds = [];
         questionSections.forEach((section) => {
           section.selectedQuestions.forEach((question) => {
             allQuestionIds.push(question.question_id);
           });
         });
+        const chapterIds = getChapterIdsFromSections(questionSections);
         
         // Add body as JSON string of question IDs (required)
         formData.append("body", JSON.stringify(allQuestionIds));
+        if (chapterIds.length > 0) {
+          formData.append("chapter_ids", JSON.stringify(chapterIds));
+        }
         
         // Add header data if available
         // Note: school_name, address, logo are now fetched from user table via user_id
@@ -1043,24 +1101,27 @@ const CustomPaper = () => {
     } else {
       // Create new paper
       try {
-        // Get all selected question IDs
+        // Get all selected question IDs and chapter IDs from selected questions
         const allQuestionIds = [];
         questionSections.forEach((section) => {
           section.selectedQuestions.forEach((question) => {
             allQuestionIds.push(question.question_id);
           });
         });
+        const chapterIds = getChapterIdsFromSections(questionSections);
         
-        // Save paper with question IDs, header data, marks, and question sections
+        const headerToSave = { ...(paperHeader || header), chapterId: paperChapterId || (paperHeader || header)?.chapterId || (paperHeader || header)?.chapter_id || "" };
+        if (headerToSave.chapterId === "") delete headerToSave.chapterId;
         await savePaper(
           user, 
           allQuestionIds, 
           logoFile, 
           "custom", 
-          header,
+          headerToSave,
           marksPerType,
           questionSections,
-          header?.documentTitle || null
+          headerToSave?.documentTitle || null,
+          chapterIds
         );
         setIsSaved(true);
         setToast({
@@ -1407,6 +1468,33 @@ const CustomPaper = () => {
                   </button>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Chapter filter - filter questions by chapter for current subject title */}
+          {subjectTitleIdForChapters && (
+            <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6 hover:shadow-xl transition-all duration-300">
+              <label className="block text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
+                <span className="w-1 h-5 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full"></span>
+                Chapter
+              </label>
+              <p className="text-xs text-gray-500 mb-2">Filter questions by chapter for your subject title</p>
+              {loadingChapters ? (
+                <p className="text-sm text-gray-500 py-2">Loading chapters...</p>
+              ) : (
+                <select
+                  value={paperChapterId}
+                  onChange={(e) => setPaperChapterId(e.target.value)}
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white"
+                >
+                  <option value="">All chapters (no filter)</option>
+                  {chapters.map((ch) => (
+                    <option key={ch.chapter_id} value={ch.chapter_id}>
+                      {ch.chapter_name}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
           )}
 

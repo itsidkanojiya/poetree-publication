@@ -25,12 +25,15 @@ const Animations = () => {
   const [selected, setSelected] = useState(null);
   const [filterSubjectId, setFilterSubjectId] = useState("");
   const [filterSubjectTitleId, setFilterSubjectTitleId] = useState("");
+  const [filterChapterId, setFilterChapterId] = useState("");
   const [filterBoardId, setFilterBoardId] = useState("");
   const [filterStandardId, setFilterStandardId] = useState("");
 
   useEffect(() => {
     let cancelled = false;
-    getAnimations()
+    setLoading(true);
+    const params = filterChapterId ? { chapter_id: filterChapterId } : {};
+    getAnimations(params)
       .then((list) => {
         if (!cancelled) setAnimations(Array.isArray(list) ? list : []);
       })
@@ -41,7 +44,7 @@ const Animations = () => {
         if (!cancelled) setLoading(false);
       });
     return () => { cancelled = true; };
-  }, []);
+  }, [filterChapterId]);
 
   const videoId = selected?.video_id || (selected?.youtube_url && selected.youtube_url.match(/(?:v=|\/)([\w-]{11})(?:\?|&|$)/)?.[1]);
   const embedUrl = selected?.embed_url || (videoId ? `https://www.youtube.com/embed/${videoId}?autoplay=1` : null);
@@ -55,6 +58,7 @@ const Animations = () => {
     }
     if (filterSubjectId && String(a.subject_id ?? a.subject?.subject_id) !== filterSubjectId) return false;
     if (filterSubjectTitleId && String(a.subject_title_id ?? a.subject_title?.subject_title_id) !== filterSubjectTitleId) return false;
+    if (filterChapterId && String(a.chapter_id ?? a.chapter?.chapter_id) !== String(filterChapterId)) return false;
     if (filterBoardId && String(a.board_id ?? a.board?.board_id) !== filterBoardId) return false;
     if (filterStandardId && String(a.standard_id ?? a.standard?.standard_id ?? a.standard) !== filterStandardId) return false;
     return true;
@@ -76,11 +80,16 @@ const Animations = () => {
     const id = a.standard_id ?? a.standard?.standard_id;
     return [String(id), { id: String(id), name: a.standard?.name || "—" }];
   })).values()];
+  const uniqueChapters = [...new Map(animations.filter((a) => a.chapter_id ?? a.chapter?.chapter_id).map((a) => {
+    const id = a.chapter_id ?? a.chapter?.chapter_id;
+    return [String(id), { id: String(id), name: a.chapter?.chapter_name || "—" }];
+  })).values()];
 
-  const hasActiveFilters = filterSubjectId || filterSubjectTitleId || filterBoardId || filterStandardId;
+  const hasActiveFilters = filterSubjectId || filterSubjectTitleId || filterChapterId || filterBoardId || filterStandardId;
   const clearFilters = () => {
     setFilterSubjectId("");
     setFilterSubjectTitleId("");
+    setFilterChapterId("");
     setFilterBoardId("");
     setFilterStandardId("");
   };
@@ -183,6 +192,16 @@ const Animations = () => {
                 ))}
               </select>
               <select
+                value={filterChapterId}
+                onChange={(e) => setFilterChapterId(e.target.value)}
+                className="px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 focus:border-violet-400 focus:ring-2 focus:ring-violet-400/20 outline-none transition min-w-[160px]"
+              >
+                <option value="">All chapters</option>
+                {uniqueChapters.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+              <select
                 value={filterBoardId}
                 onChange={(e) => setFilterBoardId(e.target.value)}
                 className="px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 focus:border-violet-400 focus:ring-2 focus:ring-violet-400/20 outline-none transition min-w-[140px]"
@@ -245,7 +264,7 @@ const Animations = () => {
                 const vid = item.video_id || (item.youtube_url && item.youtube_url.match(/(?:v=|\/)([\w-]{11})(?:\?|&|$)/)?.[1]);
                 const thumb = vid ? getThumbnailUrl(vid) : null;
                 const thumbFb = vid ? getThumbnailFallbackUrl(vid) : null;
-                const meta = [item.subject?.subject_name, item.standard?.name].filter(Boolean);
+                const meta = [item.subject?.subject_name, item.chapter?.chapter_name, item.standard?.name].filter(Boolean);
                 return (
                   <motion.button
                     key={item.animation_id}

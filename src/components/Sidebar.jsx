@@ -15,6 +15,7 @@ import {
   BookOpen,
   Sparkles,
   LayoutTemplate,
+  ClipboardList,
 } from "lucide-react";
 
 const LogoutModal = ({ isOpen, onClose, onConfirm }) => {
@@ -103,6 +104,11 @@ const Sidebar = () => {
       icon: ClipboardCheck,
     },
     {
+      name: "Quizzes",
+      href: "/dashboard/quizzes",
+      icon: ClipboardList,
+    },
+    {
       name: "Subject Requests",
       href: "/dashboard/subject-requests",
       icon: BookOpen,
@@ -121,6 +127,9 @@ const Sidebar = () => {
     }
     // For templates (Prebuilt Question) route, check if pathname starts with the route path
     if (path === "/dashboard/templates") {
+      return location.pathname.startsWith(path);
+    }
+    if (path === "/dashboard/quizzes") {
       return location.pathname.startsWith(path);
     }
     // For other routes, check exact match

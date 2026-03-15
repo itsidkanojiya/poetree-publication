@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import apiClient from "../services/apiClient";
-import { getProfile, updateWorksheetWatermarkOpacity, updateWorksheetWatermarkSettings } from "../services/authService";
+import { getProfile, updateWorksheetAppearance } from "../services/authService";
 import {
   User,
   Mail,
@@ -22,8 +22,10 @@ import {
 import Loader from "../components/Common/loader/loader";
 
 const DEFAULT_WATERMARK_OPACITY = 0.3;
-const DEFAULT_WATERMARK_ROTATION = -25;
-const DEFAULT_WATERMARK_BEND = 0;
+const DEFAULT_WATERMARK_TEXT_SIZE = 1;
+const DEFAULT_WATERMARK_LOGO_SIZE = 1;
+const DEFAULT_WATERMARK_TEXT_BEND = -35;
+
 const WATERMARK_TYPE_OPTIONS = [
   { value: "none", label: "None" },
   { value: "text", label: "Text only" },
@@ -38,8 +40,9 @@ const Profile = () => {
   const [watermarkType, setWatermarkType] = useState("text");
   const [watermarkText, setWatermarkText] = useState("");
   const [watermarkOpacity, setWatermarkOpacity] = useState(DEFAULT_WATERMARK_OPACITY);
-  const [watermarkRotation, setWatermarkRotation] = useState(DEFAULT_WATERMARK_ROTATION);
-  const [watermarkBend, setWatermarkBend] = useState(DEFAULT_WATERMARK_BEND);
+  const [watermarkTextSize, setWatermarkTextSize] = useState(DEFAULT_WATERMARK_TEXT_SIZE);
+  const [watermarkLogoSize, setWatermarkLogoSize] = useState(DEFAULT_WATERMARK_LOGO_SIZE);
+  const [watermarkTextBend, setWatermarkTextBend] = useState(DEFAULT_WATERMARK_TEXT_BEND);
   const [watermarkSaving, setWatermarkSaving] = useState(false);
   const [watermarkError, setWatermarkError] = useState(null);
   const saveTimeoutRef = useRef(null);
@@ -52,20 +55,17 @@ const Profile = () => {
       return;
     }
     setUser(storedUser);
-    setWatermarkOpacity(
-      typeof storedUser.worksheet_watermark_opacity === "number"
-        ? storedUser.worksheet_watermark_opacity
-        : DEFAULT_WATERMARK_OPACITY
-    );
     const wt = storedUser.worksheet_watermark_type;
-    if (wt === "none" || wt === "text" || wt === "image" || wt === "text_and_image") {
-      setWatermarkType(wt);
-    }
+    if (wt === "none" || wt === "text" || wt === "image" || wt === "text_and_image") setWatermarkType(wt);
     setWatermarkText(typeof storedUser.worksheet_watermark_text === "string" ? storedUser.worksheet_watermark_text : "");
-    const rot = storedUser.worksheet_watermark_rotation;
-    setWatermarkRotation(typeof rot === "number" && rot >= -180 && rot <= 180 ? rot : DEFAULT_WATERMARK_ROTATION);
-    const bend = storedUser.worksheet_watermark_bend;
-    setWatermarkBend(typeof bend === "number" && bend >= -20 && bend <= 20 ? bend : DEFAULT_WATERMARK_BEND);
+    const op = storedUser.worksheet_watermark_opacity;
+    setWatermarkOpacity(typeof op === "number" ? op : DEFAULT_WATERMARK_OPACITY);
+    const ts = storedUser.worksheet_watermark_text_size;
+    setWatermarkTextSize(typeof ts === "number" && ts >= 0.5 && ts <= 2 ? ts : DEFAULT_WATERMARK_TEXT_SIZE);
+    const ls = storedUser.worksheet_watermark_logo_size;
+    setWatermarkLogoSize(typeof ls === "number" && ls >= 0.5 && ls <= 2 ? ls : DEFAULT_WATERMARK_LOGO_SIZE);
+    const tb = storedUser.worksheet_watermark_text_bend;
+    setWatermarkTextBend(typeof tb === "number" && tb >= -90 && tb <= 90 ? tb : DEFAULT_WATERMARK_TEXT_BEND);
     loadProfile();
   }, [navigate]);
 
@@ -76,17 +76,17 @@ const Profile = () => {
       const userData = response?.user ?? response?.data ?? response;
       if (userData) {
         setUser(userData);
+        const wt = userData.worksheet_watermark_type;
+        if (wt === "none" || wt === "text" || wt === "image" || wt === "text_and_image") setWatermarkType(wt);
+        setWatermarkText(typeof userData.worksheet_watermark_text === "string" ? userData.worksheet_watermark_text : "");
         const opacity = userData.worksheet_watermark_opacity ?? DEFAULT_WATERMARK_OPACITY;
         setWatermarkOpacity(typeof opacity === "number" ? opacity : DEFAULT_WATERMARK_OPACITY);
-        const wt = userData.worksheet_watermark_type;
-        if (wt === "none" || wt === "text" || wt === "image" || wt === "text_and_image") {
-          setWatermarkType(wt);
-        }
-        setWatermarkText(typeof userData.worksheet_watermark_text === "string" ? userData.worksheet_watermark_text : "");
-        const rot = userData.worksheet_watermark_rotation;
-        setWatermarkRotation(typeof rot === "number" && rot >= -180 && rot <= 180 ? rot : DEFAULT_WATERMARK_ROTATION);
-        const bend = userData.worksheet_watermark_bend;
-        setWatermarkBend(typeof bend === "number" && bend >= -20 && bend <= 20 ? bend : DEFAULT_WATERMARK_BEND);
+        const ts = userData.worksheet_watermark_text_size;
+        setWatermarkTextSize(typeof ts === "number" && ts >= 0.5 && ts <= 2 ? ts : DEFAULT_WATERMARK_TEXT_SIZE);
+        const ls = userData.worksheet_watermark_logo_size;
+        setWatermarkLogoSize(typeof ls === "number" && ls >= 0.5 && ls <= 2 ? ls : DEFAULT_WATERMARK_LOGO_SIZE);
+        const tb = userData.worksheet_watermark_text_bend;
+        setWatermarkTextBend(typeof tb === "number" && tb >= -90 && tb <= 90 ? tb : DEFAULT_WATERMARK_TEXT_BEND);
         const currentStored = JSON.parse(localStorage.getItem("user") || "{}");
         localStorage.setItem("user", JSON.stringify({ ...currentStored, ...userData }));
       }
@@ -97,61 +97,61 @@ const Profile = () => {
     }
   }, []);
 
-  const persistWatermarkSettings = useCallback(
+  const persistWorksheetAppearance = useCallback(
     async (updates) => {
       try {
         setWatermarkSaving(true);
         setWatermarkError(null);
-        const payload = {
-          type: updates.type ?? watermarkType,
-          text: updates.text !== undefined ? updates.text : watermarkText,
-          opacity: updates.opacity !== undefined ? updates.opacity : watermarkOpacity,
-          rotation: updates.rotation !== undefined ? updates.rotation : watermarkRotation,
-          bend: updates.bend !== undefined ? updates.bend : watermarkBend,
-        };
-        await updateWorksheetWatermarkSettings(payload);
-        setUser((prev) => {
-          if (!prev) return null;
-          const next = { ...prev };
-          if (payload.type != null) next.worksheet_watermark_type = payload.type;
-          if (payload.text !== undefined) next.worksheet_watermark_text = payload.text;
-          if (payload.opacity != null) next.worksheet_watermark_opacity = payload.opacity;
-          if (payload.rotation != null) next.worksheet_watermark_rotation = payload.rotation;
-          if (payload.bend != null) next.worksheet_watermark_bend = payload.bend;
-          return next;
-        });
-        const stored = JSON.parse(localStorage.getItem("user") || "{}");
-        if (payload.type != null) stored.worksheet_watermark_type = payload.type;
-        if (payload.text !== undefined) stored.worksheet_watermark_text = payload.text;
-        if (payload.opacity != null) stored.worksheet_watermark_opacity = payload.opacity;
-        if (payload.rotation != null) stored.worksheet_watermark_rotation = payload.rotation;
-        if (payload.bend != null) stored.worksheet_watermark_bend = payload.bend;
-        localStorage.setItem("user", JSON.stringify(stored));
+        const payload = {};
+        if (updates.worksheet_watermark_type !== undefined) payload.worksheet_watermark_type = updates.worksheet_watermark_type;
+        if (updates.worksheet_watermark_text !== undefined) payload.worksheet_watermark_text = updates.worksheet_watermark_text;
+        if (updates.worksheet_watermark_opacity !== undefined) payload.worksheet_watermark_opacity = updates.worksheet_watermark_opacity;
+        if (updates.worksheet_watermark_text_size !== undefined) payload.worksheet_watermark_text_size = updates.worksheet_watermark_text_size;
+        if (updates.worksheet_watermark_logo_size !== undefined) payload.worksheet_watermark_logo_size = updates.worksheet_watermark_logo_size;
+        if (updates.worksheet_watermark_text_bend !== undefined) payload.worksheet_watermark_text_bend = updates.worksheet_watermark_text_bend;
+        if (Object.keys(payload).length === 0) return;
+        const data = await updateWorksheetAppearance(payload);
+        const updatedUser = data?.user ?? data?.data;
+        if (updatedUser) {
+          setUser((prev) => (prev ? { ...prev, ...updatedUser } : updatedUser));
+          const currentStored = JSON.parse(localStorage.getItem("user") || "{}");
+          localStorage.setItem("user", JSON.stringify({ ...currentStored, ...updatedUser }));
+        } else {
+          setUser((prev) => {
+            if (!prev) return null;
+            const next = { ...prev };
+            if (payload.worksheet_watermark_type != null) next.worksheet_watermark_type = payload.worksheet_watermark_type;
+            if (payload.worksheet_watermark_text !== undefined) next.worksheet_watermark_text = payload.worksheet_watermark_text;
+            if (payload.worksheet_watermark_opacity != null) next.worksheet_watermark_opacity = payload.worksheet_watermark_opacity;
+            if (payload.worksheet_watermark_text_size != null) next.worksheet_watermark_text_size = payload.worksheet_watermark_text_size;
+            if (payload.worksheet_watermark_logo_size != null) next.worksheet_watermark_logo_size = payload.worksheet_watermark_logo_size;
+            if (payload.worksheet_watermark_text_bend != null) next.worksheet_watermark_text_bend = payload.worksheet_watermark_text_bend;
+            return next;
+          });
+          const stored = JSON.parse(localStorage.getItem("user") || "{}");
+          if (payload.worksheet_watermark_type != null) stored.worksheet_watermark_type = payload.worksheet_watermark_type;
+          if (payload.worksheet_watermark_text !== undefined) stored.worksheet_watermark_text = payload.worksheet_watermark_text;
+          if (payload.worksheet_watermark_opacity != null) stored.worksheet_watermark_opacity = payload.worksheet_watermark_opacity;
+          if (payload.worksheet_watermark_text_size != null) stored.worksheet_watermark_text_size = payload.worksheet_watermark_text_size;
+          if (payload.worksheet_watermark_logo_size != null) stored.worksheet_watermark_logo_size = payload.worksheet_watermark_logo_size;
+          if (payload.worksheet_watermark_text_bend != null) stored.worksheet_watermark_text_bend = payload.worksheet_watermark_text_bend;
+          localStorage.setItem("user", JSON.stringify(stored));
+        }
       } catch {
-        setWatermarkError("Could not save watermark settings.");
+        setWatermarkError("Could not save worksheet appearance.");
       } finally {
         setWatermarkSaving(false);
       }
     },
-    [watermarkType, watermarkText, watermarkOpacity, watermarkRotation, watermarkBend]
+    [watermarkType, watermarkText, watermarkOpacity, watermarkTextSize, watermarkLogoSize, watermarkTextBend]
   );
-
-  const handleWatermarkSliderChange = (e) => {
-    const value = Number(e.target.value) / 100;
-    setWatermarkOpacity(value);
-    setWatermarkError(null);
-    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    saveTimeoutRef.current = setTimeout(() => {
-      persistWatermarkSettings({ opacity: value });
-    }, 500);
-  };
 
   const handleWatermarkTypeChange = (e) => {
     const value = e.target.value;
-    if (!["none", "text", "image", "text_and_image"].includes(value)) return;
+    if (!WATERMARK_TYPE_OPTIONS.some((o) => o.value === value)) return;
     setWatermarkType(value);
     setWatermarkError(null);
-    persistWatermarkSettings({ type: value });
+    persistWorksheetAppearance({ worksheet_watermark_type: value });
   };
 
   const handleWatermarkTextChange = (e) => {
@@ -160,24 +160,47 @@ const Profile = () => {
     setWatermarkError(null);
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     saveTimeoutRef.current = setTimeout(() => {
-      persistWatermarkSettings({ text: value });
+      persistWorksheetAppearance({ worksheet_watermark_text: value });
     }, 500);
   };
 
-  const handleWatermarkRotationChange = (e) => {
-    const value = Number(e.target.value);
-    setWatermarkRotation(value);
-    setWatermarkError(null);
-    persistWatermarkSettings({ rotation: value });
-  };
-
-  const handleWatermarkBendChange = (e) => {
-    const value = Number(e.target.value);
-    setWatermarkBend(value);
+  const handleWatermarkOpacityChange = (e) => {
+    const value = Number(e.target.value) / 100;
+    setWatermarkOpacity(value);
     setWatermarkError(null);
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     saveTimeoutRef.current = setTimeout(() => {
-      persistWatermarkSettings({ bend: value });
+      persistWorksheetAppearance({ worksheet_watermark_opacity: value });
+    }, 500);
+  };
+
+  const handleWatermarkTextSizeChange = (e) => {
+    const value = Number(e.target.value);
+    setWatermarkTextSize(value);
+    setWatermarkError(null);
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(() => {
+      persistWorksheetAppearance({ worksheet_watermark_text_size: value });
+    }, 300);
+  };
+
+  const handleWatermarkLogoSizeChange = (e) => {
+    const value = Number(e.target.value);
+    setWatermarkLogoSize(value);
+    setWatermarkError(null);
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(() => {
+      persistWorksheetAppearance({ worksheet_watermark_logo_size: value });
+    }, 300);
+  };
+
+  const handleWatermarkTextBendChange = (e) => {
+    const value = Number(e.target.value);
+    setWatermarkTextBend(value);
+    setWatermarkError(null);
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(() => {
+      persistWorksheetAppearance({ worksheet_watermark_text_bend: value });
     }, 300);
   };
 
@@ -393,6 +416,7 @@ const Profile = () => {
                 <p className="text-sm text-gray-600 mb-4">
                   Choose what appears as the watermark on every page of your downloaded worksheets. Opacity applies to text and/or image when shown.
                 </p>
+
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Watermark
@@ -410,6 +434,7 @@ const Profile = () => {
                     ))}
                   </select>
                 </div>
+
                 {(watermarkType === "text" || watermarkType === "text_and_image") && (
                   <div className="mb-4">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -427,6 +452,7 @@ const Profile = () => {
                     <p className="text-xs text-gray-500 mt-1">Leave empty to use your school name.</p>
                   </div>
                 )}
+
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Watermark opacity
@@ -437,147 +463,183 @@ const Profile = () => {
                       min="0"
                       max="100"
                       value={Math.round(watermarkOpacity * 100)}
-                      onChange={handleWatermarkSliderChange}
+                      onChange={handleWatermarkOpacityChange}
                       className="flex-1 h-2 bg-amber-200 rounded-lg appearance-none cursor-pointer accent-amber-600"
-                      aria-label="Watermark opacity"
+                      aria-label="Watermark opacity (0–100%)"
                       disabled={watermarkType === "none"}
                     />
-                    <span className="text-sm font-semibold text-gray-700 w-10">
+                    <span className="text-sm font-semibold text-gray-700 w-10 tabular-nums" aria-live="polite">
                       {Math.round(watermarkOpacity * 100)}%
                     </span>
                   </div>
                   {watermarkType === "none" && (
                     <p className="text-xs text-gray-500 mt-1">Opacity is ignored when watermark is None.</p>
                   )}
-                  {watermarkSaving && (
-                    <p className="text-xs text-amber-700 mt-1">Saving…</p>
-                  )}
-                  {watermarkError && (
-                    <p className="text-sm text-red-600 mt-1">{watermarkError}</p>
+                  {watermarkType !== "none" && (
+                    <p className="text-xs text-gray-500 mt-1">This opacity is used for the watermark on your downloaded worksheets.</p>
                   )}
                 </div>
-                {watermarkType !== "none" && (
-                  <>
-                    <div className="mb-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Watermark rotation (degrees)
-                      </label>
-                      <div className="flex items-center gap-3">
-                        <input
-                          type="range"
-                          min="-90"
-                          max="90"
-                          value={watermarkRotation}
-                          onChange={handleWatermarkRotationChange}
-                          className="flex-1 h-2 bg-amber-200 rounded-lg appearance-none cursor-pointer accent-amber-600"
-                          aria-label="Watermark rotation"
-                        />
-                        <span className="text-sm font-semibold text-gray-700 w-12 tabular-nums">
-                          {watermarkRotation}°
-                        </span>
-                      </div>
-                      <p className="text-xs text-gray-500 mt-1">Diagonal is around -25°.</p>
-                    </div>
-                    <div className="mb-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Watermark bend / skew (degrees)
-                      </label>
-                      <div className="flex items-center gap-3">
-                        <input
-                          type="range"
-                          min="-20"
-                          max="20"
-                          value={watermarkBend}
-                          onChange={handleWatermarkBendChange}
-                          className="flex-1 h-2 bg-amber-200 rounded-lg appearance-none cursor-pointer accent-amber-600"
-                          aria-label="Watermark bend"
-                        />
-                        <span className="text-sm font-semibold text-gray-700 w-12 tabular-nums">
-                          {watermarkBend}°
-                        </span>
-                      </div>
-                      <p className="text-xs text-gray-500 mt-1">Slant for a bent look. 0 = no skew.</p>
-                    </div>
-                  </>
+
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Watermark text size
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="range"
+                      min="0.5"
+                      max="2"
+                      step="0.1"
+                      value={watermarkTextSize}
+                      onChange={handleWatermarkTextSizeChange}
+                      className="flex-1 h-2 bg-amber-200 rounded-lg appearance-none cursor-pointer accent-amber-600"
+                      aria-label="Watermark text size (0.5–2)"
+                    />
+                    <span className="text-sm font-semibold text-gray-700 w-10 tabular-nums" aria-live="polite">
+                      {watermarkTextSize.toFixed(1)}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">Scale for watermark text. 1 = default size.</p>
+                </div>
+
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Watermark logo size
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="range"
+                      min="0.5"
+                      max="2"
+                      step="0.1"
+                      value={watermarkLogoSize}
+                      onChange={handleWatermarkLogoSizeChange}
+                      className="flex-1 h-2 bg-amber-200 rounded-lg appearance-none cursor-pointer accent-amber-600"
+                      aria-label="Watermark logo size (0.5–2)"
+                    />
+                    <span className="text-sm font-semibold text-gray-700 w-10 tabular-nums" aria-live="polite">
+                      {watermarkLogoSize.toFixed(1)}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">Scale for the watermark image when shown. 1 = default size.</p>
+                </div>
+
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Watermark text bend (degrees)
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="range"
+                      min="-90"
+                      max="90"
+                      value={watermarkTextBend}
+                      onChange={handleWatermarkTextBendChange}
+                      className="flex-1 h-2 bg-amber-200 rounded-lg appearance-none cursor-pointer accent-amber-600"
+                      aria-label="Watermark text bend (-90 to 90 degrees)"
+                    />
+                    <span className="text-sm font-semibold text-gray-700 w-12 tabular-nums" aria-live="polite">
+                      {watermarkTextBend}°
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">Diagonal is around -35°. 0 = horizontal.</p>
+                </div>
+
+                {watermarkSaving && (
+                  <p className="text-xs text-amber-700 mb-2">Saving…</p>
                 )}
-                {/* Preview: worksheet header (same style as paper header) + watermark mock */}
+                {watermarkError && (
+                  <p className="text-sm text-red-600 mb-2">{watermarkError}</p>
+                )}
+
+                {/* Preview: header + watermark (live: uses current slider values) */}
                 <div className="mt-4">
                   <p className="text-xs font-medium text-gray-600 mb-2">Preview</p>
                   <div className="relative bg-gray-100 rounded-lg overflow-hidden shadow-inner aspect-[3/2] max-h-44 p-1">
-                    {/* Worksheet header mock: white bg, black border, like paper header */}
-                    <div className="bg-white border-2 border-black rounded p-2 flex items-center justify-center gap-2">
-                      {(user.worksheet_preview?.logo_url || user.logo || user.logo_url) ? (
-                        <img
-                          src={user.worksheet_preview?.logo_url || user.logo || user.logo_url}
-                          alt="School logo"
-                          className="h-8 w-8 object-contain flex-shrink-0 border border-gray-300 rounded"
-                        />
-                      ) : (
-                        <div className="h-8 w-8 flex items-center justify-center bg-gray-700 text-white text-xs font-bold rounded flex-shrink-0">
-                          {(user.worksheet_preview?.school_name || user.school_name || "Y")
-                            .split(" ")
-                            .map((w) => w[0])
-                            .join("")
-                            .substring(0, 2)
-                            .toUpperCase()}
-                        </div>
-                      )}
-                      <div className="flex flex-col items-center text-center min-w-0 flex-1">
-                        <span className="text-xs font-bold text-gray-900 uppercase leading-tight block">
-                          {user.worksheet_preview?.school_name || user.school_name || "Your School"}
-                        </span>
-                        {(user.address ||
-                          user.school_address_city ||
-                          (user.school_address_city && user.school_address_state)) && (
-                          <span className="text-[10px] text-gray-600 mt-0.5 block">
-                            {user.address ||
-                              (user.school_address_city && user.school_address_state
-                                ? `${user.school_address_city}, ${user.school_address_state}`
-                                : user.school_address_city || "")}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    {/* Watermark mock: none / text / image / text_and_image, with rotation and bend */}
-                    {watermarkType !== "none" && (
-                      <div
-                        className="absolute inset-0 flex flex-col items-center justify-center gap-1 pointer-events-none"
-                        aria-hidden
-                      >
-                        {(watermarkType === "text" || watermarkType === "text_and_image") && (
-                          <span
-                            className="text-lg font-bold text-gray-400 whitespace-nowrap"
-                            style={{
-                              opacity: watermarkOpacity,
-                              transform: `rotate(${watermarkRotation}deg) skewX(${watermarkBend}deg)`,
-                            }}
-                          >
-                            {watermarkText.trim() || user?.school_name || "Your School"}
-                          </span>
-                        )}
-                        {(watermarkType === "image" || watermarkType === "text_and_image") && (
-                          <div
-                            className="flex items-center justify-center"
-                            style={{
-                              opacity: watermarkOpacity,
-                              transform: `rotate(${watermarkRotation}deg) skewX(${watermarkBend}deg)`,
-                            }}
-                          >
-                            {(user.worksheet_preview?.logo_url || user.logo || user.logo_url) ? (
+                    {(() => {
+                      const preview = user?.worksheet_preview || user;
+                      const schoolName = preview?.school_name || user?.school_name || "Your School";
+                      const logoUrl = preview?.logo_url || user?.logo || user?.logo_url;
+                      return (
+                        <>
+                          <div className="bg-white border-2 border-black rounded p-2 flex items-center justify-center gap-2">
+                            {logoUrl ? (
                               <img
-                                src={user.worksheet_preview?.logo_url || user.logo || user.logo_url}
-                                alt=""
-                                className="h-10 w-10 object-contain"
+                                src={logoUrl}
+                                alt="School logo"
+                                className="object-contain flex-shrink-0 border border-gray-300 rounded"
+                                style={{ height: "32px", width: "32px" }}
                               />
                             ) : (
-                              <div className="h-10 w-10 flex items-center justify-center bg-gray-500 text-white text-xs font-bold rounded">
-                                {(user?.school_name || "Y").split(" ").map((w) => w[0]).join("").substring(0, 2).toUpperCase()}
+                              <div className="h-8 w-8 flex items-center justify-center bg-gray-700 text-white text-xs font-bold rounded flex-shrink-0">
+                                {schoolName.split(" ").map((w) => w[0]).join("").substring(0, 2).toUpperCase()}
                               </div>
                             )}
+                            <div className="flex flex-col items-center text-center min-w-0 flex-1">
+                              <span className="text-xs font-bold text-gray-900 uppercase leading-tight block">
+                                {schoolName}
+                              </span>
+                              {(user?.address || user?.school_address_city) && (
+                                <span className="text-[10px] text-gray-600 mt-0.5 block">
+                                  {user.address || (user.school_address_state ? `${user.school_address_city}, ${user.school_address_state}` : user.school_address_city || "")}
+                                </span>
+                              )}
+                            </div>
                           </div>
-                        )}
-                      </div>
-                    )}
+                          {watermarkType !== "none" && (
+                            <div
+                              className="absolute inset-0 flex flex-col items-center justify-center gap-1 pointer-events-none"
+                              aria-hidden
+                            >
+                              {(watermarkType === "text" || watermarkType === "text_and_image") && (
+                                <span
+                                  className="font-bold text-gray-400 whitespace-nowrap"
+                                  style={{
+                                    opacity: watermarkOpacity,
+                                    transform: `rotate(${watermarkTextBend}deg)`,
+                                    fontSize: `${Math.round(14 * watermarkTextSize)}px`,
+                                  }}
+                                >
+                                  {watermarkText.trim() || schoolName}
+                                </span>
+                              )}
+                              {(watermarkType === "image" || watermarkType === "text_and_image") && logoUrl && (
+                                <div
+                                  className="flex items-center justify-center"
+                                  style={{
+                                    opacity: watermarkOpacity,
+                                    transform: `rotate(${watermarkTextBend}deg)`,
+                                  }}
+                                >
+                                  <img
+                                    src={logoUrl}
+                                    alt=""
+                                    className="object-contain"
+                                    style={{
+                                      height: `${24 * watermarkLogoSize}px`,
+                                      width: `${24 * watermarkLogoSize}px`,
+                                    }}
+                                  />
+                                </div>
+                              )}
+                              {(watermarkType === "image" && !logoUrl) && (
+                                <div
+                                  className="flex items-center justify-center bg-gray-500 text-white text-xs font-bold rounded"
+                                  style={{
+                                    opacity: watermarkOpacity,
+                                    transform: `rotate(${watermarkTextBend}deg)`,
+                                    height: `${24 * watermarkLogoSize}px`,
+                                    width: `${24 * watermarkLogoSize}px`,
+                                  }}
+                                >
+                                  {schoolName.split(" ").map((w) => w[0]).join("").substring(0, 2).toUpperCase()}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>

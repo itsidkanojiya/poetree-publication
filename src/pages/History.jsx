@@ -155,6 +155,7 @@ const History = () => {
                   <option value="all">All Types</option>
                   <option value="default">Pre-Built Papers</option>
                   <option value="custom">Custom Papers</option>
+                  <option value="quiz">Quizzes</option>
                 </select>
               </div>
 
@@ -226,7 +227,7 @@ const History = () => {
               <span className="text-sm text-gray-600">Active filters:</span>
               {filters.type !== "all" && (
                 <span className="px-3 py-1 bg-blue-100 text-blue-700 text-xs font-semibold rounded-full">
-                  {filters.type === "default" ? "Pre-Built" : "Custom"}
+                  {filters.type === "default" ? "Pre-Built" : filters.type === "quiz" ? "Quiz" : "Custom"}
                 </span>
               )}
               {filters.dateFrom && (

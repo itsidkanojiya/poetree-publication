@@ -26,12 +26,12 @@ export const addNewPaper = async (paperData) => {
  * Paper history – list papers for a user (excludes templates).
  * GET /api/papers/user/:user_id
  * @param {number|string} user_id - User ID
- * @param {{ type?: 'custom' | 'default' }} [options] - Optional: type filter
+ * @param {{ type?: 'custom' | 'default' | 'quiz' }} [options] - Optional: type filter
  */
 export const getPapersByUserId = async (user_id, options = {}) => {
   try {
     const params = new URLSearchParams();
-    if (options.type === "custom" || options.type === "default") {
+    if (options.type === "custom" || options.type === "default" || options.type === "quiz") {
       params.append("type", options.type);
     }
     const query = params.toString();

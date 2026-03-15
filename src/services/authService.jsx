@@ -103,6 +103,58 @@ export const updateWorksheetWatermarkOpacity = async (value) => {
 };
 
 /**
+ * Update worksheet appearance (watermark type, text, opacity, text size, logo size, text bend).
+ * Sends JSON to PUT /api/auth/profile. Used for personalized worksheet PDFs.
+ * @param {Object} updates
+ * - worksheet_watermark_type: "none" | "text" | "image" | "text_and_image"
+ * - worksheet_watermark_text: optional custom text (empty = use school name)
+ * - worksheet_watermark_opacity: 0–1
+ * - worksheet_watermark_text_size: 0.5–2 (scale; 1 = default)
+ * - worksheet_watermark_logo_size: 0.5–2 (scale; 1 = default)
+ * - worksheet_watermark_text_bend: -90 to 90 (degrees; -35 = default diagonal)
+ */
+export const updateWorksheetAppearance = async (updates) => {
+  const body = {};
+  if (updates.worksheet_watermark_type != null) {
+    const type = String(updates.worksheet_watermark_type).toLowerCase();
+    if (WATERMARK_TYPES.includes(type)) {
+      body.worksheet_watermark_type = type;
+    }
+  }
+  if (updates.worksheet_watermark_text !== undefined) {
+    body.worksheet_watermark_text =
+      updates.worksheet_watermark_text == null ? "" : String(updates.worksheet_watermark_text).trim().slice(0, 200);
+  }
+  if (updates.worksheet_watermark_opacity != null) {
+    body.worksheet_watermark_opacity = Math.min(
+      1,
+      Math.max(0, Number(updates.worksheet_watermark_opacity))
+    );
+  }
+  if (updates.worksheet_watermark_text_size != null) {
+    body.worksheet_watermark_text_size = Math.min(
+      2,
+      Math.max(0.5, Number(updates.worksheet_watermark_text_size))
+    );
+  }
+  if (updates.worksheet_watermark_logo_size != null) {
+    body.worksheet_watermark_logo_size = Math.min(
+      2,
+      Math.max(0.5, Number(updates.worksheet_watermark_logo_size))
+    );
+  }
+  if (updates.worksheet_watermark_text_bend != null) {
+    body.worksheet_watermark_text_bend = Math.min(
+      90,
+      Math.max(-90, Number(updates.worksheet_watermark_text_bend))
+    );
+  }
+  if (Object.keys(body).length === 0) return { success: true, user: null };
+  const response = await apiClient.put("/auth/profile", body);
+  return response.data;
+};
+
+/**
  * Update worksheet watermark settings: type (none | text | image | text_and_image),
  * optional custom text, and opacity (0–1). Sends JSON to PUT /auth/profile.
  */

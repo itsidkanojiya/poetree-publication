@@ -43,7 +43,7 @@ export const PaperProvider = ({ children }) => {
       await deletePaperById(id);
       setPapers((prev) => ({
         ...prev,
-        papers: (prev.papers || []).filter((paper) => paper.id !== id),
+        papers: (prev.papers || []).filter((paper) => (paper.id !== id && paper.paper_id !== id)),
       }));
       alert("Paper deleted successfully");
     } catch (error) {
