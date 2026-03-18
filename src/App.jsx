@@ -44,6 +44,9 @@ import QuizzesList from "./pages/QuizzesList";
 import CreateQuiz from "./pages/CreateQuiz";
 import QuizDetail from "./pages/QuizDetail";
 import EditQuiz from "./pages/EditQuiz";
+import LiveQuizControl from "./pages/live/LiveQuizControl";
+import LiveQuizProjector from "./pages/live/LiveQuizProjector";
+import LiveQuizStudent from "./pages/live/LiveQuizStudent";
 
 function App() {
   return (
@@ -51,6 +54,17 @@ function App() {
       <Route path="/" element={<Home />} />
       <Route path="/about" element={<About />} />
       <Route path="/animations" element={<Animations />} />
+      {/* Live Quiz: control (teacher, auth); projector & student (public) */}
+      <Route
+        path="/live/session/:sessionId"
+        element={
+          <ProtectedRoute>
+            <LiveQuizControl />
+          </ProtectedRoute>
+        }
+      />
+      <Route path="/live/:sessionId/projector" element={<LiveQuizProjector />} />
+      <Route path="/live/join/:sessionCode" element={<LiveQuizStudent />} />
       <Route path="/auth">
         <Route path="login" element={<Login />} />
         <Route path="register" element={<Register />} />

@@ -6,12 +6,14 @@ import {
   getQuizAnswerKey,
   getQuizOmrSheet,
 } from "../services/quizService";
+import { startSession } from "../services/liveQuizService";
 import {
   ArrowLeft,
   FileDown,
   FileText,
   Loader,
   ClipboardList,
+  Play,
 } from "lucide-react";
 
 const QuizDetail = () => {
@@ -22,6 +24,8 @@ const QuizDetail = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [downloading, setDownloading] = useState(null);
+  const [startingLive, setStartingLive] = useState(false);
+  const [liveError, setLiveError] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -59,6 +63,20 @@ const QuizDetail = () => {
       alert(err.message || "Download failed");
     } finally {
       setDownloading(null);
+    }
+  };
+
+  const handleStartLiveQuiz = async () => {
+    setLiveError(null);
+    setStartingLive(true);
+    try {
+      const { sessionId } = await startSession(id);
+      navigate(`/live/session/${sessionId}`);
+    } catch (err) {
+      const msg = err.response?.data?.message || err.message || "Failed to start live quiz";
+      setLiveError(msg);
+    } finally {
+      setStartingLive(false);
     }
   };
 
@@ -123,6 +141,17 @@ const QuizDetail = () => {
           </div>
 
           <div className="p-6 border-b border-gray-200 flex flex-wrap gap-3">
+            <button
+              onClick={handleStartLiveQuiz}
+              disabled={startingLive}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium disabled:opacity-50"
+            >
+              {startingLive ? <Loader className="w-5 h-5 animate-spin" /> : <Play className="w-5 h-5" />}
+              {startingLive ? "Starting..." : "Start live quiz"}
+            </button>
+            {liveError && (
+              <span className="text-red-600 text-sm self-center">{liveError}</span>
+            )}
             <button
               onClick={() => handleDownload("student")}
               disabled={!!downloading}

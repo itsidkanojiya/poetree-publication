@@ -54,8 +54,32 @@ export const UserTeachingProvider = ({ children }) => {
       try {
         const data = await getMyApprovedSelections();
         const approved = data?.approved_selections || {};
-        const subjects = Array.isArray(approved.subjects) ? approved.subjects : [];
+        let subjects = Array.isArray(approved.subjects) ? approved.subjects : [];
         const subject_titles = Array.isArray(approved.subject_titles) ? approved.subject_titles : [];
+
+        // When backend returns empty subjects but has subject_titles or grouped, derive subjects so the context dropdown has options
+        if (subjects.length === 0 && (subject_titles.length > 0 || (Array.isArray(approved.grouped) && approved.grouped.length > 0))) {
+          if (Array.isArray(approved.grouped) && approved.grouped.length > 0) {
+            subjects = approved.grouped
+              .map((g) => g.subject)
+              .filter(Boolean)
+              .map((s) => ({
+                subject_id: s.subject_id ?? s.id,
+                subject_name: s.subject_name ?? s.name,
+                ...s,
+              }));
+          }
+          if (subjects.length === 0 && subject_titles.length > 0) {
+            const seen = new Set();
+            subjects = subject_titles
+              .map((t) => t.subject ?? (t.subject_id != null ? { subject_id: t.subject_id, subject_name: t.subject_name } : null))
+              .filter((s) => s && s.subject_id != null && !seen.has(s.subject_id) && (seen.add(s.subject_id), true))
+              .map((s) => ({
+                subject_id: s.subject_id ?? s.id,
+                subject_name: s.subject_name ?? s.name ?? `Subject ${s.subject_id}`,
+              }));
+          }
+        }
 
         if (!cancelled) {
           setApprovedSelections({ subjects, subject_titles });

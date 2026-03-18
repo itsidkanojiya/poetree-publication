@@ -28,7 +28,7 @@ export const getMyApprovedSelections = async () => {
  * Remove approved subject and/or subject-title selections.
  * POST /api/auth/my-selections/remove
  * Body: { user_subject_ids?: number[], user_subject_title_ids?: number[] }
- * At least one array must be non-empty. Uses row ids from user_subjects / user_subject_titles.
+ * Backend deletes those rows; they disappear from pending and approved.
  */
 export const removeApprovedSelections = async ({
   user_subject_ids = [],
@@ -42,6 +42,23 @@ export const removeApprovedSelections = async ({
   const response = await apiClient.post("/auth/my-selections/remove", {
     ...(ids.length > 0 ? { user_subject_ids: ids } : {}),
     ...(titleIds.length > 0 ? { user_subject_title_ids: titleIds } : {}),
+  });
+  return response.data;
+};
+
+/**
+ * Remove/cancel subject title(s) so they disappear from all lists.
+ * POST /api/auth/my-selections/remove-subject-title
+ * Body: { user_subject_title_ids: number[] } — row ids (user_subject_titles.id) or master subject_title_id.
+ * Use after success: refresh pending and approved lists.
+ */
+export const removeSubjectTitles = async ({ user_subject_title_ids = [] }) => {
+  const titleIds = Array.isArray(user_subject_title_ids) ? user_subject_title_ids.map(Number) : [];
+  if (titleIds.length === 0) {
+    throw new Error("user_subject_title_ids must be a non-empty array");
+  }
+  const response = await apiClient.post("/auth/my-selections/remove-subject-title", {
+    user_subject_title_ids: titleIds,
   });
   return response.data;
 };

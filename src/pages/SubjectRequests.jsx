@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import apiClient from "../services/apiClient";
-import { removeApprovedSelections } from "../services/userService";
+import { removeApprovedSelections, removeSubjectTitles } from "../services/userService";
 import Toast from "../components/Common/Toast";
 import {
   CheckCircle2,
@@ -66,6 +66,7 @@ const SubjectRequests = () => {
         }));
         const pendingTitles = (pendingSelections.subject_titles || []).map(
           (st) => ({
+            id: st.id ?? st.user_subject_title_id ?? st.user_subject_titles_id,
             subject_id: st.subject_id || st.subject?.subject_id,
             subject_title_id:
               st.subject_title_id || st.subjectTitle?.subject_title_id,
@@ -250,7 +251,22 @@ const SubjectRequests = () => {
       setToast({
         show: true,
         message:
-          "Please complete all subject selections with at least one title.",
+          "Each selected subject must include at least one subject title. Subject-only requests are not allowed.",
+        type: "warning",
+      });
+      return;
+    }
+
+    const subject_titles = newRequestSubjects.flatMap((s) =>
+      s.selectedTitles.map((titleId) => ({
+        subject_id: parseInt(s.subjectId),
+        subject_title_id: parseInt(titleId),
+      }))
+    );
+    if (subject_titles.length === 0) {
+      setToast({
+        show: true,
+        message: "Please select at least one subject title.",
         type: "warning",
       });
       return;
@@ -263,15 +279,7 @@ const SubjectRequests = () => {
         ...new Set(newRequestSubjects.map((s) => parseInt(s.subjectId))),
       ];
 
-      // Format subject_titles
-      const subject_titles = newRequestSubjects.flatMap((s) =>
-        s.selectedTitles.map((titleId) => ({
-          subject_id: parseInt(s.subjectId),
-          subject_title_id: parseInt(titleId),
-        }))
-      );
-
-      // Prepare the request payload
+      // Prepare the request payload (subject_titles already built above)
       const payload = {
         subjects: subjectsArray,
         subject_titles,
@@ -297,12 +305,15 @@ const SubjectRequests = () => {
       // Refresh data
       fetchAllData();
     } catch (error) {
-      console.error("Error submitting request:", error);
+      const data = error.response?.data;
+      const message =
+        data?.message ||
+        (Array.isArray(data?.missingTitleSubjects)
+          ? "Each selected subject must include at least one selected subject title."
+          : "Failed to submit request. Please try again.");
       setToast({
         show: true,
-        message:
-          error.response?.data?.message ||
-          "Failed to submit request. Please try again.",
+        message,
         type: "error",
       });
       setIsSubmitting(false);
@@ -331,17 +342,49 @@ const SubjectRequests = () => {
 
   const handleRemoveApprovedSubjectTitle = async (rowId) => {
     if (rowId == null) return;
-    if (!window.confirm("Remove this approved subject title from your selections? You can request it again later.")) return;
+    if (!window.confirm("Remove this approved subject title from your selections? It will disappear from all lists. You can request it again later.")) return;
     const key = `title-${rowId}`;
     setRemovingId(key);
     try {
-      await removeApprovedSelections({ user_subject_title_ids: [Number(rowId)] });
+      try {
+        await removeSubjectTitles({ user_subject_title_ids: [Number(rowId)] });
+      } catch (e) {
+        if (e.response?.status === 404) {
+          await removeApprovedSelections({ user_subject_title_ids: [Number(rowId)] });
+        } else throw e;
+      }
       setToast({ show: true, message: "Subject title removed from your selections.", type: "success" });
       fetchAllData();
     } catch (err) {
       setToast({
         show: true,
         message: err.response?.data?.message || "Failed to remove selection.",
+        type: "error",
+      });
+    } finally {
+      setRemovingId(null);
+    }
+  };
+
+  const handleCancelPendingSubjectTitle = async (rowId) => {
+    if (rowId == null) return;
+    if (!window.confirm("Cancel this pending subject title request? It will be removed and you can request it again later.")) return;
+    const key = `pending-title-${rowId}`;
+    setRemovingId(key);
+    try {
+      try {
+        await removeSubjectTitles({ user_subject_title_ids: [Number(rowId)] });
+      } catch (e) {
+        if (e.response?.status === 404) {
+          await removeApprovedSelections({ user_subject_title_ids: [Number(rowId)] });
+        } else throw e;
+      }
+      setToast({ show: true, message: "Pending subject title request cancelled.", type: "success" });
+      fetchAllData();
+    } catch (err) {
+      setToast({
+        show: true,
+        message: err.response?.data?.message || "Failed to cancel request.",
         type: "error",
       });
     } finally {
@@ -497,26 +540,45 @@ const SubjectRequests = () => {
                                 ):
                               </p>
                               <div className="flex flex-wrap gap-2">
-                                {request.subject_titles.map((st, idx) => (
-                                  <span
-                                    key={idx}
-                                    className="px-3 py-2 bg-white text-gray-800 text-sm font-medium rounded-lg border-2 border-amber-400 shadow-sm hover:shadow-md transition-shadow"
-                                    title={`${st.subject_name || "Subject"} - ${
-                                      st.title_name || "Title"
-                                    }`}
-                                  >
-                                    <span className="font-bold text-amber-700">
-                                      {st.subject_name || "Subject"}
+                                {request.subject_titles.map((st, idx) => {
+                                  const cancelKey = st.id != null ? `pending-title-${st.id}` : null;
+                                  const isRemoving = cancelKey && removingId === cancelKey;
+                                  return (
+                                    <span
+                                      key={st.id ?? idx}
+                                      className="inline-flex items-center gap-1 px-3 py-2 bg-white text-gray-800 text-sm font-medium rounded-lg border-2 border-amber-400 shadow-sm hover:shadow-md transition-shadow"
+                                      title={`${st.subject_name || "Subject"} - ${
+                                        st.title_name || "Title"
+                                      }`}
+                                    >
+                                      <span className="font-bold text-amber-700">
+                                        {st.subject_name || "Subject"}
+                                      </span>
+                                      <span className="mx-1 text-gray-400">
+                                        •
+                                      </span>
+                                      <span>
+                                        {st.title_name ||
+                                          `Title ${st.subject_title_id}`}
+                                      </span>
+                                      {cancelKey && (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleCancelPendingSubjectTitle(st.id)}
+                                          disabled={!!removingId}
+                                          className="p-0.5 rounded hover:bg-red-100 text-gray-500 hover:text-red-600 transition disabled:opacity-50"
+                                          title="Cancel this pending request"
+                                        >
+                                          {isRemoving ? (
+                                            <RefreshCw size={14} className="animate-spin" />
+                                          ) : (
+                                            <X size={14} />
+                                          )}
+                                        </button>
+                                      )}
                                     </span>
-                                    <span className="mx-1 text-gray-400">
-                                      •
-                                    </span>
-                                    <span>
-                                      {st.title_name ||
-                                        `Title ${st.subject_title_id}`}
-                                    </span>
-                                  </span>
-                                ))}
+                                  );
+                                })}
                               </div>
                             </div>
                           )}

@@ -8,6 +8,7 @@ import {
   getQuizAnswerKey,
   getQuizOmrSheet,
 } from "../services/quizService";
+import { startSession } from "../services/liveQuizService";
 import {
   ClipboardList,
   Plus,
@@ -19,6 +20,7 @@ import {
   Calendar,
   FileText,
   Loader,
+  Play,
 } from "lucide-react";
 
 const QuizzesList = () => {
@@ -30,6 +32,8 @@ const QuizzesList = () => {
   const [downloading, setDownloading] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [startingLiveId, setStartingLiveId] = useState(null);
+  const [liveError, setLiveError] = useState(null);
 
   const fetchQuizzes = async () => {
     if (!user?.id) return;
@@ -79,6 +83,20 @@ const QuizzesList = () => {
     }
   };
 
+  const handleStartLiveQuiz = async (paperId) => {
+    setLiveError(null);
+    setStartingLiveId(paperId);
+    try {
+      const { sessionId } = await startSession(paperId);
+      navigate(`/live/session/${sessionId}`);
+    } catch (err) {
+      const msg = err.response?.data?.message || err.message || "Failed to start live quiz";
+      setLiveError(msg);
+    } finally {
+      setStartingLiveId(null);
+    }
+  };
+
   const getPaperId = (q) => q.id ?? q.paper_id;
 
   return (
@@ -123,7 +141,13 @@ const QuizzesList = () => {
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="space-y-4">
+            {liveError && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                {liveError}
+              </div>
+            )}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {quizzes.map((quiz) => {
               const id = getPaperId(quiz);
               const title = quiz.paper_title || quiz.title || "Untitled Quiz";
@@ -157,6 +181,18 @@ const QuizzesList = () => {
                     )}
                     <p className="text-sm text-gray-500 mb-4">{questionCount} question(s)</p>
                     <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={() => handleStartLiveQuiz(id)}
+                        disabled={!!startingLiveId}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 text-sm font-medium disabled:opacity-50"
+                      >
+                        {startingLiveId === id ? (
+                          <Loader className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Play className="w-4 h-4" />
+                        )}
+                        Start live quiz
+                      </button>
                       <button
                         onClick={() => navigate(`/dashboard/quizzes/${id}`)}
                         className="inline-flex items-center gap-1 px-3 py-1.5 bg-amber-50 text-amber-700 rounded-lg hover:bg-amber-100 text-sm font-medium"
@@ -222,6 +258,7 @@ const QuizzesList = () => {
                 </div>
               );
             })}
+            </div>
           </div>
         )}
 

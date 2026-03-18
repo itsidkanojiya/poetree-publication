@@ -105,22 +105,59 @@ export const getUserSelections = async (userId) => {
 /**
  * Approve user selections and activate user
  * POST /api/admin/approve-selections/{userId}
- * Body: { subject_ids: number[], subject_title_ids: number[], reject_others: boolean }
+ *
+ * Backend contract (IMPORTANT):
+ * - `subject_ids` and `subject_title_ids` are ROW IDs (user_subjects.id / user_subject_titles.id)
+ * - To approve by MASTER IDs, use:
+ *   - approve_by_subject_ids: number[] (subjects.subject_id)
+ *   - approve_by_subject_title_ids: number[] (subject_titles.subject_title_id)
+ *
+ * Pass either row-id arrays or master-id arrays. Do not mix.
  */
 export const approveUserSelections = async (
   userId,
-  { subject_ids, subject_title_ids, reject_others = false },
+  {
+    // Row IDs
+    subject_ids,
+    subject_title_ids,
+    // Master IDs
+    approve_by_subject_ids,
+    approve_by_subject_title_ids,
+    reject_others = false,
+  },
 ) => {
   try {
-    const body = {
-      subject_ids: Array.isArray(subject_ids)
-        ? subject_ids.map((id) => Number(id))
-        : [],
-      subject_title_ids: Array.isArray(subject_title_ids)
-        ? subject_title_ids.map((id) => Number(id))
-        : [],
-      reject_others: Boolean(reject_others),
-    };
+    const rowSubjectIds = Array.isArray(subject_ids)
+      ? subject_ids.map((id) => Number(id))
+      : [];
+    const rowTitleIds = Array.isArray(subject_title_ids)
+      ? subject_title_ids.map((id) => Number(id))
+      : [];
+    const masterSubjectIds = Array.isArray(approve_by_subject_ids)
+      ? approve_by_subject_ids.map((id) => Number(id))
+      : [];
+    const masterTitleIds = Array.isArray(approve_by_subject_title_ids)
+      ? approve_by_subject_title_ids.map((id) => Number(id))
+      : [];
+
+    const usingRowIds = rowSubjectIds.length > 0 || rowTitleIds.length > 0;
+    const usingMasterIds = masterSubjectIds.length > 0 || masterTitleIds.length > 0;
+
+    if (usingRowIds && usingMasterIds) {
+      throw new Error("approveUserSelections: do not mix row-id and master-id fields");
+    }
+
+    const body = usingMasterIds
+      ? {
+          approve_by_subject_ids: masterSubjectIds,
+          approve_by_subject_title_ids: masterTitleIds,
+          reject_others: Boolean(reject_others),
+        }
+      : {
+          subject_ids: rowSubjectIds,
+          subject_title_ids: rowTitleIds,
+          reject_others: Boolean(reject_others),
+        };
     const response = await apiClient.post(
       `/admin/approve-selections/${userId}`,
       body,

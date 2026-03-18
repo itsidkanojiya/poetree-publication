@@ -247,7 +247,7 @@ const Register = () => {
       return;
     }
 
-    // Validate that all selections have required fields
+    // Backend: subject-only is not allowed. Every subject must have at least one title.
     const isValid = selectedSubjects.every(
       (s) => s.subjectId && s.selectedTitles.length > 0
     );
@@ -255,7 +255,22 @@ const Register = () => {
       setToast({
         show: true,
         message:
-          "Please complete all subject selections with at least one subject title.",
+          "Each selected subject must include at least one subject title. Subject-only signup is not allowed.",
+        type: "warning",
+      });
+      return;
+    }
+
+    const subject_titles = selectedSubjects.flatMap((s) =>
+      s.selectedTitles.map((titleId) => ({
+        subject_id: parseInt(s.subjectId),
+        subject_title_id: parseInt(titleId),
+      }))
+    );
+    if (subject_titles.length === 0) {
+      setToast({
+        show: true,
+        message: "Please select at least one subject title.",
         type: "warning",
       });
       return;
@@ -264,19 +279,10 @@ const Register = () => {
     setLoading(true);
     setError("");
 
-    // Format data for backend API - Multiple Subjects format
-    // Extract unique subject IDs
+    // Extract unique subject IDs (every subject_id must appear in subject_titles)
     const subjects = [
       ...new Set(selectedSubjects.map((s) => parseInt(s.subjectId))),
     ];
-
-    // Format subject_titles as array of objects
-    const subject_titles = selectedSubjects.flatMap((s) =>
-      s.selectedTitles.map((titleId) => ({
-        subject_id: parseInt(s.subjectId),
-        subject_title_id: parseInt(titleId),
-      }))
-    );
 
     // Remove subjects from personalInfo if it exists (cleanup)
     const { subjects: _, ...cleanPersonalInfo } = personalInfo;
@@ -288,7 +294,6 @@ const Register = () => {
           ...cleanPersonalInfo,
           subjects,
           subject_titles,
-          user_type: "admin",
         },
         { headers: { "Content-Type": "application/json" } }
       );
@@ -310,8 +315,12 @@ const Register = () => {
         }, 2000);
       }
     } catch (err) {
+      const data = err.response?.data;
       const errorMessage =
-        err.response?.data?.message || "Registration failed!";
+        data?.message ||
+        (Array.isArray(data?.missingTitleSubjects)
+          ? "Each selected subject must include at least one selected subject title."
+          : "Registration failed!");
       setError(errorMessage);
       setToast({
         show: true,

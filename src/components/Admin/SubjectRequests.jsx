@@ -55,18 +55,18 @@ const AdminSubjectRequests = () => {
       const approvedTitleIds = (requestsData?.subject_titles?.approved || []).map(
         (t) => t.subject_title_id ?? t.id
       );
-      const subject_ids =
+      const approve_by_subject_ids =
         type === "subject"
           ? [...approvedSubjectIds, item.subject_id ?? item.id]
           : approvedSubjectIds;
-      const subject_title_ids =
+      const approve_by_subject_title_ids =
         type === "subject_title"
           ? [...approvedTitleIds, item.subject_title_id ?? item.id]
           : approvedTitleIds;
 
       await approveUserSelections(userId, {
-        subject_ids,
-        subject_title_ids,
+        approve_by_subject_ids,
+        approve_by_subject_title_ids,
         reject_others: false,
       });
       setToast({
