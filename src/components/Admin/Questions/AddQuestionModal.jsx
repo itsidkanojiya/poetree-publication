@@ -16,6 +16,7 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
     subject_title_id: "",
     chapter_id: "",
     marks: "",
+    difficulty: "medium",
     image: null,
   });
   const [subjects, setSubjects] = useState([]);
@@ -115,6 +116,7 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
       subject_title_id: question.subject_title_id || "",
       chapter_id: question.chapter_id ?? question.chapter?.chapter_id ?? "",
       marks: question.marks || "",
+      difficulty: question.difficulty === "easy" || question.difficulty === "hard" ? question.difficulty : "medium",
       image: null,
     });
 
@@ -210,6 +212,7 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
       if (formData.subject_title_id) formDataToSend.append("subject_title_id", formData.subject_title_id);
       if (formData.chapter_id) formDataToSend.append("chapter_id", formData.chapter_id);
       if (formData.marks) formDataToSend.append("marks", formData.marks);
+      formDataToSend.append("difficulty", formData.difficulty || "medium");
       if (formData.image) formDataToSend.append("image", formData.image);
 
       // Handle type-specific fields
@@ -287,6 +290,9 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
     if (!formData.board_id) newErrors.board_id = "Board is required";
     if (!formData.subject_title_id) newErrors.subject_title_id = "Subject Title is required";
     if (!formData.chapter_id) newErrors.chapter_id = "Chapter is required";
+    if (!formData.difficulty || !["easy", "medium", "hard"].includes(formData.difficulty)) {
+      newErrors.difficulty = "Difficulty is required";
+    }
     if (!formData.question.trim()) newErrors.question = "Question is required";
     // Answer is optional for all question types — user can add a question without an answer
     if (questionType === "mcq") {
@@ -641,6 +647,28 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
                   className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition outline-none"
                   placeholder="e.g., 1"
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Difficulty <span className="text-red-500">*</span>
+                </label>
+                <select
+                  name="difficulty"
+                  value={formData.difficulty}
+                  onChange={handleChange}
+                  className={`w-full px-4 py-3 border-2 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition outline-none ${
+                    errors.difficulty ? "border-red-300" : "border-gray-200"
+                  }`}
+                  required
+                >
+                  <option value="easy">Easy</option>
+                  <option value="medium">Medium</option>
+                  <option value="hard">Hard</option>
+                </select>
+                {errors.difficulty && (
+                  <p className="mt-1 text-sm text-red-600">{errors.difficulty}</p>
+                )}
               </div>
             </div>
 

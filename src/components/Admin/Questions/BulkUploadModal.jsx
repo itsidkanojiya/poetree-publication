@@ -55,6 +55,7 @@ const BulkUploadModal = ({ questionType, onClose, onSuccess }) => {
       board: "Board",
       board_id: "Board ID",
       marks: "Marks",
+      difficulty: "Difficulty",
       image: "Image",
     };
 
@@ -100,6 +101,7 @@ const BulkUploadModal = ({ questionType, onClose, onSuccess }) => {
       mapping.subject_title_id,
       mapping.board_id,
       mapping.marks,
+      mapping.difficulty,
     ];
     if (questionType === "mcq") {
       headers.push(mapping.option1, mapping.option2, mapping.option3, mapping.option4);
@@ -128,6 +130,7 @@ const BulkUploadModal = ({ questionType, onClose, onSuccess }) => {
       titleId,
       boardId,
       "1",
+      "medium",
     ];
     if (questionType === "mcq") {
       sampleRow.push("Option A", "Option B", "Option C", "Option D");
@@ -225,9 +228,21 @@ const BulkUploadModal = ({ questionType, onClose, onSuccess }) => {
             ? String(row[mapping.standard]).trim()
             : "",
           marks: row[mapping.marks] ? String(row[mapping.marks]).trim() : "",
+          difficulty: "",
           image: null,
           imageFileName: row[mapping.image] || "",
         };
+
+        const rawDiff = row[mapping.difficulty] != null ? String(row[mapping.difficulty]).trim().toLowerCase() : "";
+        if (rawDiff === "easy" || rawDiff === "medium" || rawDiff === "hard") {
+          question.difficulty = rawDiff;
+        } else if (rawDiff) {
+          newErrors.push(
+            `Row ${index + 2}: Difficulty must be easy, medium, or hard (got "${row[mapping.difficulty]}")`
+          );
+        } else {
+          question.difficulty = "medium";
+        }
 
         // Handle question type specific fields
         if (questionType === "mcq") {
@@ -598,6 +613,7 @@ const BulkUploadModal = ({ questionType, onClose, onSuccess }) => {
           formData.append("question", String(question.question));
           formData.append("answer", String(question.answer));
           formData.append("marks", String(question.marks));
+          formData.append("difficulty", question.difficulty || "medium");
 
           // OPTIONAL FIELDS
           if (question.solution) formData.append("solution", question.solution);

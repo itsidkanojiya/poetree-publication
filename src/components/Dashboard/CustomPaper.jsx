@@ -13,6 +13,7 @@ import {
   Plus,
   ChevronDown,
   Award,
+  AlertTriangle,
 } from "lucide-react";
 import Button from "../Common/Buttons/Button";
 import { savePaper } from "../../utils/savePaper";
@@ -21,9 +22,15 @@ import usePdfContent from "../../hooks/usePdfContent";
 import HeaderCard from "../Cards/HeaderCard";
 import apiClient from "../../services/apiClient";
 import { getPaperById, updatePaper } from "../../services/paperService";
-import { getChaptersBySubjectTitle } from "../../services/adminService";
+import {
+  getChaptersBySubjectTitle,
+  smartProposePaper,
+  getQuestionsByType,
+} from "../../services/adminService";
 import Toast from "../Common/Toast";
 import Loader from "../Common/loader/loader";
+import SmartPaperStepper from "./SmartPaperStepper";
+import SmartPaperWizardSubjectForm from "./SmartPaperWizardSubjectForm";
 
 // Constants
 const PAGE_DIMENSIONS = {
@@ -54,6 +61,48 @@ const INITIAL_QUESTION_SECTIONS = [
   { type: "long", selectedQuestions: [] },
   { type: "passage", selectedQuestions: [] },
   { type: "match", selectedQuestions: [] },
+];
+
+/** Canonical keys for POST /papers/smart-propose `section_question_counts` (non‑negative integers; sum ≥ 1). */
+const SMART_SECTION_KEYS = [
+  "mcq",
+  "blank",
+  "true_false",
+  "onetwo",
+  "short",
+  "long",
+  "passage",
+  "match",
+];
+
+/** Default counts per type (small paper preset; total 25 questions). */
+const DEFAULT_SMART_SECTION_COUNTS = {
+  mcq: 8,
+  blank: 2,
+  true_false: 2,
+  onetwo: 2,
+  short: 4,
+  long: 6,
+  passage: 0,
+  match: 1,
+};
+
+const SMART_SECTION_GROUPS = [
+  {
+    id: "objective",
+    title: "Objective and quick",
+    keys: ["mcq", "true_false", "blank"],
+  },
+  {
+    id: "written",
+    title: "Written answers",
+    keys: ["onetwo", "short", "long"],
+  },
+  {
+    id: "context",
+    title: "Context and matching",
+    keys: ["passage", "match"],
+  },
 ];
 
 /** Collect unique chapter IDs from all selected questions (for chapter_ids when saving paper). */
@@ -318,6 +367,7 @@ const CustomPaper = () => {
   const { header, paperId, editMode, paperData: initialPaperData } = location.state || {};
   const divContents = usePdfContent();
   const pagesRef = useRef(null);
+  const previewPanelRef = useRef(null);
   
   // Edit mode state
   const [isEditMode, setIsEditMode] = useState(editMode || false);
@@ -345,6 +395,22 @@ const CustomPaper = () => {
   });
   const [chapters, setChapters] = useState([]);
   const [loadingChapters, setLoadingChapters] = useState(false);
+
+  const [smartWizardActive, setSmartWizardActive] = useState(false);
+  /** header → subject → targets → generating → preview */
+  const [smartWizardStep, setSmartWizardStep] = useState("header");
+  const [smartTotalMarks, setSmartTotalMarks] = useState(80);
+  const [smartDifficulty, setSmartDifficulty] = useState({
+    easy: 30,
+    medium: 40,
+    hard: 30,
+  });
+  const [smartSectionCounts, setSmartSectionCounts] = useState(() => ({
+    ...DEFAULT_SMART_SECTION_COUNTS,
+  }));
+  const [smartChapterPercents, setSmartChapterPercents] = useState([]);
+  const [smartMeta, setSmartMeta] = useState(null);
+  const [previewHighlight, setPreviewHighlight] = useState(false);
 
   const [approvedSubjectIds, setApprovedSubjectIds] = useState([]);
   const [approvedSubjectsMap, setApprovedSubjectsMap] = useState(new Map()); // Store subject_id -> subject_name mapping
@@ -668,9 +734,14 @@ const CustomPaper = () => {
   }, []);
 
   const effectiveHeaderForChapter = paperHeader || header;
-  const subjectTitleIdForChapters = effectiveHeaderForChapter?.subjectTitle != null && effectiveHeaderForChapter?.subjectTitle !== ""
-    ? effectiveHeaderForChapter.subjectTitle
-    : null;
+  const rawSubjectTitleId =
+    effectiveHeaderForChapter?.subjectTitle ??
+    effectiveHeaderForChapter?.subject_title_id ??
+    null;
+  const subjectTitleIdForChapters =
+    rawSubjectTitleId != null && rawSubjectTitleId !== ""
+      ? rawSubjectTitleId
+      : null;
 
   useEffect(() => {
     if (!subjectTitleIdForChapters) {
@@ -691,6 +762,22 @@ const CustomPaper = () => {
       });
     return () => { cancelled = true; };
   }, [subjectTitleIdForChapters]);
+
+  useEffect(() => {
+    if (!chapters.length) {
+      setSmartChapterPercents([]);
+      return;
+    }
+    const n = chapters.length;
+    const base = Math.floor(100 / n);
+    let rem = 100 - base * n;
+    setSmartChapterPercents(
+      chapters.map((ch, i) => ({
+        chapter_id: ch.chapter_id,
+        percent: base + (i < rem ? 1 : 0),
+      }))
+    );
+  }, [chapters]);
 
   // Fetch questions filtered by approved subjects, board, subject title, and chapter from API
   useEffect(() => {
@@ -762,6 +849,339 @@ const CustomPaper = () => {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  // Sidebar "Smart paper" opens multi-step wizard (header → subject → targets → animation → preview)
+  useEffect(() => {
+    if (isEditMode) return;
+    const st = location.state;
+    if (!st?.smartPaperWizard) return;
+    setSmartWizardActive(true);
+    setSmartWizardStep("header");
+    const { smartPaperWizard: _w, header: incomingHeader, ...rest } = st;
+    navigate(location.pathname, {
+      replace: true,
+      state: Object.keys(rest).length ? rest : undefined,
+    });
+    if (incomingHeader) {
+      setPaperHeader(incomingHeader);
+    } else {
+      try {
+        const u = JSON.parse(localStorage.getItem("user") || "null");
+        setPaperHeader({
+          schoolName: u?.school_name || "",
+          address: u?.address || "",
+          documentTitle: "",
+          date: new Date().toISOString().slice(0, 10),
+          timing: "",
+          division: "",
+          section: "",
+          subject: "",
+          board: "",
+          subjectTitle: "",
+          standard: "",
+          class: "",
+        });
+      } catch {
+        setPaperHeader({
+          documentTitle: "",
+          date: new Date().toISOString().slice(0, 10),
+          timing: "",
+          division: "",
+          section: "",
+        });
+      }
+    }
+  }, []);
+
+  const sumSmartPercents = (obj) =>
+    Object.values(obj).reduce((a, b) => a + (Number(b) || 0), 0);
+
+  const getTeachingContext = () => {
+    const h = paperHeader || header;
+    const rawSt =
+      h?.subjectTitle ?? h?.subject_title_id ?? null;
+    const subject_title_id =
+      rawSt != null && rawSt !== "" ? Number(rawSt) : null;
+    const board_id =
+      h?.board != null && h?.board !== "" ? Number(h.board) : null;
+    let std = h?.standard;
+    if (std != null && std !== "") {
+      if (typeof std === "string") {
+        const m = std.match(/\d+/);
+        std = m ? parseInt(m[0], 10) : parseInt(std, 10);
+      } else {
+        std = Number(std);
+      }
+      if (Number.isNaN(std)) std = null;
+    } else {
+      std = null;
+    }
+    return { subject_title_id, board_id, standard: std };
+  };
+
+  const normalizeSmartChapterPercents = () => {
+    if (!chapters.length) return;
+    const n = chapters.length;
+    const base = Math.floor(100 / n);
+    let rem = 100 - base * n;
+    setSmartChapterPercents(
+      chapters.map((ch, i) => ({
+        chapter_id: ch.chapter_id,
+        percent: base + (i < rem ? 1 : 0),
+      }))
+    );
+  };
+
+  const getSmartSectionQuestionTotal = () =>
+    SMART_SECTION_KEYS.reduce((s, k) => s + (Number(smartSectionCounts[k]) || 0), 0);
+
+  const resetSmartSectionCountsDefaults = () => {
+    setSmartSectionCounts({ ...DEFAULT_SMART_SECTION_COUNTS });
+  };
+
+  const clearSmartSectionCounts = () => {
+    setSmartSectionCounts(
+      SMART_SECTION_KEYS.reduce((acc, k) => {
+        acc[k] = 0;
+        return acc;
+      }, {})
+    );
+  };
+
+  const updateSmartChapterPercent = (chapterId, value) => {
+    const v = Math.max(0, Math.min(100, Number(value) || 0));
+    setSmartChapterPercents((prev) =>
+      prev.map((row) =>
+        row.chapter_id === chapterId ? { ...row, percent: v } : row
+      )
+    );
+  };
+
+  const SMART_WIZARD_MIN_MS = 2800;
+
+  const handleSmartPaperGenerate = async () => {
+    const ctx = getTeachingContext();
+    if (
+      ctx.subject_title_id == null ||
+      Number.isNaN(ctx.subject_title_id) ||
+      ctx.board_id == null ||
+      Number.isNaN(ctx.board_id) ||
+      ctx.standard == null ||
+      Number.isNaN(ctx.standard)
+    ) {
+      setToast({
+        message:
+          "Set subject title, board, and standard in the paper header first.",
+        type: "error",
+      });
+      return;
+    }
+    if (!smartChapterPercents.length) {
+      setToast({
+        message:
+          "No chapters for this subject title. Add chapters in admin or pick another title.",
+        type: "error",
+      });
+      return;
+    }
+    const chSum = smartChapterPercents.reduce(
+      (s, c) => s + (Number(c.percent) || 0),
+      0
+    );
+    if (Math.abs(chSum - 100) > 0.01) {
+      setToast({
+        message: `Chapter % must sum to 100 (currently ${chSum}).`,
+        type: "error",
+      });
+      return;
+    }
+    const dSum = sumSmartPercents(smartDifficulty);
+    if (Math.abs(dSum - 100) > 0.01) {
+      setToast({
+        message: `Difficulty % must sum to 100 (currently ${dSum}).`,
+        type: "error",
+      });
+      return;
+    }
+    const sSum = getSmartSectionQuestionTotal();
+    if (sSum < 1) {
+      setToast({
+        message:
+          "Set at least one question in the section mix (total questions must be at least 1).",
+        type: "error",
+      });
+      return;
+    }
+
+    const inWizard = smartWizardActive && smartWizardStep === "targets";
+    if (inWizard) {
+      setSmartWizardStep("generating");
+    }
+    setSmartMeta(null);
+    const startedAt = Date.now();
+
+    try {
+      const payload = {
+        subject_title_id: ctx.subject_title_id,
+        board_id: ctx.board_id,
+        standard: ctx.standard,
+        total_marks: Number(smartTotalMarks) || 80,
+        chapter_weights: smartChapterPercents.map((c) => ({
+          chapter_id: Number(c.chapter_id),
+          percent: Number(c.percent),
+        })),
+        difficulty_weights: {
+          easy: Number(smartDifficulty.easy),
+          medium: Number(smartDifficulty.medium),
+          hard: Number(smartDifficulty.hard),
+        },
+        section_question_counts: SMART_SECTION_KEYS.reduce((acc, k) => {
+          acc[k] = Math.max(0, Math.floor(Number(smartSectionCounts[k]) || 0));
+          return acc;
+        }, {}),
+        exclude_question_ids: [],
+      };
+
+      const raw = await smartProposePaper(payload);
+      const data = raw?.data ?? raw;
+      const list = data?.questions || [];
+      if (!Array.isArray(list) || list.length === 0) {
+        setSmartMeta({
+          warnings: data?.warnings || [],
+          suggestions: data?.suggestions || [],
+          totals: data?.totals || null,
+        });
+        setToast({
+          message:
+            data?.message ||
+            "No questions returned. Add more questions or adjust targets.",
+          type: "error",
+        });
+        if (inWizard) setSmartWizardStep("targets");
+        return;
+      }
+
+      const byId = {};
+      const order = [];
+      for (const row of list) {
+        const id = row.question_id ?? row.id;
+        if (id == null) continue;
+        order.push(id);
+        byId[id] = { ...row };
+      }
+
+      const typesNeeded = [
+        ...new Set(order.map((id) => byId[id]?.type).filter(Boolean)),
+      ];
+      const filters = {
+        subject_title_id: ctx.subject_title_id,
+        board_id: ctx.board_id,
+        standard: ctx.standard,
+      };
+      await Promise.all(
+        typesNeeded.map(async (t) => {
+          const qs = await getQuestionsByType(t, filters);
+          const arr = Array.isArray(qs) ? qs : qs?.questions || qs?.data || [];
+          arr.forEach((full) => {
+            const fid = full.question_id ?? full.id;
+            if (fid != null && byId[fid]) {
+              byId[fid] = { ...full, ...byId[fid] };
+            }
+          });
+        })
+      );
+
+      const groupedQuestions = {
+        mcq: [],
+        blank: [],
+        short: [],
+        long: [],
+        onetwo: [],
+        true_false: [],
+        passage: [],
+        match: [],
+      };
+
+      order.forEach((id) => {
+        const q = byId[id];
+        if (!q) return;
+        const nt = normalizeQuestionType(q.type);
+        if (groupedQuestions[nt]) {
+          groupedQuestions[nt].push(q);
+        }
+      });
+
+      setQuestionSections((prev) =>
+        prev.map((section) => ({
+          ...section,
+          selectedQuestions: groupedQuestions[section.type] || [],
+        }))
+      );
+
+      setSmartMeta({
+        warnings: data?.warnings || [],
+        suggestions: data?.suggestions || [],
+        totals: data?.totals || null,
+      });
+
+      if (inWizard) {
+        const elapsed = Date.now() - startedAt;
+        if (elapsed < SMART_WIZARD_MIN_MS) {
+          await new Promise((r) =>
+            setTimeout(r, SMART_WIZARD_MIN_MS - elapsed)
+          );
+        }
+        setSmartWizardStep("preview");
+      }
+
+      setToast({
+        message: inWizard
+          ? `Your paper is ready: ${order.length} question(s).`
+          : `Smart paper applied: ${order.length} question(s). Showing preview.`,
+        type: "success",
+      });
+
+      if (!inWizard) {
+        setPreviewHighlight(true);
+        setTimeout(() => setPreviewHighlight(false), 2600);
+        setTimeout(() => {
+          previewPanelRef.current?.scrollIntoView({
+            behavior: "smooth",
+            block: "start",
+            inline: "nearest",
+          });
+          const inner = previewPanelRef.current;
+          if (inner && typeof inner.scrollTo === "function") {
+            inner.scrollTo({ top: 0, behavior: "smooth" });
+          }
+        }, 120);
+      } else {
+        setPreviewHighlight(true);
+        setTimeout(() => setPreviewHighlight(false), 2600);
+        setTimeout(() => {
+          previewPanelRef.current?.scrollIntoView({
+            behavior: "smooth",
+            block: "start",
+            inline: "nearest",
+          });
+          const inner = previewPanelRef.current;
+          if (inner && typeof inner.scrollTo === "function") {
+            inner.scrollTo({ top: 0, behavior: "smooth" });
+          }
+        }, 120);
+      }
+    } catch (err) {
+      console.error(err);
+      if (inWizard) setSmartWizardStep("targets");
+      setToast({
+        message:
+          err.response?.data?.message ||
+          err.message ||
+          "Smart paper failed. Is the backend ready?",
+        type: "error",
+      });
+    }
+  };
 
   const handleMarksChange = (type, value) => {
     const numValue = parseFloat(value) || 0;
@@ -840,6 +1260,11 @@ const CustomPaper = () => {
     });
     localStorage.removeItem("questionSections");
     localStorage.removeItem("marksPerType");
+    if (smartWizardActive) {
+      setSmartWizardStep("header");
+      setSmartMeta(null);
+      setSmartSectionCounts({ ...DEFAULT_SMART_SECTION_COUNTS });
+    }
   };
 
   const downloadPDF = async () => {
@@ -1287,6 +1712,8 @@ const CustomPaper = () => {
 
   const printedTypes = new Set();
 
+  const smartSectionQuestionTotal = getSmartSectionQuestionTotal();
+
   // Show loading state while loading paper data
   if (loadingPaper) {
     return (
@@ -1295,6 +1722,701 @@ const CustomPaper = () => {
           <Loader className="mx-auto mb-4" />
           <p className="text-gray-600 font-semibold">Loading paper data...</p>
         </div>
+      </div>
+    );
+  }
+
+  const proceedWizardHeader = () => {
+    if (!paperHeader?.documentTitle?.trim()) {
+      setToast({
+        message: "Please enter a paper title.",
+        type: "error",
+      });
+      return;
+    }
+    setSmartWizardStep("subject");
+  };
+
+  if (smartWizardActive && smartWizardStep === "header") {
+    if (!paperHeader) {
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40 flex items-center justify-center">
+          <Loader className="mx-auto mb-4" />
+        </div>
+      );
+    }
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40">
+        <div className="bg-white/80 backdrop-blur-lg border-b border-gray-200/50 px-6 py-4 sticky top-0 z-50 shadow-lg shadow-gray-200/50">
+          <div className="flex flex-wrap items-center justify-between gap-3 w-full max-w-5xl mx-auto">
+            <div className="flex items-center gap-4">
+              <button
+                type="button"
+                onClick={() => setShowBackConfirm(true)}
+                className="group flex items-center gap-2 px-3 py-2 text-gray-700 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200 font-medium"
+              >
+                <ChevronLeft
+                  size={20}
+                  className="group-hover:-translate-x-1 transition-transform"
+                />
+                <span>Back to Dashboard</span>
+              </button>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Sparkles size={22} className="text-indigo-600" />
+                <span className="font-bold text-gray-800">Smart paper</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="max-w-3xl mx-auto px-6 py-8 pb-16">
+          <SmartPaperStepper activeIndex={0} />
+          <p className="text-gray-600 text-sm mb-6">
+            Start with your paper header. School name and address come from your profile; next you will choose subject, board, and standard.
+          </p>
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+            <div className="px-6 py-4 bg-gradient-to-r from-indigo-500 to-violet-600 text-white flex items-center gap-3">
+              <Sparkles size={22} />
+              <div>
+                <div className="font-bold text-base">Paper header</div>
+                <div className="text-xs text-indigo-100">Title, date, and exam details</div>
+              </div>
+            </div>
+            <div className="p-6 space-y-4 border-t border-gray-100 bg-gradient-to-b from-white to-slate-50/80">
+              <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+                <strong>School on the paper:</strong>{" "}
+                {paperHeader.schoolName || "—"} (from your profile). Update in Profile if needed.
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">
+                  Paper title <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={paperHeader.documentTitle || ""}
+                  onChange={(e) =>
+                    setPaperHeader((p) => ({ ...p, documentTitle: e.target.value }))
+                  }
+                  className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl text-sm"
+                  placeholder="e.g. Unit Test – Term 1"
+                />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Date</label>
+                  <input
+                    type="date"
+                    value={paperHeader.date || ""}
+                    onChange={(e) =>
+                      setPaperHeader((p) => ({ ...p, date: e.target.value }))
+                    }
+                    className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Time / duration</label>
+                  <input
+                    type="text"
+                    value={paperHeader.timing || ""}
+                    onChange={(e) =>
+                      setPaperHeader((p) => ({ ...p, timing: e.target.value }))
+                    }
+                    className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl text-sm"
+                    placeholder="e.g. 3 hours"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Section</label>
+                  <input
+                    type="text"
+                    value={paperHeader.section || ""}
+                    onChange={(e) =>
+                      setPaperHeader((p) => ({ ...p, section: e.target.value }))
+                    }
+                    className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Division</label>
+                  <input
+                    type="text"
+                    value={paperHeader.division || ""}
+                    onChange={(e) =>
+                      setPaperHeader((p) => ({ ...p, division: e.target.value }))
+                    }
+                    className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl text-sm"
+                  />
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={proceedWizardHeader}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-bold text-white bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 shadow-lg"
+              >
+                Continue to subject
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {showBackConfirm && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 border border-gray-200">
+              <h3 className="text-xl font-bold text-gray-800 mb-2">Leave this page?</h3>
+              <p className="text-gray-600 mb-6">
+                Are you sure? You can save as draft and continue later, or discard and start fresh next time.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3 justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShowBackConfirm(false)}
+                  className="px-4 py-2.5 rounded-xl font-semibold border-2 border-gray-300 text-gray-700 hover:bg-gray-50 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDiscardAndGo}
+                  className="px-4 py-2.5 rounded-xl font-semibold bg-rose-500 text-white hover:bg-rose-600 transition"
+                >
+                  Discard
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveDraftAndGo}
+                  disabled={isSaving}
+                  className="px-4 py-2.5 rounded-xl font-semibold bg-violet-500 text-white hover:bg-violet-600 transition disabled:opacity-50"
+                >
+                  {isSaving ? "Saving..." : "Save as draft"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {toast && (
+          <Toast
+            message={toast.message}
+            type={toast.type}
+            onClose={() => setToast(null)}
+            duration={3000}
+          />
+        )}
+      </div>
+    );
+  }
+
+  if (smartWizardActive && smartWizardStep === "subject") {
+    if (!paperHeader) {
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40 flex items-center justify-center">
+          <Loader className="mx-auto mb-4" />
+        </div>
+      );
+    }
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40">
+        <div className="bg-white/80 backdrop-blur-lg border-b border-gray-200/50 px-6 py-4 sticky top-0 z-50 shadow-lg shadow-gray-200/50">
+          <div className="flex flex-wrap items-center justify-between gap-3 w-full max-w-5xl mx-auto">
+            <div className="flex items-center gap-4">
+              <button
+                type="button"
+                onClick={() => setShowBackConfirm(true)}
+                className="group flex items-center gap-2 px-3 py-2 text-gray-700 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200 font-medium"
+              >
+                <ChevronLeft
+                  size={20}
+                  className="group-hover:-translate-x-1 transition-transform"
+                />
+                <span>Back to Dashboard</span>
+              </button>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Sparkles size={22} className="text-indigo-600" />
+                <span className="font-bold text-gray-800">Smart paper</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="max-w-3xl mx-auto px-6 py-8 pb-16">
+          <SmartPaperStepper activeIndex={1} />
+          <p className="text-gray-600 text-sm mb-6">
+            Choose the subject, standard, board, and subject title for this paper. This matches how your question bank is filtered.
+          </p>
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+            <SmartPaperWizardSubjectForm
+              paperHeader={paperHeader}
+              setPaperHeader={setPaperHeader}
+              onBack={() => setSmartWizardStep("header")}
+              onContinue={() => setSmartWizardStep("targets")}
+            />
+          </div>
+        </div>
+
+        {showBackConfirm && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 border border-gray-200">
+              <h3 className="text-xl font-bold text-gray-800 mb-2">Leave this page?</h3>
+              <p className="text-gray-600 mb-6">
+                Are you sure? You can save as draft and continue later, or discard and start fresh next time.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3 justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShowBackConfirm(false)}
+                  className="px-4 py-2.5 rounded-xl font-semibold border-2 border-gray-300 text-gray-700 hover:bg-gray-50 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDiscardAndGo}
+                  className="px-4 py-2.5 rounded-xl font-semibold bg-rose-500 text-white hover:bg-rose-600 transition"
+                >
+                  Discard
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveDraftAndGo}
+                  disabled={isSaving}
+                  className="px-4 py-2.5 rounded-xl font-semibold bg-violet-500 text-white hover:bg-violet-600 transition disabled:opacity-50"
+                >
+                  {isSaving ? "Saving..." : "Save as draft"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {toast && (
+          <Toast
+            message={toast.message}
+            type={toast.type}
+            onClose={() => setToast(null)}
+            duration={3000}
+          />
+        )}
+      </div>
+    );
+  }
+
+  if (smartWizardActive && smartWizardStep === "targets") {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40">
+        <div className="bg-white/80 backdrop-blur-lg border-b border-gray-200/50 px-6 py-4 sticky top-0 z-50 shadow-lg shadow-gray-200/50">
+          <div className="flex flex-wrap items-center justify-between gap-3 w-full max-w-5xl mx-auto">
+            <div className="flex items-center gap-4">
+              <button
+                type="button"
+                onClick={() => setShowBackConfirm(true)}
+                className="group flex items-center gap-2 px-3 py-2 text-gray-700 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200 font-medium"
+              >
+                <ChevronLeft
+                  size={20}
+                  className="group-hover:-translate-x-1 transition-transform"
+                />
+                <span>Back to Dashboard</span>
+              </button>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Sparkles size={22} className="text-indigo-600" />
+                <span className="font-bold text-gray-800">Smart paper</span>
+                <span className="text-xs font-semibold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-full border border-indigo-100">
+                  Step 3 — Smart settings
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="max-w-3xl mx-auto px-6 py-8 pb-16">
+          <SmartPaperStepper activeIndex={2} />
+          <p className="text-gray-600 text-sm mb-6">
+            Set targets for your paper. After you submit, you will see a brief generating screen, then the full preview with download and save.
+          </p>
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+            <div className="px-6 py-4 bg-gradient-to-r from-indigo-500 to-violet-600 text-white flex items-center gap-3">
+              <Sparkles size={22} />
+              <div>
+                <div className="font-bold text-base">Smart paper settings</div>
+                <div className="text-xs text-indigo-100">
+                  Question counts per type, difficulty mix, and chapter balance
+                </div>
+              </div>
+            </div>
+            <div className="p-6 space-y-5 border-t border-gray-100 bg-gradient-to-b from-white to-slate-50/80">
+              {!subjectTitleIdForChapters && (
+                <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
+                  <p className="font-bold mb-1">Header required</p>
+                  <p className="mb-2">
+                    Your <strong>paper header</strong> must include <strong>Subject title, Board, and Standard</strong>.
+                  </p>
+                  <p>
+                    Go to <strong>Generate → Edit header</strong>, fill those fields, then open <strong>Smart paper</strong> again from the sidebar (or use Add Questions to return here with the same header).
+                  </p>
+                </div>
+              )}
+              <p className="text-sm text-gray-600">
+                Uses your header (subject title, board, standard) and chapter list. Requires backend{" "}
+                <code className="text-xs bg-gray-100 px-1 rounded">POST /papers/smart-propose</code> and questions with difficulty set.
+              </p>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    Total marks <span className="text-gray-400 font-normal">(optional)</span>
+                  </label>
+                  <p className="text-[11px] text-gray-500 mb-1">
+                    Paper size follows your question counts below; this value is sent for API compatibility.
+                  </p>
+                  <input
+                    type="number"
+                    min={1}
+                    value={smartTotalMarks}
+                    onChange={(e) => setSmartTotalMarks(Number(e.target.value) || 0)}
+                    className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Easy %</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={smartDifficulty.easy}
+                    onChange={(e) =>
+                      setSmartDifficulty((p) => ({ ...p, easy: Number(e.target.value) || 0 }))
+                    }
+                    className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Medium %</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={smartDifficulty.medium}
+                    onChange={(e) =>
+                      setSmartDifficulty((p) => ({ ...p, medium: Number(e.target.value) || 0 }))
+                    }
+                    className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Hard %</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={smartDifficulty.hard}
+                    onChange={(e) =>
+                      setSmartDifficulty((p) => ({ ...p, hard: Number(e.target.value) || 0 }))
+                    }
+                    className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl text-sm"
+                  />
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-indigo-100 bg-gradient-to-br from-indigo-50/80 to-white p-4 space-y-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-bold text-gray-900">Number of questions per type</h3>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Set how many questions to pull from each type. Types at 0 are skipped. Total marks on the paper
+                      will match the sum of selected questions.
+                    </p>
+                  </div>
+                  <div
+                    className={`shrink-0 rounded-lg px-3 py-1.5 text-sm font-bold ${
+                      smartSectionQuestionTotal >= 1
+                        ? "bg-emerald-100 text-emerald-800"
+                        : "bg-amber-100 text-amber-900"
+                    }`}
+                  >
+                    Total questions: {smartSectionQuestionTotal}
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={resetSmartSectionCountsDefaults}
+                    className="text-xs font-semibold text-indigo-600 hover:underline px-1"
+                  >
+                    Reset defaults
+                  </button>
+                  <span className="text-gray-300">|</span>
+                  <button
+                    type="button"
+                    onClick={clearSmartSectionCounts}
+                    className="text-xs font-semibold text-gray-600 hover:underline px-1"
+                  >
+                    Clear all
+                  </button>
+                </div>
+                <div className="space-y-3">
+                  {SMART_SECTION_GROUPS.map((group) => (
+                    <details
+                      key={group.id}
+                      className="group border border-gray-200 rounded-xl bg-white overflow-hidden open:shadow-sm"
+                      {...(group.id === "objective" ? { open: true } : {})}
+                    >
+                      <summary className="cursor-pointer list-none px-4 py-3 font-semibold text-gray-800 text-sm flex items-center justify-between bg-gray-50/80 hover:bg-gray-50 [&::-webkit-details-marker]:hidden">
+                        <span>{group.title}</span>
+                        <ChevronDown className="h-4 w-4 text-gray-500 shrink-0 opacity-70" />
+                      </summary>
+                      <div className="px-4 pb-4 pt-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 border-t border-gray-100">
+                        {group.keys.map((key) => (
+                          <div key={key}>
+                            <label className="block text-xs font-semibold text-gray-700 mb-1">
+                              {QUESTION_TYPE_CONFIG[key]?.label || key}{" "}
+                              <span className="text-gray-400 font-normal">(count)</span>
+                            </label>
+                            <input
+                              type="number"
+                              min={0}
+                              max={500}
+                              step={1}
+                              value={smartSectionCounts[key] ?? 0}
+                              onChange={(e) =>
+                                setSmartSectionCounts((p) => ({
+                                  ...p,
+                                  [key]: Math.max(0, Math.floor(Number(e.target.value) || 0)),
+                                }))
+                              }
+                              className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl text-sm"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-bold text-gray-800">Chapter mix (%)</span>
+                  <button
+                    type="button"
+                    onClick={normalizeSmartChapterPercents}
+                    className="text-xs font-semibold text-indigo-600 hover:underline"
+                  >
+                    Normalize to 100%
+                  </button>
+                </div>
+                {smartChapterPercents.length === 0 ? (
+                  <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                    No chapters yet for this subject title.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {smartChapterPercents.map((row) => {
+                      const ch = chapters.find((c) => c.chapter_id === row.chapter_id);
+                      return (
+                        <div key={row.chapter_id} className="flex items-center gap-2">
+                          <span className="text-sm text-gray-700 flex-1 truncate" title={ch?.chapter_name}>
+                            {ch?.chapter_name || `Chapter ${row.chapter_id}`}
+                          </span>
+                          <input
+                            type="number"
+                            min={0}
+                            max={100}
+                            value={row.percent}
+                            onChange={(e) =>
+                              updateSmartChapterPercent(row.chapter_id, e.target.value)
+                            }
+                            className="w-16 px-2 py-1.5 border-2 border-gray-200 rounded-lg text-sm"
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+              <div className="flex flex-col-reverse sm:flex-row gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setSmartWizardStep("subject")}
+                  className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl border-2 border-gray-300 font-semibold text-gray-700 hover:bg-gray-50"
+                >
+                  <ChevronLeft size={18} />
+                  Back to subject
+                </button>
+                <button
+                  type="button"
+                  disabled={
+                    approvedSubjectIds.length === 0 ||
+                    !subjectTitleIdForChapters ||
+                    smartSectionQuestionTotal < 1
+                  }
+                  onClick={handleSmartPaperGenerate}
+                  className="flex-1 inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-bold text-white bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 disabled:opacity-50 shadow-lg"
+                >
+                  <Sparkles size={18} />
+                  Generate smart paper
+                </button>
+              </div>
+              {smartMeta &&
+                (smartMeta.warnings?.length > 0 || smartMeta.suggestions?.length > 0) && (
+                  <div className="space-y-2 pt-2">
+                    {smartMeta.warnings?.length > 0 && (
+                      <div className="rounded-xl border border-amber-300 bg-amber-50 p-3">
+                        <div className="flex items-center gap-2 font-bold text-amber-900 text-sm mb-1">
+                          <AlertTriangle size={16} />
+                          Warnings
+                        </div>
+                        <ul className="text-sm text-amber-900 list-disc list-inside">
+                          {smartMeta.warnings.map((w, i) => (
+                            <li key={i}>{w}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {smartMeta.suggestions?.length > 0 && (
+                      <div className="rounded-xl border border-blue-200 bg-blue-50 p-3">
+                        <div className="font-bold text-blue-900 text-sm mb-1">Suggestions</div>
+                        <ul className="text-sm text-blue-900 list-disc list-inside">
+                          {smartMeta.suggestions.map((s, i) => (
+                            <li key={i}>{s}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
+            </div>
+          </div>
+        </div>
+
+        {showBackConfirm && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 border border-gray-200">
+              <h3 className="text-xl font-bold text-gray-800 mb-2">Leave this page?</h3>
+              <p className="text-gray-600 mb-6">
+                Are you sure? You can save as draft and continue later, or discard and start fresh next time.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3 justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShowBackConfirm(false)}
+                  className="px-4 py-2.5 rounded-xl font-semibold border-2 border-gray-300 text-gray-700 hover:bg-gray-50 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDiscardAndGo}
+                  className="px-4 py-2.5 rounded-xl font-semibold bg-rose-500 text-white hover:bg-rose-600 transition"
+                >
+                  Discard
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveDraftAndGo}
+                  disabled={isSaving}
+                  className="px-4 py-2.5 rounded-xl font-semibold bg-violet-500 text-white hover:bg-violet-600 transition disabled:opacity-50"
+                >
+                  {isSaving ? "Saving..." : "Save as draft"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {toast && (
+          <Toast
+            message={toast.message}
+            type={toast.type}
+            onClose={() => setToast(null)}
+            duration={3000}
+          />
+        )}
+      </div>
+    );
+  }
+
+  if (smartWizardActive && smartWizardStep === "generating") {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40">
+        <div className="bg-white/80 backdrop-blur-lg border-b border-gray-200/50 px-6 py-4 sticky top-0 z-50 shadow-lg shadow-gray-200/50">
+          <div className="flex flex-wrap items-center justify-between gap-3 w-full max-w-5xl mx-auto">
+            <div className="flex items-center gap-4">
+              <button
+                type="button"
+                onClick={() => setShowBackConfirm(true)}
+                className="group flex items-center gap-2 px-3 py-2 text-gray-700 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200 font-medium"
+              >
+                <ChevronLeft
+                  size={20}
+                  className="group-hover:-translate-x-1 transition-transform"
+                />
+                <span>Back to Dashboard</span>
+              </button>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Sparkles size={22} className="text-indigo-600 animate-pulse" />
+                <span className="font-bold text-gray-800">Smart paper</span>
+                <span className="text-xs font-semibold text-violet-700 bg-violet-50 px-2.5 py-1 rounded-full border border-violet-100">
+                  Generating
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-col items-center justify-center px-6 py-16 min-h-[calc(100vh-88px)]">
+          <div className="w-full max-w-md rounded-2xl bg-white/90 border border-gray-200/80 shadow-xl shadow-indigo-100/50 p-8 text-center">
+            <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-100 to-violet-100">
+              <Sparkles className="h-10 w-10 text-indigo-600 animate-pulse" />
+            </div>
+            <Loader className="mx-auto mb-6" />
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">
+              Crafting your paper with AI
+            </h2>
+            <p className="text-gray-600 text-sm sm:text-base leading-relaxed mb-6">
+              Balancing chapters, difficulty, and sections. Please wait — this will only take a moment.
+            </p>
+            <div className="h-2 w-full rounded-full bg-gray-100 overflow-hidden">
+              <div className="h-full w-2/5 rounded-full bg-gradient-to-r from-indigo-500 to-violet-500 animate-pulse" />
+            </div>
+            <p className="text-xs text-gray-400 mt-4">You can stay on this page — the preview will appear here next.</p>
+          </div>
+        </div>
+
+        {showBackConfirm && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 border border-gray-200">
+              <h3 className="text-xl font-bold text-gray-800 mb-2">Leave this page?</h3>
+              <p className="text-gray-600 mb-6">
+                Generation is in progress. If you leave, you may lose this run. Are you sure?
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3 justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShowBackConfirm(false)}
+                  className="px-4 py-2.5 rounded-xl font-semibold border-2 border-gray-300 text-gray-700 hover:bg-gray-50 transition"
+                >
+                  Stay
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDiscardAndGo}
+                  className="px-4 py-2.5 rounded-xl font-semibold bg-rose-500 text-white hover:bg-rose-600 transition"
+                >
+                  Leave anyway
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {toast && (
+          <Toast
+            message={toast.message}
+            type={toast.type}
+            onClose={() => setToast(null)}
+            duration={3000}
+          />
+        )}
       </div>
     );
   }
@@ -1318,6 +2440,12 @@ const CustomPaper = () => {
             {isEditMode && (
               <div className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-lg font-semibold text-sm">
                 ✏️ Edit Mode
+              </div>
+            )}
+            {smartWizardActive && smartWizardStep === "preview" && (
+              <div className="hidden sm:flex items-center gap-2 text-sm font-semibold text-indigo-700 bg-indigo-50 px-3 py-1.5 rounded-full border border-indigo-100">
+                <Sparkles size={16} />
+                Preview and download
               </div>
             )}
           </div>
@@ -1429,9 +2557,10 @@ const CustomPaper = () => {
         }}
       />
 
-      {/* Split Screen Layout */}
+      {/* Split Screen Layout — wizard preview uses full width (no question list beside preview) */}
       <div className="flex h-[calc(100vh-73px)] overflow-hidden">
         {/* Left Half - Question Selection */}
+        {!(smartWizardActive && smartWizardStep === "preview") && (
         <div className="w-1/2 border-r border-gray-200/60 overflow-y-auto bg-gradient-to-b from-white to-gray-50/50 p-6 scroll-smooth">
           <div className="mb-6">
             <h2 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-2 flex items-center gap-3">
@@ -1929,9 +3058,19 @@ const CustomPaper = () => {
             )}
           </div>
         </div>
+        )}
 
         {/* Right Half - Paper Preview */}
-        <div className="w-1/2 overflow-y-auto bg-gradient-to-b from-slate-50 to-gray-100/50 p-6 scroll-smooth">
+        <div
+          ref={previewPanelRef}
+          className={`${
+            smartWizardActive && smartWizardStep === "preview" ? "w-full" : "w-1/2"
+          } overflow-y-auto bg-gradient-to-b from-slate-50 to-gray-100/50 p-6 scroll-smooth transition-shadow duration-500 ${
+            previewHighlight
+              ? "ring-4 ring-indigo-400/80 ring-inset shadow-[inset_0_0_0_2px_rgba(129,140,248,0.5)]"
+              : ""
+          }`}
+        >
           <div className="mb-6">
             <div className="flex items-center justify-between mb-2">
               <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">

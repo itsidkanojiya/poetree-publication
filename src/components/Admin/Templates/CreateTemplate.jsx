@@ -166,10 +166,39 @@ const CreateTemplate = () => {
   }, [formData.subject_title_id]);
 
   useEffect(() => {
-    if (currentQuestionType) {
-      fetchQuestionsByType();
-    }
-  }, [currentQuestionType]);
+    if (currentStep !== 3) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const filters = {
+          subject_title_id: formData.subject_title_id,
+          board_id: formData.board_id,
+          standard: formData.standard,
+        };
+        const questions = await getQuestionsByType(currentQuestionType, filters);
+        const questionsArray = Array.isArray(questions)
+          ? questions
+          : questions?.questions || questions?.data || [];
+        if (!cancelled) {
+          setAvailableQuestions((prev) => ({
+            ...prev,
+            [currentQuestionType]: questionsArray,
+          }));
+        }
+      } catch (error) {
+        console.error("Error fetching questions:", error);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    currentQuestionType,
+    formData.subject_title_id,
+    formData.board_id,
+    formData.standard,
+    currentStep,
+  ]);
 
   const fetchInitialData = async () => {
     try {
@@ -201,23 +230,6 @@ const CreateTemplate = () => {
     } catch (error) {
       console.error("Error fetching subject titles:", error);
       setSubjectTitles([]);
-    }
-  };
-
-  const fetchQuestionsByType = async () => {
-    try {
-      if (!availableQuestions[currentQuestionType]) {
-        const questions = await getQuestionsByType(currentQuestionType);
-        const questionsArray = Array.isArray(questions)
-          ? questions
-          : questions?.questions || questions?.data || [];
-        setAvailableQuestions((prev) => ({
-          ...prev,
-          [currentQuestionType]: questionsArray,
-        }));
-      }
-    } catch (error) {
-      console.error("Error fetching questions:", error);
     }
   };
 
@@ -273,7 +285,6 @@ const CreateTemplate = () => {
       const questionId = q.question_id || q.id;
       return questionId && selectedQuestionIds.has(questionId);
     });
-    // Add number property for proper numbering in preview
     return filtered.map((q, index) => ({
       ...q,
       number: index + 1,
@@ -972,9 +983,6 @@ const CreateTemplate = () => {
   const renderStep3 = () => {
     const selectedQuestions = getSelectedQuestions();
     const currentQuestions = availableQuestions[currentQuestionType] || [];
-    const selectedInCurrentType = currentQuestions.filter((q) =>
-      selectedQuestionIds.has(q.question_id)
-    ).length;
 
     return (
       <div className="space-y-6">
@@ -1029,7 +1037,7 @@ const CreateTemplate = () => {
               <div className="space-y-2 max-h-[500px] overflow-y-auto">
                 {currentQuestions.length === 0 ? (
                   <div className="text-center py-8 text-gray-500">
-                    No questions available for this type
+                    No questions available for this type (check subject title / board / standard filters).
                   </div>
                 ) : (
                   currentQuestions.map((q) => {
@@ -1065,11 +1073,16 @@ const CreateTemplate = () => {
                             <p className="text-gray-800 font-medium">
                               {q.question}
                             </p>
-                            <div className="flex items-center gap-3 mt-2 text-sm text-gray-600">
+                            <div className="flex items-center gap-3 mt-2 text-sm text-gray-600 flex-wrap">
                               <span className="px-2 py-1 bg-gray-100 rounded">
                                 {q.type}
                               </span>
                               <span>{q.marks} marks</span>
+                              {q.difficulty && (
+                                <span className="px-2 py-1 bg-violet-100 text-violet-800 rounded capitalize">
+                                  {q.difficulty}
+                                </span>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -1127,7 +1140,7 @@ const CreateTemplate = () => {
                 <div className="space-y-2 max-h-[300px] overflow-y-auto">
                   {selectedQuestions.map((q) => (
                     <div
-                      key={q.question_id}
+                      key={q.question_id || q.id}
                       className="p-2 bg-gray-50 rounded border border-gray-200 text-sm"
                     >
                       <div className="flex items-center gap-2">
@@ -1138,6 +1151,7 @@ const CreateTemplate = () => {
                       </div>
                       <div className="text-xs text-gray-500 mt-1 ml-6">
                         {q.type} • {q.marks} marks
+                        {q.difficulty ? ` • ${q.difficulty}` : ""}
                       </div>
                     </div>
                   ))}

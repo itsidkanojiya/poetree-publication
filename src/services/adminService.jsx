@@ -576,8 +576,8 @@ export const deleteAnimation = async (id) => {
 // ==================== QUESTION MANAGEMENT ====================
 
 /**
- * Get questions by type (and optional filters including chapter_id)
- * GET /api/question?type={type}&chapter_id=1
+ * Get questions by type (and optional filters including chapter_id, difficulty, scope)
+ * GET /api/question?type={type}&chapter_id=1&difficulty=easy&subject_title_id=&board_id=&standard=
  */
 export const getQuestionsByType = async (type, filters = {}) => {
   try {
@@ -590,11 +590,68 @@ export const getQuestionsByType = async (type, filters = {}) => {
         : String(filters.chapter_id);
       if (cid) params.append("chapter_id", cid);
     }
+    if (filters.difficulty != null && filters.difficulty !== "") {
+      const d = Array.isArray(filters.difficulty)
+        ? filters.difficulty.join(",")
+        : String(filters.difficulty);
+      if (d) params.append("difficulty", d);
+    }
+    if (filters.subject_title_id != null && filters.subject_title_id !== "") {
+      params.append("subject_title_id", String(filters.subject_title_id));
+    }
+    if (filters.board_id != null && filters.board_id !== "") {
+      params.append("board_id", String(filters.board_id));
+    }
+    if (filters.standard != null && filters.standard !== "") {
+      params.append("standard", String(filters.standard));
+    }
     const query = params.toString();
     const response = await apiClient.get(`/question?${query}`);
     return response.data?.questions || response.data || [];
   } catch (error) {
     console.error("Error fetching questions:", error);
+    throw error;
+  }
+};
+
+/**
+ * Smart paper proposal
+ * POST /api/papers/smart-propose
+ */
+export const smartProposePaper = async (payload) => {
+  try {
+    const response = await apiClient.post("/papers/smart-propose", payload, {
+      headers: { "Content-Type": "application/json" },
+      timeout: 120000,
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error proposing smart paper:", error);
+    throw error;
+  }
+};
+
+/**
+ * Optional: question bank stats
+ * GET /api/question/stats
+ */
+export const getQuestionBankStats = async (filters = {}) => {
+  try {
+    const params = new URLSearchParams();
+    if (filters.subject_title_id != null && filters.subject_title_id !== "") {
+      params.append("subject_title_id", String(filters.subject_title_id));
+    }
+    if (filters.board_id != null && filters.board_id !== "") {
+      params.append("board_id", String(filters.board_id));
+    }
+    if (filters.standard != null && filters.standard !== "") {
+      params.append("standard", String(filters.standard));
+    }
+    const q = params.toString();
+    const response = await apiClient.get(`/question/stats${q ? `?${q}` : ""}`);
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching question stats:", error);
     throw error;
   }
 };

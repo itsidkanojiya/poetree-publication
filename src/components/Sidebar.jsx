@@ -16,6 +16,7 @@ import {
   Sparkles,
   LayoutTemplate,
   ClipboardList,
+  Wand2,
 } from "lucide-react";
 
 const LogoutModal = ({ isOpen, onClose, onConfirm }) => {
@@ -89,6 +90,12 @@ const Sidebar = () => {
       state: { from: "prebuild" },
     },
     {
+      name: "Smart paper",
+      href: "/dashboard/generate/custompaper",
+      icon: Wand2,
+      state: { smartPaperWizard: true },
+    },
+    {
       name: "Prebuilt Question",
       href: "/dashboard/templates",
       icon: LayoutTemplate,
@@ -131,6 +138,9 @@ const Sidebar = () => {
     }
     if (path === "/dashboard/quizzes") {
       return location.pathname.startsWith(path);
+    }
+    if (path === "/dashboard/generate/custompaper") {
+      return location.pathname === path;
     }
     // For other routes, check exact match
     return location.pathname === path;
