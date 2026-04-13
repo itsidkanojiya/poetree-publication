@@ -7,14 +7,19 @@ import { LuLogIn } from "react-icons/lu";
 
 export const Header = () => {
   return (
-
     <div className="hidden md:flex h-14 w-full px-5 md:px-10 bg-primary justify-between items-center">
       {/* Left Section */}
-      <div id="nav-left" className="w-1/2 md:w-1/3 h-full text-neutral text-sm md:text-md font-semibold">
+      <div
+        id="nav-left"
+        className="w-1/2 md:w-1/3 h-full text-neutral text-sm md:text-md font-semibold"
+      >
         <ul className="h-full flex items-center justify-evenly space-x-4 md:space-x-8">
           <li className="flex items-center">
             <FiMail className="mx-2 text-white" />
-            <a href="mailto:support@poetree.com" className="hover:text-secondary">
+            <a
+              href="mailto:support@poetree.com"
+              className="hover:text-secondary"
+            >
               support@poetree.com
             </a>
           </li>
@@ -28,7 +33,10 @@ export const Header = () => {
       </div>
 
       {/* Right Section */}
-      <div id="nav-right" className="w-1/2 md:w-1/3 h-full text-neutral text-sm md:text-md font-semibold">
+      <div
+        id="nav-right"
+        className="w-1/2 md:w-1/3 h-full text-neutral text-sm md:text-md font-semibold"
+      >
         <ul className="h-full flex items-center justify-evenly space-x-4 md:space-x-8">
           <li className="flex items-center">
             <LuLogIn className="mr-2 text-accent" />
@@ -51,6 +59,5 @@ export const Header = () => {
         </ul>
       </div>
     </div>
-
   );
 };

@@ -20,13 +20,21 @@ const SelectHeaderModal = ({ isOpen, onClose, onSelect }) => {
           headers.map((header) => (
             <div key={header.id} className="mb-2 border p-2 rounded">
               <p className="font-medium">{header.title}</p>
-              <button onClick={() => onSelect(header)} className="bg-green-500 text-white px-3 py-1 rounded mt-2">
+              <button
+                onClick={() => onSelect(header)}
+                className="bg-green-500 text-white px-3 py-1 rounded mt-2"
+              >
                 Select
               </button>
             </div>
           ))
         )}
-        <button onClick={onClose} className="mt-4 bg-red-500 text-white px-4 py-2 rounded">Close</button>
+        <button
+          onClick={onClose}
+          className="mt-4 bg-red-500 text-white px-4 py-2 rounded"
+        >
+          Close
+        </button>
       </div>
     </div>
   );
