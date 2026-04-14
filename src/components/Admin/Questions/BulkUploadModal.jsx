@@ -714,7 +714,7 @@ const BulkUploadModal = ({ questionType, onClose, onSuccess }) => {
               <li>
                 <strong>Required columns:</strong> Question, Answer, Standard,
                 Subject (or Subject ID), Subject Title (or Subject Title ID),
-                Board (or Board ID), Marks
+                Board (or Board ID), Marks, Difficulty
               </li>
               {questionType === "mcq" && (
                 <li>
@@ -931,6 +931,7 @@ const BulkUploadModal = ({ questionType, onClose, onSuccess }) => {
                 </p>
                 <ul className="text-xs text-amber-700 mt-1 space-y-0.5 list-disc list-inside">
                   <li>Question, Answer, Standard, Marks</li>
+                  <li>Difficulty (easy, medium, or hard)</li>
                   <li>Subject (or Subject ID)</li>
                   <li>
                     Subject Title (or Subject Title ID) -{" "}

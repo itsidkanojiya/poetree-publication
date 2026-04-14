@@ -158,9 +158,27 @@ const sampleQuestions = [
   }
 ];
 
+const difficultyLevels = [
+  "easy",
+  "easy",
+  "medium",
+  "medium",
+  "easy",
+  "medium",
+  "hard",
+  "medium",
+  "easy",
+  "hard",
+];
+
+const sampleQuestionsWithDifficulty = sampleQuestions.map((question, index) => ({
+  ...question,
+  Difficulty: difficultyLevels[index] || "medium",
+}));
+
 // Create workbook and worksheet
 const workbook = XLSX.utils.book_new();
-const worksheet = XLSX.utils.json_to_sheet(sampleQuestions);
+const worksheet = XLSX.utils.json_to_sheet(sampleQuestionsWithDifficulty);
 
 // Set column widths
 worksheet['!cols'] = [
@@ -171,9 +189,11 @@ worksheet['!cols'] = [
   { wch: 15 }, // Option4
   { wch: 10 }, // Answer
   { wch: 15 }, // Subject
+  { wch: 20 }, // Subject Title
   { wch: 10 }, // Board
   { wch: 10 }, // Standard
   { wch: 10 }, // Marks
+  { wch: 12 }, // Difficulty
   { wch: 50 }, // Solution
   { wch: 20 }, // Image
 ];

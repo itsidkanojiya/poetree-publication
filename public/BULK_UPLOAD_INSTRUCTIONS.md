@@ -28,6 +28,7 @@ The Excel file contains the following columns:
 | Board         | ✅ **REQUIRED**       | Board name (will be matched to ID)   | "CBSE"                                    |
 | Standard      | ✅ **REQUIRED**       | Grade level (1-12)                   | "10"                                      |
 | Marks         | ✅ **REQUIRED**       | Marks for question                   | "1"                                       |
+| Difficulty    | ✅ **REQUIRED**       | Question difficulty                  | "easy", "medium", or "hard"              |
 | Solution      | ⚪ Optional           | Explanation/answer                   | "Water is composed of..."                 |
 | Image         | ⚪ Optional           | Image filename                       | "water_question.jpg"                      |
 
@@ -95,6 +96,7 @@ All questions **MUST** have these fields filled:
 - ✅ Board (or Board ID)
 - ✅ Standard
 - ✅ Marks
+- ✅ Difficulty (`easy`, `medium`, or `hard`)
 - ✅ Options (for MCQ, Passage, Match types)
 
 ### **Field Matching:**
@@ -112,6 +114,7 @@ All questions **MUST** have these fields filled:
 - ❌ Missing `board_id` - Make sure "Board" column is filled
 - ❌ Missing `standard` - Make sure "Standard" column is filled
 - ❌ Missing `marks` - Make sure "Marks" column is filled
+- ❌ Invalid `difficulty` - Use only `easy`, `medium`, or `hard`
 
 ## 🔧 Customization
 
