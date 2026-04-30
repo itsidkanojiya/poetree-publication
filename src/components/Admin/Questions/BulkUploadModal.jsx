@@ -51,6 +51,8 @@ const BulkUploadModal = ({ questionType, onClose, onSuccess }) => {
       subject_id: "Subject ID",
       subject_title: "Subject Title",
       subject_title_id: "Subject Title ID",
+      chapter: "Chapter",
+      chapter_id: "Chapter ID",
       standard: "Standard",
       board: "Board",
       board_id: "Board ID",
@@ -99,6 +101,7 @@ const BulkUploadModal = ({ questionType, onClose, onSuccess }) => {
       mapping.standard,
       mapping.subject_id,
       mapping.subject_title_id,
+      mapping.chapter_id,
       mapping.board_id,
       mapping.marks,
       mapping.difficulty,
@@ -223,6 +226,7 @@ const BulkUploadModal = ({ questionType, onClose, onSuccess }) => {
           solution: row[mapping.solution] || "",
           subject_id: "",
           subject_title_id: "",
+      chapter_id: "",
           board_id: "",
           standard: row[mapping.standard]
             ? String(row[mapping.standard]).trim()
@@ -470,6 +474,22 @@ const BulkUploadModal = ({ questionType, onClose, onSuccess }) => {
           }
         }
 
+        // Map chapter name/id to chapter_id
+        if (row[mapping.chapter_id]) {
+          const chapterId = parseInt(row[mapping.chapter_id], 10);
+          if (!Number.isNaN(chapterId)) {
+            question.chapter_id = chapterId;
+          } else {
+            newErrors.push(
+              `Row ${index + 2}: Chapter ID "${row[mapping.chapter_id]}" is not valid`
+            );
+          }
+        } else if (row[mapping.chapter]) {
+          newErrors.push(
+            `Row ${index + 2}: Chapter name is not enough in bulk upload. Please provide "Chapter ID".`
+          );
+        }
+
         // Validate ALL required fields
         if (!question.question) {
           newErrors.push(`Row ${index + 2}: Question is required`);
@@ -618,6 +638,9 @@ const BulkUploadModal = ({ questionType, onClose, onSuccess }) => {
           // OPTIONAL FIELDS
           if (question.solution) formData.append("solution", question.solution);
           if (question.image) formData.append("image", question.image);
+          if (question.chapter_id) {
+            formData.append("chapter_id", String(question.chapter_id));
+          }
 
           // Type-specific required fields
           if (questionType === "mcq") {
@@ -714,7 +737,7 @@ const BulkUploadModal = ({ questionType, onClose, onSuccess }) => {
               <li>
                 <strong>Required columns:</strong> Question, Answer, Standard,
                 Subject (or Subject ID), Subject Title (or Subject Title ID),
-                Board (or Board ID), Marks, Difficulty
+                Chapter ID, Board (or Board ID), Marks, Difficulty
               </li>
               {questionType === "mcq" && (
                 <li>

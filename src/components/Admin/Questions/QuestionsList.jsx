@@ -161,6 +161,8 @@ const QuestionsList = ({ questionType }) => {
       standard: "Standard",
       subject_id: "Subject ID",
       subject_title_id: "Subject Title ID",
+      chapter_id: "Chapter ID",
+      chapter: "Chapter",
       board_id: "Board ID",
       marks: "Marks",
       solution: "Solution",
@@ -186,6 +188,8 @@ const QuestionsList = ({ questionType }) => {
       m.standard,
       m.subject_id,
       m.subject_title_id,
+      m.chapter_id,
+      m.chapter,
       m.board_id,
       m.marks,
     ];
@@ -203,6 +207,8 @@ const QuestionsList = ({ questionType }) => {
         q.standard != null ? String(q.standard) : "",
         q.subject_id != null ? String(q.subject_id) : "",
         q.subject_title_id != null ? String(q.subject_title_id) : "",
+        q.chapter_id != null ? String(q.chapter_id) : "",
+        q.chapter?.chapter_name ?? q.chapter_name ?? "",
         q.board_id != null ? String(q.board_id) : "",
         q.marks != null ? String(q.marks) : "",
       ];
