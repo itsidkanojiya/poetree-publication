@@ -101,6 +101,7 @@ const BulkUploadModal = ({ questionType, onClose, onSuccess }) => {
       mapping.standard,
       mapping.subject_id,
       mapping.subject_title_id,
+      mapping.chapter,
       mapping.chapter_id,
       mapping.board_id,
       mapping.marks,
@@ -131,6 +132,8 @@ const BulkUploadModal = ({ questionType, onClose, onSuccess }) => {
       "10",
       subjectId,
       titleId,
+      "",
+      "1",
       boardId,
       "1",
       "medium",
@@ -485,9 +488,15 @@ const BulkUploadModal = ({ questionType, onClose, onSuccess }) => {
             );
           }
         } else if (row[mapping.chapter]) {
-          newErrors.push(
-            `Row ${index + 2}: Chapter name is not enough in bulk upload. Please provide "Chapter ID".`
-          );
+          const chapterValue = String(row[mapping.chapter]).trim();
+          const chapterIdFromChapterCol = parseInt(chapterValue, 10);
+          if (!Number.isNaN(chapterIdFromChapterCol)) {
+            question.chapter_id = chapterIdFromChapterCol;
+          } else {
+            newErrors.push(
+              `Row ${index + 2}: Chapter "${chapterValue}" could not be resolved. Please provide numeric "Chapter ID".`
+            );
+          }
         }
 
         // Validate ALL required fields
@@ -737,7 +746,7 @@ const BulkUploadModal = ({ questionType, onClose, onSuccess }) => {
               <li>
                 <strong>Required columns:</strong> Question, Answer, Standard,
                 Subject (or Subject ID), Subject Title (or Subject Title ID),
-                Chapter ID, Board (or Board ID), Marks, Difficulty
+                Chapter (or Chapter ID), Board (or Board ID), Marks, Difficulty
               </li>
               {questionType === "mcq" && (
                 <li>
