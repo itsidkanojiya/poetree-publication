@@ -10,11 +10,12 @@ import {
   AlertCircle,
 } from "lucide-react";
 import * as XLSX from "xlsx";
-import { addQuestion } from "../../../services/adminService";
 import {
+  addQuestion,
   getAllSubjects,
   getAllBoards,
   getAllSubjectTitles,
+  getChaptersBySubjectTitle,
 } from "../../../services/adminService";
 import Toast from "../../Common/Toast";
 import Loader from "../../Common/loader/loader";
@@ -26,6 +27,9 @@ const BulkUploadModal = ({ questionType, onClose, onSuccess }) => {
   const [subjects, setSubjects] = useState([]);
   const [subjectTitles, setSubjectTitles] = useState([]);
   const [boards, setBoards] = useState([]);
+  /** Chapters for reference: from GET /chapters?subject_title_id= per title */
+  const [chapterReference, setChapterReference] = useState([]);
+  const [loadingChapterReference, setLoadingChapterReference] = useState(false);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState({
@@ -51,7 +55,6 @@ const BulkUploadModal = ({ questionType, onClose, onSuccess }) => {
       subject_id: "Subject ID",
       subject_title: "Subject Title",
       subject_title_id: "Subject Title ID",
-      chapter: "Chapter",
       chapter_id: "Chapter ID",
       standard: "Standard",
       board: "Board",
@@ -101,7 +104,6 @@ const BulkUploadModal = ({ questionType, onClose, onSuccess }) => {
       mapping.standard,
       mapping.subject_id,
       mapping.subject_title_id,
-      mapping.chapter,
       mapping.chapter_id,
       mapping.board_id,
       mapping.marks,
@@ -132,7 +134,6 @@ const BulkUploadModal = ({ questionType, onClose, onSuccess }) => {
       "10",
       subjectId,
       titleId,
-      "",
       "1",
       boardId,
       "1",
@@ -477,8 +478,8 @@ const BulkUploadModal = ({ questionType, onClose, onSuccess }) => {
           }
         }
 
-        // Map chapter name/id to chapter_id
-        if (row[mapping.chapter_id]) {
+        // Chapter: use "Chapter ID" only (name comes from backend). Legacy: numeric-only "Chapter" column still accepted.
+        if (row[mapping.chapter_id] != null && String(row[mapping.chapter_id]).trim() !== "") {
           const chapterId = parseInt(row[mapping.chapter_id], 10);
           if (!Number.isNaN(chapterId)) {
             question.chapter_id = chapterId;
@@ -487,14 +488,14 @@ const BulkUploadModal = ({ questionType, onClose, onSuccess }) => {
               `Row ${index + 2}: Chapter ID "${row[mapping.chapter_id]}" is not valid`
             );
           }
-        } else if (row[mapping.chapter]) {
-          const chapterValue = String(row[mapping.chapter]).trim();
-          const chapterIdFromChapterCol = parseInt(chapterValue, 10);
-          if (!Number.isNaN(chapterIdFromChapterCol)) {
-            question.chapter_id = chapterIdFromChapterCol;
+        } else if (row.Chapter != null && String(row.Chapter).trim() !== "") {
+          const chapterValue = String(row.Chapter).trim();
+          const legacyId = parseInt(chapterValue, 10);
+          if (!Number.isNaN(legacyId)) {
+            question.chapter_id = legacyId;
           } else {
             newErrors.push(
-              `Row ${index + 2}: Chapter "${chapterValue}" could not be resolved. Please provide numeric "Chapter ID".`
+              `Row ${index + 2}: Use column "Chapter ID" with a number only. Chapter name is not read from Excel (it is stored from ID on save).`
             );
           }
         }
@@ -530,6 +531,9 @@ const BulkUploadModal = ({ questionType, onClose, onSuccess }) => {
               index + 2
             }: Board ID is required (provide Board name or Board ID)`
           );
+        }
+        if (!question.chapter_id) {
+          newErrors.push(`Row ${index + 2}: Chapter ID is required`);
         }
         if (!question.standard) {
           newErrors.push(`Row ${index + 2}: Standard is required`);
@@ -714,6 +718,46 @@ const BulkUploadModal = ({ questionType, onClose, onSuccess }) => {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    if (!subjectTitles.length) {
+      setChapterReference([]);
+      return;
+    }
+    let cancelled = false;
+    setLoadingChapterReference(true);
+    (async () => {
+      try {
+        const nested = await Promise.all(
+          subjectTitles.map(async (st) => {
+            const titleId = st.subject_title_id ?? st.id;
+            if (titleId == null || titleId === "") return [];
+            const titleName =
+              st.title_name ?? st.subject_title_name ?? st.name ?? `Title ${titleId}`;
+            try {
+              const list = await getChaptersBySubjectTitle(titleId);
+              const arr = Array.isArray(list) ? list : [];
+              return arr.map((ch) => ({
+                chapter_id: ch.chapter_id,
+                chapter_name: ch.chapter_name ?? "",
+                subject_title_id: titleId,
+                subject_title_name: titleName,
+              }));
+            } catch (err) {
+              console.error(`Chapters for subject_title_id ${titleId}:`, err);
+              return [];
+            }
+          })
+        );
+        if (!cancelled) setChapterReference(nested.flat());
+      } finally {
+        if (!cancelled) setLoadingChapterReference(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [subjectTitles]);
+
   return (
     <>
       {toast.show && (
@@ -746,7 +790,7 @@ const BulkUploadModal = ({ questionType, onClose, onSuccess }) => {
               <li>
                 <strong>Required columns:</strong> Question, Answer, Standard,
                 Subject (or Subject ID), Subject Title (or Subject Title ID),
-                Chapter (or Chapter ID), Board (or Board ID), Marks, Difficulty
+                Chapter ID, Board (or Board ID), Marks, Difficulty
               </li>
               {questionType === "mcq" && (
                 <li>
@@ -791,7 +835,7 @@ const BulkUploadModal = ({ questionType, onClose, onSuccess }) => {
               <CheckCircle2 className="w-5 h-5" />
               Available Options (Use exact names or IDs from below):
             </h4>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
               <div>
                 <p className="font-semibold text-green-700 mb-1">
                   Subjects ({subjects.length}):
@@ -820,17 +864,17 @@ const BulkUploadModal = ({ questionType, onClose, onSuccess }) => {
                 <div className="bg-white rounded p-2 max-h-32 overflow-y-auto">
                   {subjectTitles.length > 0 ? (
                     <ul className="space-y-1">
-                      {subjectTitles.map((st) => (
-                        <li
-                          key={st.subject_title_id}
-                          className="text-green-600"
-                        >
-                          <span className="font-mono text-xs text-gray-500">
-                            ID: {st.subject_title_id}
-                          </span>{" "}
-                          - {st.title_name}
-                        </li>
-                      ))}
+                      {subjectTitles.map((st) => {
+                        const tid = st.subject_title_id ?? st.id;
+                        return (
+                          <li key={tid} className="text-green-600">
+                            <span className="font-mono text-xs text-gray-500">
+                              ID: {tid}
+                            </span>{" "}
+                            - {st.title_name ?? st.subject_title_name ?? st.name}
+                          </li>
+                        );
+                      })}
                     </ul>
                   ) : (
                     <p className="text-gray-500">Loading...</p>
@@ -858,10 +902,45 @@ const BulkUploadModal = ({ questionType, onClose, onSuccess }) => {
                   )}
                 </div>
               </div>
+              <div>
+                <p className="font-semibold text-green-700 mb-1">
+                  Chapters ({chapterReference.length})
+                  {loadingChapterReference ? (
+                    <span className="ml-2 font-normal text-gray-500 text-xs">Loading…</span>
+                  ) : null}
+                  :
+                </p>
+                <div className="bg-white rounded p-2 max-h-32 overflow-y-auto">
+                  {!subjectTitles.length ? (
+                    <p className="text-gray-500 text-xs">Subject titles load first.</p>
+                  ) : loadingChapterReference && chapterReference.length === 0 ? (
+                    <p className="text-gray-500 text-xs">Loading chapters…</p>
+                  ) : chapterReference.length > 0 ? (
+                    <ul className="space-y-1">
+                      {chapterReference.map((row) => (
+                        <li
+                          key={`${row.subject_title_id}-${row.chapter_id}`}
+                          className="text-green-600 text-xs leading-snug"
+                        >
+                          <span className="font-mono text-xs text-gray-500">ID: {row.chapter_id}</span>
+                          {" "}- {row.chapter_name}
+                          <span className="block text-[10px] text-gray-500 mt-0.5">
+                            Title ID {row.subject_title_id}: {row.subject_title_name}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-gray-500 text-xs">
+                      No chapters found. Add them under Admin → Subject Titles → Manage chapters.
+                    </p>
+                  )}
+                </div>
+              </div>
             </div>
             <p className="text-xs text-green-600 mt-2">
-              💡 <strong>Tip:</strong> Use exact names from above or use IDs
-              directly in Excel for better reliability
+              💡 <strong>Tip:</strong> Use exact names or IDs from above. For <strong>Chapter ID</strong>, use the ID from
+              the Chapters list that matches your row&apos;s <strong>Subject Title ID</strong>.
             </p>
           </div>
 
@@ -970,6 +1049,7 @@ const BulkUploadModal = ({ questionType, onClose, onSuccess }) => {
                     <strong>This is required!</strong>
                   </li>
                   <li>Board (or Board ID)</li>
+                  <li>Chapter ID (name is filled from ID when saved)</li>
                   {questionType === "mcq" && (
                     <li>Option1, Option2, Option3, Option4</li>
                   )}
