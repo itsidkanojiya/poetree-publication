@@ -3,6 +3,7 @@ import * as XLSX from "xlsx";
 import {
   getQuestionsByType,
   deleteQuestion,
+  bulkDeleteQuestions,
   getAllSubjects,
   getAllBoards,
   getAllSubjectTitles,
@@ -34,6 +35,9 @@ const QuestionsList = ({ questionType }) => {
   const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
   const [selectedQuestion, setSelectedQuestion] = useState(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [previewSingleQuestion, setPreviewSingleQuestion] = useState(null);
   const [toast, setToast] = useState({ show: false, message: "", type: "success" });
@@ -99,6 +103,7 @@ const QuestionsList = ({ questionType }) => {
       if (filterChapterId) filters.chapter_id = filterChapterId;
       const data = await getQuestionsByType(questionType, filters);
       setQuestions(Array.isArray(data) ? data : []);
+      setSelectedIds([]);
     } catch (error) {
       setToast({
         show: true,
@@ -285,6 +290,42 @@ const QuestionsList = ({ questionType }) => {
     }
   };
 
+  const toggleSelect = (id) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAll = () => {
+    const visibleIds = filteredQuestions.map((q) => q.question_id);
+    const allSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.includes(id));
+    setSelectedIds(allSelected ? [] : visibleIds);
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0) return;
+    try {
+      setBulkDeleting(true);
+      const res = await bulkDeleteQuestions(selectedIds);
+      setToast({
+        show: true,
+        message: `Deleted ${res?.deletedCount ?? selectedIds.length} question(s) successfully`,
+        type: "success",
+      });
+      setShowBulkDeleteModal(false);
+      setSelectedIds([]);
+      fetchQuestions();
+    } catch (error) {
+      setToast({
+        show: true,
+        message: error.response?.data?.message || "Failed to delete questions",
+        type: "error",
+      });
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
   const handleAddSuccess = () => {
     setShowAddModal(false);
     fetchQuestions();
@@ -417,12 +458,48 @@ const QuestionsList = ({ questionType }) => {
         </div>
       </div>
 
+      {/* Selection action bar */}
+      {selectedIds.length > 0 && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 px-4 py-3 bg-red-50 border border-red-200 rounded-xl">
+          <span className="text-sm font-semibold text-red-700">
+            {selectedIds.length} question{selectedIds.length > 1 ? "s" : ""} selected
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setSelectedIds([])}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 transition"
+            >
+              Clear
+            </button>
+            <button
+              onClick={() => setShowBulkDeleteModal(true)}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-gradient-to-r from-red-500 to-rose-600 text-white rounded-lg hover:from-red-600 hover:to-rose-700 transition shadow"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>Delete Selected ({selectedIds.length})</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Questions Table */}
       <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white">
               <tr>
+                <th className="px-6 py-4 text-left text-sm font-semibold w-12">
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 cursor-pointer accent-white"
+                    checked={
+                      filteredQuestions.length > 0 &&
+                      filteredQuestions.every((q) => selectedIds.includes(q.question_id))
+                    }
+                    onChange={toggleSelectAll}
+                    title="Select all"
+                  />
+                </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold">Question</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold">Answer</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold">Subject</th>
@@ -435,13 +512,28 @@ const QuestionsList = ({ questionType }) => {
             <tbody className="divide-y divide-gray-200">
               {filteredQuestions.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan="8" className="px-6 py-8 text-center text-gray-500">
                     No questions found
                   </td>
                 </tr>
               ) : (
                 filteredQuestions.map((question) => (
-                  <tr key={question.question_id} className="hover:bg-gray-50 transition">
+                  <tr
+                    key={question.question_id}
+                    className={`transition ${
+                      selectedIds.includes(question.question_id)
+                        ? "bg-blue-50 hover:bg-blue-100"
+                        : "hover:bg-gray-50"
+                    }`}
+                  >
+                    <td className="px-6 py-4 text-sm">
+                      <input
+                        type="checkbox"
+                        className="w-4 h-4 cursor-pointer accent-blue-600"
+                        checked={selectedIds.includes(question.question_id)}
+                        onChange={() => toggleSelect(question.question_id)}
+                      />
+                    </td>
                     <td className="px-6 py-4 text-sm text-gray-900 max-w-md">
                       <div className="line-clamp-2">
                         {question.question || "N/A"}
@@ -627,6 +719,34 @@ const QuestionsList = ({ questionType }) => {
                 className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
               >
                 Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Delete Confirmation Modal */}
+      {showBulkDeleteModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4">
+            <h3 className="text-xl font-bold text-gray-800 mb-4">Delete Selected Questions</h3>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to delete {selectedIds.length} selected question(s)? This action cannot be undone.
+            </p>
+            <div className="flex gap-4">
+              <button
+                onClick={() => setShowBulkDeleteModal(false)}
+                disabled={bulkDeleting}
+                className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBulkDelete}
+                disabled={bulkDeleting}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition disabled:opacity-50"
+              >
+                {bulkDeleting ? "Deleting..." : "Delete"}
               </button>
             </div>
           </div>

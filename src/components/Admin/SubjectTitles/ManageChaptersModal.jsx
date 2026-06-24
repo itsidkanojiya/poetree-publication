@@ -1,15 +1,26 @@
 import { useState, useEffect } from "react";
-import { X, Plus, Trash2, Loader2 } from "lucide-react";
-import { getChaptersBySubjectTitle, createChapter, deleteChapter } from "../../../services/adminService";
+import { X, Plus, Trash2, Loader2, Pencil, Check } from "lucide-react";
+import {
+  getChaptersBySubjectTitle,
+  createChapter,
+  updateChapter,
+  deleteChapter,
+} from "../../../services/adminService";
 
 const ManageChaptersModal = ({ subjectTitleId, titleName, onClose }) => {
   const [chapters, setChapters] = useState([]);
   const [loading, setLoading] = useState(true);
   const [newChapterName, setNewChapterName] = useState("");
+  const [newChapterNumber, setNewChapterNumber] = useState("");
   const [creating, setCreating] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
   const [error, setError] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
+  // Inline edit state
+  const [editingId, setEditingId] = useState(null);
+  const [editName, setEditName] = useState("");
+  const [editNumber, setEditNumber] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
 
   useEffect(() => {
     if (!subjectTitleId) return;
@@ -31,6 +42,17 @@ const ManageChaptersModal = ({ subjectTitleId, titleName, onClose }) => {
     return () => { cancelled = true; };
   }, [subjectTitleId]);
 
+  // Sort: numbered chapters first (ascending), then unnumbered by name.
+  const sortChapters = (list) =>
+    [...list].sort((a, b) => {
+      const an = a.chapter_number;
+      const bn = b.chapter_number;
+      if (an != null && bn != null) return an - bn;
+      if (an != null) return -1;
+      if (bn != null) return 1;
+      return (a.chapter_name || "").localeCompare(b.chapter_name || "");
+    });
+
   const handleCreate = async (e) => {
     e.preventDefault();
     const name = newChapterName.trim();
@@ -41,23 +63,78 @@ const ManageChaptersModal = ({ subjectTitleId, titleName, onClose }) => {
       const res = await createChapter({
         chapter_name: name,
         subject_title_id: Number(subjectTitleId),
+        chapter_number: newChapterNumber === "" ? null : Number(newChapterNumber),
       });
       const created = res?.chapter || res;
       if (created?.chapter_id) {
-        setChapters((prev) => [
-          ...prev,
-          {
-            chapter_id: created.chapter_id,
-            chapter_name: created.chapter_name,
-            subject_title_id: created.subject_title_id,
-          },
-        ]);
+        setChapters((prev) =>
+          sortChapters([
+            ...prev,
+            {
+              chapter_id: created.chapter_id,
+              chapter_name: created.chapter_name,
+              chapter_number: created.chapter_number ?? null,
+              subject_title_id: created.subject_title_id,
+            },
+          ])
+        );
         setNewChapterName("");
+        setNewChapterNumber("");
       }
     } catch (err) {
       setError(err.response?.data?.message || "Failed to create chapter");
     } finally {
       setCreating(false);
+    }
+  };
+
+  const startEdit = (ch) => {
+    setEditingId(ch.chapter_id);
+    setEditName(ch.chapter_name || "");
+    setEditNumber(ch.chapter_number != null ? String(ch.chapter_number) : "");
+    setError(null);
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditName("");
+    setEditNumber("");
+  };
+
+  const handleEditSave = async () => {
+    const name = editName.trim();
+    if (!name || editingId == null) return;
+    setSavingEdit(true);
+    setError(null);
+    try {
+      const res = await updateChapter(editingId, {
+        chapter_name: name,
+        chapter_number: editNumber === "" ? null : Number(editNumber),
+      });
+      const updated = res?.chapter || res;
+      setChapters((prev) =>
+        sortChapters(
+          prev.map((ch) =>
+            ch.chapter_id === editingId
+              ? {
+                  ...ch,
+                  chapter_name: updated?.chapter_name ?? name,
+                  chapter_number:
+                    updated?.chapter_number !== undefined
+                      ? updated.chapter_number
+                      : editNumber === ""
+                      ? null
+                      : Number(editNumber),
+                }
+              : ch
+          )
+        )
+      );
+      cancelEdit();
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to update chapter");
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -109,6 +186,15 @@ const ManageChaptersModal = ({ subjectTitleId, titleName, onClose }) => {
             </label>
             <div className="flex gap-2">
               <input
+                type="number"
+                min="0"
+                value={newChapterNumber}
+                onChange={(e) => setNewChapterNumber(e.target.value)}
+                placeholder="No."
+                title="Chapter number (optional)"
+                className="w-20 px-3 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
+              />
+              <input
                 type="text"
                 value={newChapterName}
                 onChange={(e) => setNewChapterName(e.target.value)}
@@ -146,30 +232,86 @@ const ManageChaptersModal = ({ subjectTitleId, titleName, onClose }) => {
               </p>
             ) : (
               <ul className="space-y-2">
-                {chapters.map((ch, index) => {
+                {chapters.map((ch) => {
                   const isDeleting = deletingId === ch.chapter_id;
+                  const isEditing = editingId === ch.chapter_id;
                   return (
                     <li
                       key={ch.chapter_id}
-                      className="flex items-center justify-between py-2 px-3 bg-gray-50 rounded-lg text-gray-800"
+                      className="flex items-center justify-between gap-2 py-2 px-3 bg-gray-50 rounded-lg text-gray-800"
                     >
-                      <span className="font-medium">
-                        <span className="text-gray-500 font-normal mr-2">{index + 1}.</span>
-                        {ch.chapter_name}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteClick(ch)}
-                        disabled={!!deletingId}
-                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition disabled:opacity-50"
-                        title="Delete chapter"
-                      >
-                        {isDeleting ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <Trash2 className="w-4 h-4" />
-                        )}
-                      </button>
+                      {isEditing ? (
+                        <>
+                          <input
+                            type="number"
+                            min="0"
+                            value={editNumber}
+                            onChange={(e) => setEditNumber(e.target.value)}
+                            placeholder="No."
+                            className="w-16 px-2 py-1.5 border-2 border-gray-200 rounded-lg outline-none focus:border-blue-500"
+                          />
+                          <input
+                            type="text"
+                            value={editName}
+                            onChange={(e) => setEditName(e.target.value)}
+                            maxLength={200}
+                            className="flex-1 px-3 py-1.5 border-2 border-gray-200 rounded-lg outline-none focus:border-blue-500"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleEditSave}
+                            disabled={!editName.trim() || savingEdit}
+                            className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition disabled:opacity-50"
+                            title="Save"
+                          >
+                            {savingEdit ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Check className="w-4 h-4" />
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={cancelEdit}
+                            disabled={savingEdit}
+                            className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition disabled:opacity-50"
+                            title="Cancel"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <span className="font-medium flex-1 truncate">
+                            <span className="text-gray-500 font-normal mr-2">
+                              {ch.chapter_number != null ? `${ch.chapter_number}.` : "—"}
+                            </span>
+                            {ch.chapter_name}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => startEdit(ch)}
+                            disabled={!!deletingId || !!editingId}
+                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition disabled:opacity-50"
+                            title="Edit chapter"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteClick(ch)}
+                            disabled={!!deletingId || !!editingId}
+                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition disabled:opacity-50"
+                            title="Delete chapter"
+                          >
+                            {isDeleting ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="w-4 h-4" />
+                            )}
+                          </button>
+                        </>
+                      )}
                     </li>
                   );
                 })}

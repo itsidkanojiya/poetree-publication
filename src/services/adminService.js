@@ -362,8 +362,11 @@ export const deleteSubjectTitle = async (id) => {
 // ==================== CHAPTERS ====================
 
 /**
- * List chapters by subject title
+ * List chapters by subject title.
  * GET /api/chapters?subject_title_id=:id
+ *
+ * Returns all chapters for the subject title, ordered by chapter_number
+ * (numbered first, then unnumbered by name). chapter_number may be null.
  */
 export const getChaptersBySubjectTitle = async (subjectTitleId) => {
   try {
@@ -381,17 +384,43 @@ export const getChaptersBySubjectTitle = async (subjectTitleId) => {
 /**
  * Create chapter
  * POST /api/chapters
- * Body: { chapter_name: string, subject_title_id: number }
+ * Body: { chapter_name: string, subject_title_id: number, chapter_number?: number|null }
  */
-export const createChapter = async ({ chapter_name, subject_title_id }) => {
+export const createChapter = async ({ chapter_name, subject_title_id, chapter_number }) => {
   try {
-    const response = await apiClient.post("/chapters", {
+    const body = {
       chapter_name: String(chapter_name).trim(),
       subject_title_id: Number(subject_title_id),
-    });
+    };
+    if (chapter_number !== undefined) {
+      body.chapter_number =
+        chapter_number === "" || chapter_number == null ? null : Number(chapter_number);
+    }
+    const response = await apiClient.post("/chapters", body);
     return response.data;
   } catch (error) {
     console.error("Error creating chapter:", error);
+    throw error;
+  }
+};
+
+/**
+ * Update a chapter (admin)
+ * PUT /api/chapters/:chapterId
+ * Body: { chapter_name?: string, chapter_number?: number|null }
+ */
+export const updateChapter = async (chapterId, { chapter_name, chapter_number } = {}) => {
+  try {
+    const body = {};
+    if (chapter_name !== undefined) body.chapter_name = String(chapter_name).trim();
+    if (chapter_number !== undefined) {
+      body.chapter_number =
+        chapter_number === "" || chapter_number == null ? null : Number(chapter_number);
+    }
+    const response = await apiClient.put(`/chapters/${Number(chapterId)}`, body);
+    return response.data;
+  } catch (error) {
+    console.error("Error updating chapter:", error);
     throw error;
   }
 };
@@ -714,6 +743,20 @@ export const deleteQuestion = async (id) => {
 };
 
 /**
+ * Bulk delete questions
+ * POST /api/question/bulk-delete  { ids: [...] }
+ */
+export const bulkDeleteQuestions = async (ids) => {
+  try {
+    const response = await apiClient.post(`/question/bulk-delete`, { ids });
+    return response.data;
+  } catch (error) {
+    console.error("Error bulk deleting questions:", error);
+    throw error;
+  }
+};
+
+/**
  * Get question statistics
  * GET /api/question/analysis
  */
@@ -782,6 +825,20 @@ export const deleteAnswerSheet = async (id) => {
   }
 };
 
+/**
+ * Bulk delete answer sheets
+ * POST /api/answersheets/bulk-delete  { ids: [...] }
+ */
+export const bulkDeleteAnswerSheets = async (ids) => {
+  try {
+    const response = await apiClient.post(`/answersheets/bulk-delete`, { ids });
+    return response.data;
+  } catch (error) {
+    console.error("Error bulk deleting answer sheets:", error);
+    throw error;
+  }
+};
+
 // ==================== WORKSHEET MANAGEMENT ====================
 
 /**
@@ -833,6 +890,20 @@ export const deleteWorksheet = async (id) => {
     return response.data;
   } catch (error) {
     console.error("Error deleting worksheet:", error);
+    throw error;
+  }
+};
+
+/**
+ * Bulk delete worksheets
+ * POST /api/worksheets/bulk-delete  { ids: [...] }
+ */
+export const bulkDeleteWorksheets = async (ids) => {
+  try {
+    const response = await apiClient.post(`/worksheets/bulk-delete`, { ids });
+    return response.data;
+  } catch (error) {
+    console.error("Error bulk deleting worksheets:", error);
     throw error;
   }
 };

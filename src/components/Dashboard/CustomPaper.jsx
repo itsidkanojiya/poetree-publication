@@ -2212,10 +2212,13 @@ const CustomPaper = () => {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {smartChapterPercents.map((row) => {
                       const ch = chapters.find((c) => c.chapter_id === row.chapter_id);
+                      const chapterLabel = `${
+                        ch?.chapter_number != null ? `${ch.chapter_number}. ` : ""
+                      }${ch?.chapter_name || `Chapter ${row.chapter_id}`}`;
                       return (
                         <div key={row.chapter_id} className="flex items-center gap-2">
-                          <span className="text-sm text-gray-700 flex-1 truncate" title={ch?.chapter_name}>
-                            {ch?.chapter_name || `Chapter ${row.chapter_id}`}
+                          <span className="text-sm text-gray-700 flex-1 truncate" title={chapterLabel}>
+                            {chapterLabel}
                           </span>
                           <input
                             type="number"

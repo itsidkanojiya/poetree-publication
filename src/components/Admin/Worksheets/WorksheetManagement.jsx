@@ -2,10 +2,11 @@ import { useState, useEffect } from "react";
 import {
   getAllWorksheets,
   deleteWorksheet,
+  bulkDeleteWorksheets,
   getAllSubjectTitles,
   getChaptersBySubjectTitle,
 } from "../../../services/adminService";
-import { Plus, Trash2, Search, FileText, Eye } from "lucide-react";
+import { Plus, Trash2, Search, FileText, Eye, CheckSquare } from "lucide-react";
 import Toast from "../../Common/Toast";
 import Loader from "../../Common/loader/loader";
 import AddWorksheetModal from "./AddWorksheetModal";
@@ -22,6 +23,9 @@ const WorksheetManagement = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedWorksheet, setSelectedWorksheet] = useState(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const [toast, setToast] = useState({ show: false, message: "", type: "success" });
 
   useEffect(() => {
@@ -68,6 +72,7 @@ const WorksheetManagement = () => {
       if (filterChapterId) filters.chapter_id = filterChapterId;
       const data = await getAllWorksheets(filters);
       setWorksheets(Array.isArray(data) ? data : data?.worksheets ?? []);
+      setSelectedIds([]);
     } catch (error) {
       setToast({
         show: true,
@@ -117,6 +122,42 @@ const WorksheetManagement = () => {
         message: error.response?.data?.message || "Failed to delete worksheet",
         type: "error",
       });
+    }
+  };
+
+  const toggleSelect = (id) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAll = () => {
+    const visibleIds = filteredWorksheets.map((w) => w.worksheet_id);
+    const allSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.includes(id));
+    setSelectedIds(allSelected ? [] : visibleIds);
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0) return;
+    try {
+      setBulkDeleting(true);
+      const res = await bulkDeleteWorksheets(selectedIds);
+      setToast({
+        show: true,
+        message: `Deleted ${res?.deletedCount ?? selectedIds.length} worksheet(s) successfully`,
+        type: "success",
+      });
+      setShowBulkDeleteModal(false);
+      setSelectedIds([]);
+      fetchWorksheets();
+    } catch (error) {
+      setToast({
+        show: true,
+        message: error.response?.data?.message || "Failed to delete worksheets",
+        type: "error",
+      });
+    } finally {
+      setBulkDeleting(false);
     }
   };
 
@@ -201,6 +242,43 @@ const WorksheetManagement = () => {
         </div>
       </div>
 
+      {/* Selection action bar */}
+      {filteredWorksheets.length > 0 && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 px-4 py-3 bg-white border border-gray-200 rounded-xl shadow-sm">
+          <button
+            onClick={toggleSelectAll}
+            className="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-blue-600 transition"
+          >
+            <CheckSquare className="w-4 h-4" />
+            <span>
+              {filteredWorksheets.every((w) => selectedIds.includes(w.worksheet_id))
+                ? "Deselect all"
+                : "Select all"}
+            </span>
+          </button>
+          {selectedIds.length > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold text-red-700">
+                {selectedIds.length} selected
+              </span>
+              <button
+                onClick={() => setSelectedIds([])}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-lg hover:bg-gray-200 transition"
+              >
+                Clear
+              </button>
+              <button
+                onClick={() => setShowBulkDeleteModal(true)}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-gradient-to-r from-red-500 to-rose-600 text-white rounded-lg hover:from-red-600 hover:to-rose-700 transition shadow"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Delete Selected ({selectedIds.length})</span>
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Worksheets Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredWorksheets.length === 0 ? (
@@ -212,8 +290,22 @@ const WorksheetManagement = () => {
           filteredWorksheets.map((worksheet) => (
             <div
               key={worksheet.worksheet_id}
-              className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition"
+              className={`relative bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition ${
+                selectedIds.includes(worksheet.worksheet_id)
+                  ? "ring-2 ring-blue-500"
+                  : ""
+              }`}
             >
+              {/* Selection checkbox */}
+              <label className="absolute top-3 left-3 z-10 bg-white/90 rounded-md p-1 shadow cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="w-5 h-5 cursor-pointer accent-blue-600 block"
+                  checked={selectedIds.includes(worksheet.worksheet_id)}
+                  onChange={() => toggleSelect(worksheet.worksheet_id)}
+                />
+              </label>
+
               {/* Cover Image */}
               {worksheet.worksheet_coverlink && (
                 <div className="h-48 bg-gray-100 overflow-hidden">
@@ -318,6 +410,34 @@ const WorksheetManagement = () => {
                 className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
               >
                 Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Delete Confirmation Modal */}
+      {showBulkDeleteModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4">
+            <h3 className="text-xl font-bold text-gray-800 mb-4">Delete Selected Worksheets</h3>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to delete {selectedIds.length} selected worksheet(s)? This action cannot be undone.
+            </p>
+            <div className="flex gap-4">
+              <button
+                onClick={() => setShowBulkDeleteModal(false)}
+                disabled={bulkDeleting}
+                className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBulkDelete}
+                disabled={bulkDeleting}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition disabled:opacity-50"
+              >
+                {bulkDeleting ? "Deleting..." : "Delete"}
               </button>
             </div>
           </div>
