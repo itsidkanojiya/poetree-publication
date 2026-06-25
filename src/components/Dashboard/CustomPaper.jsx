@@ -30,7 +30,7 @@ import {
 import Toast from "../Common/Toast";
 import Loader from "../Common/loader/loader";
 import SmartPaperStepper from "./SmartPaperStepper";
-import SmartPaperWizardSubjectForm from "./SmartPaperWizardSubjectForm";
+import { useUserTeaching } from "../../context/UserTeachingContext";
 
 // Constants
 const PAGE_DIMENSIONS = {
@@ -362,6 +362,7 @@ const getQuestionTypeTitle = (questionType, language, subjectName) => {
 
 const CustomPaper = () => {
   const { user } = useAuth();
+  const { contextSelection } = useUserTeaching();
   const navigate = useNavigate();
   const location = useLocation();
   const { header, paperId, editMode, paperData: initialPaperData } = location.state || {};
@@ -742,6 +743,12 @@ const CustomPaper = () => {
     rawSubjectTitleId != null && rawSubjectTitleId !== ""
       ? rawSubjectTitleId
       : null;
+  // The standard chosen in the teaching context (a standard_id). Used to show
+  // only chapters assigned to that standard in the Chapter mix.
+  const standardForChapters =
+    effectiveHeaderForChapter?.standard != null && effectiveHeaderForChapter?.standard !== ""
+      ? effectiveHeaderForChapter.standard
+      : null;
 
   useEffect(() => {
     if (!subjectTitleIdForChapters) {
@@ -752,7 +759,15 @@ const CustomPaper = () => {
     setLoadingChapters(true);
     getChaptersBySubjectTitle(subjectTitleIdForChapters)
       .then((list) => {
-        if (!cancelled) setChapters(Array.isArray(list) ? list : []);
+        if (cancelled) return;
+        let chapterList = Array.isArray(list) ? list : [];
+        // Filter to chapters assigned to the selected standard (standard_id match).
+        if (standardForChapters != null) {
+          chapterList = chapterList.filter(
+            (ch) => ch.standard != null && Number(ch.standard) === Number(standardForChapters)
+          );
+        }
+        setChapters(chapterList);
       })
       .catch(() => {
         if (!cancelled) setChapters([]);
@@ -761,7 +776,7 @@ const CustomPaper = () => {
         if (!cancelled) setLoadingChapters(false);
       });
     return () => { cancelled = true; };
-  }, [subjectTitleIdForChapters]);
+  }, [subjectTitleIdForChapters, standardForChapters]);
 
   useEffect(() => {
     if (!chapters.length) {
@@ -893,6 +908,30 @@ const CustomPaper = () => {
     }
   }, []);
 
+  // Seed the paper's subject/standard/board/subject-title from the already-chosen
+  // teaching context so the Smart paper wizard can skip the redundant Subject step.
+  // contextSelection loads asynchronously, so this runs whenever it becomes available.
+  useEffect(() => {
+    if (!smartWizardActive || !contextSelection) return;
+    setPaperHeader((prev) => {
+      if (!prev) return prev;
+      // Don't override a header that already carries a subject context
+      // (e.g. editing an existing paper or one passed via route state).
+      if (prev.subjectTitle && prev.board && prev.standard) return prev;
+      return {
+        ...prev,
+        subject: prev.subject || contextSelection.subject_name || "",
+        board: prev.board || contextSelection.board_id || "",
+        subjectTitle: prev.subjectTitle || contextSelection.subject_title_id || "",
+        standard:
+          prev.standard != null && prev.standard !== ""
+            ? prev.standard
+            : contextSelection.standard ?? "",
+        class: prev.class || contextSelection.standard_name || "",
+      };
+    });
+  }, [smartWizardActive, contextSelection]);
+
   const sumSmartPercents = (obj) =>
     Object.values(obj).reduce((a, b) => a + (Number(b) || 0), 0);
 
@@ -928,6 +967,16 @@ const CustomPaper = () => {
       chapters.map((ch, i) => ({
         chapter_id: ch.chapter_id,
         percent: base + (i < rem ? 1 : 0),
+      }))
+    );
+  };
+
+  const resetSmartChapterPercents = () => {
+    if (!chapters.length) return;
+    setSmartChapterPercents(
+      chapters.map((ch) => ({
+        chapter_id: ch.chapter_id,
+        percent: 0,
       }))
     );
   };
@@ -1734,7 +1783,9 @@ const CustomPaper = () => {
       });
       return;
     }
-    setSmartWizardStep("subject");
+    // Subject context comes from the chosen teaching context, so skip straight
+    // to the smart settings step.
+    setSmartWizardStep("targets");
   };
 
   if (smartWizardActive && smartWizardStep === "header") {
@@ -1855,103 +1906,9 @@ const CustomPaper = () => {
                 onClick={proceedWizardHeader}
                 className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-bold text-white bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 shadow-lg"
               >
-                Continue to subject
+                Continue to smart settings
               </button>
             </div>
-          </div>
-        </div>
-
-        {showBackConfirm && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 border border-gray-200">
-              <h3 className="text-xl font-bold text-gray-800 mb-2">Leave this page?</h3>
-              <p className="text-gray-600 mb-6">
-                Are you sure? You can save as draft and continue later, or discard and start fresh next time.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-3 justify-end">
-                <button
-                  type="button"
-                  onClick={() => setShowBackConfirm(false)}
-                  className="px-4 py-2.5 rounded-xl font-semibold border-2 border-gray-300 text-gray-700 hover:bg-gray-50 transition"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleDiscardAndGo}
-                  className="px-4 py-2.5 rounded-xl font-semibold bg-rose-500 text-white hover:bg-rose-600 transition"
-                >
-                  Discard
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSaveDraftAndGo}
-                  disabled={isSaving}
-                  className="px-4 py-2.5 rounded-xl font-semibold bg-violet-500 text-white hover:bg-violet-600 transition disabled:opacity-50"
-                >
-                  {isSaving ? "Saving..." : "Save as draft"}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {toast && (
-          <Toast
-            message={toast.message}
-            type={toast.type}
-            onClose={() => setToast(null)}
-            duration={3000}
-          />
-        )}
-      </div>
-    );
-  }
-
-  if (smartWizardActive && smartWizardStep === "subject") {
-    if (!paperHeader) {
-      return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40 flex items-center justify-center">
-          <Loader className="mx-auto mb-4" />
-        </div>
-      );
-    }
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40">
-        <div className="bg-white/80 backdrop-blur-lg border-b border-gray-200/50 px-6 py-4 sticky top-0 z-50 shadow-lg shadow-gray-200/50">
-          <div className="flex flex-wrap items-center justify-between gap-3 w-full max-w-5xl mx-auto">
-            <div className="flex items-center gap-4">
-              <button
-                type="button"
-                onClick={() => setShowBackConfirm(true)}
-                className="group flex items-center gap-2 px-3 py-2 text-gray-700 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200 font-medium"
-              >
-                <ChevronLeft
-                  size={20}
-                  className="group-hover:-translate-x-1 transition-transform"
-                />
-                <span>Back to Dashboard</span>
-              </button>
-              <div className="flex items-center gap-2 flex-wrap">
-                <Sparkles size={22} className="text-indigo-600" />
-                <span className="font-bold text-gray-800">Smart paper</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="max-w-3xl mx-auto px-6 py-8 pb-16">
-          <SmartPaperStepper activeIndex={1} />
-          <p className="text-gray-600 text-sm mb-6">
-            Choose the subject, standard, board, and subject title for this paper. This matches how your question bank is filtered.
-          </p>
-          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
-            <SmartPaperWizardSubjectForm
-              paperHeader={paperHeader}
-              setPaperHeader={setPaperHeader}
-              onBack={() => setSmartWizardStep("header")}
-              onContinue={() => setSmartWizardStep("targets")}
-            />
           </div>
         </div>
 
@@ -2031,7 +1988,7 @@ const CustomPaper = () => {
         </div>
 
         <div className="max-w-3xl mx-auto px-6 py-8 pb-16">
-          <SmartPaperStepper activeIndex={2} />
+          <SmartPaperStepper activeIndex={1} />
           <p className="text-gray-600 text-sm mb-6">
             Set targets for your paper. After you submit, you will see a brief generating screen, then the full preview with download and save.
           </p>
@@ -2196,17 +2153,27 @@ const CustomPaper = () => {
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-bold text-gray-800">Chapter mix (%)</span>
-                  <button
-                    type="button"
-                    onClick={normalizeSmartChapterPercents}
-                    className="text-xs font-semibold text-indigo-600 hover:underline"
-                  >
-                    Normalize to 100%
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={resetSmartChapterPercents}
+                      className="text-xs font-semibold text-gray-500 hover:underline"
+                    >
+                      Set all to 0
+                    </button>
+                    <button
+                      type="button"
+                      onClick={normalizeSmartChapterPercents}
+                      className="text-xs font-semibold text-indigo-600 hover:underline"
+                    >
+                      Normalize to 100%
+                    </button>
+                  </div>
                 </div>
                 {smartChapterPercents.length === 0 ? (
                   <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
-                    No chapters yet for this subject title.
+                    No chapters assigned to this standard for this subject title. Assign a
+                    standard to chapters under Subject Titles → Manage Chapters.
                   </p>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -2239,11 +2206,11 @@ const CustomPaper = () => {
               <div className="flex flex-col-reverse sm:flex-row gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => setSmartWizardStep("subject")}
+                  onClick={() => setSmartWizardStep("header")}
                   className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl border-2 border-gray-300 font-semibold text-gray-700 hover:bg-gray-50"
                 >
                   <ChevronLeft size={18} />
-                  Back to subject
+                  Back to paper header
                 </button>
                 <button
                   type="button"

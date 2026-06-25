@@ -5,6 +5,7 @@ import {
   createChapter,
   updateChapter,
   deleteChapter,
+  getAllStandards,
 } from "../../../services/adminService";
 
 const ManageChaptersModal = ({ subjectTitleId, titleName, onClose }) => {
@@ -12,6 +13,7 @@ const ManageChaptersModal = ({ subjectTitleId, titleName, onClose }) => {
   const [loading, setLoading] = useState(true);
   const [newChapterName, setNewChapterName] = useState("");
   const [newChapterNumber, setNewChapterNumber] = useState("");
+  const [newChapterStandard, setNewChapterStandard] = useState("");
   const [creating, setCreating] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
   const [error, setError] = useState(null);
@@ -20,7 +22,29 @@ const ManageChaptersModal = ({ subjectTitleId, titleName, onClose }) => {
   const [editingId, setEditingId] = useState(null);
   const [editName, setEditName] = useState("");
   const [editNumber, setEditNumber] = useState("");
+  const [editStandard, setEditStandard] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
+  const [standards, setStandards] = useState([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    getAllStandards()
+      .then((data) => {
+        const list = Array.isArray(data) ? data : [];
+        if (!cancelled) {
+          setStandards(list.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setStandards([]);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  const getStandardName = (id) => {
+    if (id == null || id === "") return "";
+    return standards.find((s) => String(s.standard_id) === String(id))?.name ?? `Std ${id}`;
+  };
 
   useEffect(() => {
     if (!subjectTitleId) return;
@@ -64,6 +88,7 @@ const ManageChaptersModal = ({ subjectTitleId, titleName, onClose }) => {
         chapter_name: name,
         subject_title_id: Number(subjectTitleId),
         chapter_number: newChapterNumber === "" ? null : Number(newChapterNumber),
+        standard: newChapterStandard === "" ? null : Number(newChapterStandard),
       });
       const created = res?.chapter || res;
       if (created?.chapter_id) {
@@ -74,12 +99,14 @@ const ManageChaptersModal = ({ subjectTitleId, titleName, onClose }) => {
               chapter_id: created.chapter_id,
               chapter_name: created.chapter_name,
               chapter_number: created.chapter_number ?? null,
+              standard: created.standard ?? null,
               subject_title_id: created.subject_title_id,
             },
           ])
         );
         setNewChapterName("");
         setNewChapterNumber("");
+        setNewChapterStandard("");
       }
     } catch (err) {
       setError(err.response?.data?.message || "Failed to create chapter");
@@ -92,6 +119,7 @@ const ManageChaptersModal = ({ subjectTitleId, titleName, onClose }) => {
     setEditingId(ch.chapter_id);
     setEditName(ch.chapter_name || "");
     setEditNumber(ch.chapter_number != null ? String(ch.chapter_number) : "");
+    setEditStandard(ch.standard != null ? String(ch.standard) : "");
     setError(null);
   };
 
@@ -99,6 +127,7 @@ const ManageChaptersModal = ({ subjectTitleId, titleName, onClose }) => {
     setEditingId(null);
     setEditName("");
     setEditNumber("");
+    setEditStandard("");
   };
 
   const handleEditSave = async () => {
@@ -110,6 +139,7 @@ const ManageChaptersModal = ({ subjectTitleId, titleName, onClose }) => {
       const res = await updateChapter(editingId, {
         chapter_name: name,
         chapter_number: editNumber === "" ? null : Number(editNumber),
+        standard: editStandard === "" ? null : Number(editStandard),
       });
       const updated = res?.chapter || res;
       setChapters((prev) =>
@@ -125,6 +155,12 @@ const ManageChaptersModal = ({ subjectTitleId, titleName, onClose }) => {
                       : editNumber === ""
                       ? null
                       : Number(editNumber),
+                  standard:
+                    updated?.standard !== undefined
+                      ? updated.standard
+                      : editStandard === ""
+                      ? null
+                      : Number(editStandard),
                 }
               : ch
           )
@@ -184,7 +220,7 @@ const ManageChaptersModal = ({ subjectTitleId, titleName, onClose }) => {
             <label className="block text-sm font-semibold text-gray-700 mb-2">
               Add new chapter
             </label>
-            <div className="flex gap-2">
+            <div className="flex gap-2 mb-2">
               <input
                 type="number"
                 min="0"
@@ -192,8 +228,23 @@ const ManageChaptersModal = ({ subjectTitleId, titleName, onClose }) => {
                 onChange={(e) => setNewChapterNumber(e.target.value)}
                 placeholder="No."
                 title="Chapter number (optional)"
-                className="w-20 px-3 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
+                className="w-1/2 px-3 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
               />
+              <select
+                value={newChapterStandard}
+                onChange={(e) => setNewChapterStandard(e.target.value)}
+                title="Standard (optional)"
+                className="w-1/2 px-3 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none bg-white"
+              >
+                <option value="">Standard</option>
+                {standards.map((s) => (
+                  <option key={s.standard_id} value={s.standard_id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex gap-2">
               <input
                 type="text"
                 value={newChapterName}
@@ -248,8 +299,22 @@ const ManageChaptersModal = ({ subjectTitleId, titleName, onClose }) => {
                             value={editNumber}
                             onChange={(e) => setEditNumber(e.target.value)}
                             placeholder="No."
-                            className="w-16 px-2 py-1.5 border-2 border-gray-200 rounded-lg outline-none focus:border-blue-500"
+                            title="Chapter number"
+                            className="w-14 px-2 py-1.5 border-2 border-gray-200 rounded-lg outline-none focus:border-blue-500"
                           />
+                          <select
+                            value={editStandard}
+                            onChange={(e) => setEditStandard(e.target.value)}
+                            title="Standard"
+                            className="w-24 px-2 py-1.5 border-2 border-gray-200 rounded-lg outline-none focus:border-blue-500 bg-white"
+                          >
+                            <option value="">Std</option>
+                            {standards.map((s) => (
+                              <option key={s.standard_id} value={s.standard_id}>
+                                {s.name}
+                              </option>
+                            ))}
+                          </select>
                           <input
                             type="text"
                             value={editName}
@@ -288,6 +353,11 @@ const ManageChaptersModal = ({ subjectTitleId, titleName, onClose }) => {
                             </span>
                             {ch.chapter_name}
                           </span>
+                          {ch.standard != null && (
+                            <span className="shrink-0 text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-full px-2 py-0.5">
+                              {getStandardName(ch.standard)}
+                            </span>
+                          )}
                           <button
                             type="button"
                             onClick={() => startEdit(ch)}

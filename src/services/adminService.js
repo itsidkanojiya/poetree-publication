@@ -384,9 +384,9 @@ export const getChaptersBySubjectTitle = async (subjectTitleId) => {
 /**
  * Create chapter
  * POST /api/chapters
- * Body: { chapter_name: string, subject_title_id: number, chapter_number?: number|null }
+ * Body: { chapter_name: string, subject_title_id: number, chapter_number?: number|null, standard?: number|null }
  */
-export const createChapter = async ({ chapter_name, subject_title_id, chapter_number }) => {
+export const createChapter = async ({ chapter_name, subject_title_id, chapter_number, standard }) => {
   try {
     const body = {
       chapter_name: String(chapter_name).trim(),
@@ -395,6 +395,9 @@ export const createChapter = async ({ chapter_name, subject_title_id, chapter_nu
     if (chapter_number !== undefined) {
       body.chapter_number =
         chapter_number === "" || chapter_number == null ? null : Number(chapter_number);
+    }
+    if (standard !== undefined) {
+      body.standard = standard === "" || standard == null ? null : Number(standard);
     }
     const response = await apiClient.post("/chapters", body);
     return response.data;
@@ -407,15 +410,18 @@ export const createChapter = async ({ chapter_name, subject_title_id, chapter_nu
 /**
  * Update a chapter (admin)
  * PUT /api/chapters/:chapterId
- * Body: { chapter_name?: string, chapter_number?: number|null }
+ * Body: { chapter_name?: string, chapter_number?: number|null, standard?: number|null }
  */
-export const updateChapter = async (chapterId, { chapter_name, chapter_number } = {}) => {
+export const updateChapter = async (chapterId, { chapter_name, chapter_number, standard } = {}) => {
   try {
     const body = {};
     if (chapter_name !== undefined) body.chapter_name = String(chapter_name).trim();
     if (chapter_number !== undefined) {
       body.chapter_number =
         chapter_number === "" || chapter_number == null ? null : Number(chapter_number);
+    }
+    if (standard !== undefined) {
+      body.standard = standard === "" || standard == null ? null : Number(standard);
     }
     const response = await apiClient.put(`/chapters/${Number(chapterId)}`, body);
     return response.data;
