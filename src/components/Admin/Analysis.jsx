@@ -211,7 +211,7 @@ const Analysis = () => {
                 <div className="p-3 bg-red-50 rounded-lg">
                   <div className="text-sm text-gray-600 mb-1">True & False</div>
                   <div className="text-xl font-bold text-red-600">
-                    {questionData?.["true&false"] || 0}
+                    {questionData?.truefalse || 0}
                   </div>
                 </div>
                 <div className="p-3 bg-yellow-50 rounded-lg">

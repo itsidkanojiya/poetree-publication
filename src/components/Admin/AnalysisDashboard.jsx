@@ -253,7 +253,7 @@ const AnalysisDashboard = () => {
                     <div className="p-3 bg-gray-50 rounded-lg">
                       <span className="text-sm text-gray-600">True & False</span>
                       <p className="text-xl font-bold text-gray-800">
-                        {questionData["true&false"] || 0}
+                        {questionData.truefalse || 0}
                       </p>
                     </div>
                     <div className="p-3 bg-gray-50 rounded-lg">

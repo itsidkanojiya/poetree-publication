@@ -635,7 +635,8 @@ const BulkUploadModal = ({ questionType, onClose, onSuccess }) => {
           const formData = new FormData();
 
           // REQUIRED FIELDS - Always append (convert to proper types)
-          formData.append("type", question.type);
+          const apiType = question.type === "true&false" ? "truefalse" : question.type;
+          formData.append("type", apiType);
           formData.append("subject_id", String(question.subject_id));
           formData.append(
             "subject_title_id",
