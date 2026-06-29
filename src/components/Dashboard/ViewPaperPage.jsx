@@ -40,75 +40,143 @@ const getSectionTitle = (type) => {
   return titles[key] || QUESTION_TYPE_CONFIG[type]?.label || type;
 };
 
-// Same as CustomPaper: fixed page size for PDF (no header cut, multi-page)
+// Fixed page size for PDF (no header cut, multi-page).
+// These constants + the per-question pagination below are kept in sync with
+// CustomPaper.jsx so the View and the downloaded PDF lay out identically.
 const PAGE_HEIGHT = 1123;
 const PAGE_WIDTH = 748;
 const HEADER_HEIGHT = 230;
-const CONTENT_PADDING = 120;
+const CONTENT_PADDING = 64; // p-8 on the page container = 32px top + 32px bottom
+const MARGIN = 40;
+const SAFETY_BUFFER = 24;
 
-function estQuestionHeight(q) {
-  const t = normalizeQuestionType(q.type);
-  let h = 28 + 18;
-  if (t === "mcq" && q.options) {
-    const opts = Array.isArray(q.options) ? q.options : [];
-    h += Math.ceil(opts.length / 2) * 32;
-  } else if (t === "passage" && q.options) {
+const COMPONENT_HEIGHTS = {
+  QUESTION: 28,
+  OPTION: 32,
+  IMAGE: 220,
+  SECTION: 32,
+  SPACING: 24,
+  PASSAGE_LINE: 26,
+  PASSAGE_SUB_Q: 34,
+  MATCH_ROW: 42,
+};
+
+const toOptionsArray = (options) => {
+  if (Array.isArray(options)) return options;
+  if (typeof options === "string") {
     try {
-      const pqs = typeof q.options === "string" ? JSON.parse(q.options) : q.options;
-      let subH = Array.isArray(pqs) ? pqs.length * 34 : 0;
-      if (Array.isArray(pqs)) {
-        pqs.forEach((pq) => {
-          if (pq && pq.type === "mcq" && Array.isArray(pq.options)) {
-            const opts = pq.options.filter((o) => o != null && String(o).trim() !== "");
-            subH += Math.max(0, opts.length * 22);
-          }
-        });
-      }
-      h += 120 + subH;
+      const parsed = JSON.parse(options);
+      return Array.isArray(parsed) ? parsed : [];
     } catch {
-      h += 150;
+      return [];
     }
-  } else if (t === "match" && q.options) {
+  }
+  return [];
+};
+
+// Options always render in a 2-column grid, so rows = ceil(count / 2).
+const getMcqOptionsHeight = (options) => {
+  const opts = toOptionsArray(options);
+  if (opts.length === 0) return 0;
+  const rows = Math.ceil(opts.length / 2);
+  let height = rows * COMPONENT_HEIGHTS.OPTION;
+  const maxLen = opts.reduce(
+    (m, o) => Math.max(m, typeof o === "string" ? o.length : 0),
+    0
+  );
+  if (maxLen > 40) height += rows * COMPONENT_HEIGHTS.OPTION; // wrapped long options
+  return height;
+};
+
+const getPassageQuestionHeight = (question) => {
+  let h = COMPONENT_HEIGHTS.QUESTION;
+  const passageText = question.question || "";
+  h += Math.max(1, Math.ceil(passageText.length / 55)) * COMPONENT_HEIGHTS.PASSAGE_LINE;
+  const arr = toOptionsArray(question.options);
+  arr.forEach((pq) => {
+    h += COMPONENT_HEIGHTS.PASSAGE_SUB_Q;
+    if (pq && pq.type === "mcq" && Array.isArray(pq.options)) {
+      const opts = pq.options.filter((o) => o != null && String(o).trim() !== "");
+      h += opts.length * COMPONENT_HEIGHTS.OPTION;
+    }
+  });
+  return h;
+};
+
+const getMatchQuestionHeight = (question) => {
+  let h = COMPONENT_HEIGHTS.QUESTION;
+  if (question.options) {
     try {
-      const m = typeof q.options === "string" ? JSON.parse(q.options) : q.options;
-      const rows = Math.max((m.left || []).length, (m.right || []).length);
-      h += 50 + rows * 42;
-    } catch {
-      h += 100;
-    }
-  } else if (q.image_url) {
-    h += 220;
+      const data =
+        typeof question.options === "string" ? JSON.parse(question.options) : question.options;
+      const rows = Math.max((data?.left || []).length, (data?.right || []).length, 1);
+      h += 40 + rows * COMPONENT_HEIGHTS.MATCH_ROW;
+    } catch {}
   }
   return h;
-}
+};
 
-function estSectionHeight(section) {
-  const sectionTitle = 32 + 24;
-  const questionsHeight = section.selectedQuestions.reduce((sum, q) => sum + estQuestionHeight(q), 0);
-  return sectionTitle + questionsHeight;
-}
-
-function buildPages(sections) {
-  if (!sections.length) return [];
-  const firstPageContentMax = PAGE_HEIGHT - HEADER_HEIGHT - CONTENT_PADDING;
-  const nextPageContentMax = PAGE_HEIGHT - CONTENT_PADDING;
-  const pages = [];
-  let current = [];
-  let currentHeight = 0;
-
-  for (const section of sections) {
-    const sectionH = estSectionHeight(section);
-    const limit = pages.length === 0 ? firstPageContentMax : nextPageContentMax;
-    if (current.length > 0 && currentHeight + sectionH > limit) {
-      pages.push(current);
-      current = [];
-      currentHeight = 0;
-    }
-    current.push(section);
-    currentHeight += sectionH;
+const estimateQuestionHeight = (question, { isFirstOfType, hasQuestionsOnPage }) => {
+  const type = normalizeQuestionType(question.type);
+  let h;
+  if (type === "passage") h = getPassageQuestionHeight(question);
+  else if (type === "match") h = getMatchQuestionHeight(question);
+  else {
+    h = COMPONENT_HEIGHTS.QUESTION;
+    if (type === "mcq") h += getMcqOptionsHeight(question.options);
   }
-  if (current.length > 0) pages.push(current);
-  return pages;
+  if (isFirstOfType) h += COMPONENT_HEIGHTS.SECTION;
+  if (question.image_url != null && question.image_url !== "") h += COMPONENT_HEIGHTS.IMAGE;
+  if (hasQuestionsOnPage) h += COMPONENT_HEIGHTS.SPACING;
+  return h;
+};
+
+// Per-question pagination (mirrors CustomPaper.renderPages): a question that
+// doesn't fit is pushed to the next page instead of being clipped, and a single
+// section can span multiple pages (its title is printed once via printedTypes).
+function buildPages(sections) {
+  let pages = [];
+  let currentHeight = PAGE_HEIGHT - HEADER_HEIGHT - CONTENT_PADDING;
+  let currentPage = [];
+
+  sections.forEach((section) => {
+    section.selectedQuestions.forEach((question) => {
+      const type = normalizeQuestionType(question.type);
+      const isFirstOfType = !currentPage.some(
+        (s) => normalizeQuestionType(s.type) === type
+      );
+      const hasQuestionsOnPage = currentPage.some((s) => s.selectedQuestions.length > 0);
+      const questionHeight = estimateQuestionHeight(question, {
+        isFirstOfType,
+        hasQuestionsOnPage,
+      });
+
+      const availableHeight = currentHeight - MARGIN - SAFETY_BUFFER;
+
+      if (questionHeight > availableHeight) {
+        if (currentPage.length > 0) pages.push(currentPage);
+        currentPage = [];
+        // First question of its type on the fresh page, no inter-question spacing
+        const newQuestionHeight = estimateQuestionHeight(question, {
+          isFirstOfType: true,
+          hasQuestionsOnPage: false,
+        });
+        currentPage.push({ type: question.type, selectedQuestions: [question] });
+        currentHeight = PAGE_HEIGHT - CONTENT_PADDING - newQuestionHeight;
+        if (currentHeight < 0) currentHeight = 0;
+      } else {
+        const existing = currentPage.find(
+          (s) => normalizeQuestionType(s.type) === type
+        );
+        if (!existing) currentPage.push({ type: question.type, selectedQuestions: [question] });
+        else existing.selectedQuestions.push(question);
+        currentHeight -= questionHeight;
+      }
+    });
+  });
+
+  if (currentPage.length > 0) pages.push(currentPage);
+  return pages.length > 0 ? pages : [[]];
 }
 
 function parseBodyToQuestionIds(body) {

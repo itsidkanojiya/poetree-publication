@@ -36,8 +36,9 @@ import { useUserTeaching } from "../../context/UserTeachingContext";
 const PAGE_DIMENSIONS = {
   HEIGHT: 1123,
   WIDTH: 748,
-  MARGIN: 70,
-  SAFETY_BUFFER: 40, // Extra margin so content never overflows and gets clipped
+  MARGIN: 40,
+  SAFETY_BUFFER: 24, // Small safety margin; real container padding is handled by CONTENT_PADDING
+  CONTENT_PADDING: 64, // p-8 on the page container = 32px top + 32px bottom
 };
 
 const COMPONENT_HEIGHTS = {
@@ -46,7 +47,7 @@ const COMPONENT_HEIGHTS = {
   OPTION: 32,
   IMAGE: 220,
   SECTION: 32,
-  SPACING: 18,
+  SPACING: 24, // matches the space-y-6 (1.5rem) gap between questions
   PASSAGE_LINE: 26,
   PASSAGE_SUB_Q: 34,
   MATCH_ROW: 42,
@@ -258,28 +259,24 @@ const getMcqLayout = (options) => {
   }
 };
 
-// Function to calculate MCQ options height based on layout
+// Function to calculate MCQ options height.
+// Options are always rendered in a 2-column grid (see grid-cols-2 in the page
+// render), so rows = ceil(count / 2). Long options that wrap to a second line
+// add an extra line so tall questions aren't under-counted.
 const getMcqOptionsHeight = (options) => {
   if (!options || options.length === 0) return 0;
 
-  // Calculate average option length
-  const avgLength =
-    options.reduce((sum, opt) => sum + (opt?.length || 0), 0) / options.length;
+  const rows = Math.ceil(options.length / 2);
+  let height = rows * COMPONENT_HEIGHTS.OPTION;
 
-  // Calculate number of rows based on layout
-  let rows;
-  if (avgLength < 20) {
-    // Short options: 4 in 1 row
-    rows = Math.ceil(options.length / 4);
-  } else if (avgLength < 50) {
-    // Medium options: 2x2 grid
-    rows = Math.ceil(options.length / 2);
-  } else {
-    // Long options: 1 by 4 (vertical)
-    rows = options.length;
+  // Each column is ~half the content width; options longer than ~40 chars wrap
+  // to a second line. Add one extra option-line per wrapped row (worst case).
+  const maxLen = options.reduce((m, opt) => Math.max(m, opt?.length || 0), 0);
+  if (maxLen > 40) {
+    height += rows * COMPONENT_HEIGHTS.OPTION;
   }
 
-  return rows * COMPONENT_HEIGHTS.OPTION;
+  return height;
 };
 
 // Estimate height for passage question (passage text + sub-questions; MCQ sub-questions add option lines)
@@ -296,7 +293,7 @@ const getPassageQuestionHeight = (question) => {
           h += COMPONENT_HEIGHTS.PASSAGE_SUB_Q;
           if (pq && pq.type === "mcq" && Array.isArray(pq.options)) {
             const opts = pq.options.filter((o) => o != null && String(o).trim() !== "");
-            h += Math.max(0, opts.length * 22);
+            h += Math.max(0, opts.length * COMPONENT_HEIGHTS.OPTION);
           }
         });
       }
@@ -1381,7 +1378,7 @@ const CustomPaper = () => {
     
     // Generate and download PDF (sequential so page order is correct)
     try {
-      const pdf = new jsPDF("p", "mm", "a4");
+      const pdf = new jsPDF({ orientation: "p", unit: "mm", format: "a4", compress: true });
       const pages = pagesRef.current.children;
 
       for (let index = 0; index < pages.length; index++) {
@@ -1397,21 +1394,23 @@ const CustomPaper = () => {
           )
         );
         const canvas = await html2canvas(page, {
-          scale: 2.5,
+          scale: 2,
           useCORS: true,
           allowTaint: false,
           logging: false,
           backgroundColor: "#ffffff",
           ignoreElements: (element) => element.classList.contains("no-print"),
         });
-        const imgData = canvas.toDataURL("image/png", 1.0);
+        // JPEG (compressed) keeps text crisp while shrinking the PDF ~50-100x
+        // versus full-quality PNG screenshots.
+        const imgData = canvas.toDataURL("image/jpeg", 0.92);
         const imgWidth = 210;
         const imgHeight = (canvas.height * imgWidth) / canvas.width;
         const maxHeight = 297;
         const finalHeight = imgHeight > maxHeight ? maxHeight : imgHeight;
 
         if (index > 0) pdf.addPage();
-        pdf.addImage(imgData, "PNG", 0, 0, imgWidth, finalHeight);
+        pdf.addImage(imgData, "JPEG", 0, 0, imgWidth, finalHeight, undefined, "FAST");
       }
 
       pdf.save("exam-paper.pdf");
@@ -1636,7 +1635,8 @@ const CustomPaper = () => {
 
   const renderPages = () => {
     let pages = [];
-    let currentHeight = PAGE_DIMENSIONS.HEIGHT - COMPONENT_HEIGHTS.HEADER;
+    let currentHeight =
+      PAGE_DIMENSIONS.HEIGHT - COMPONENT_HEIGHTS.HEADER - PAGE_DIMENSIONS.CONTENT_PADDING;
     let currentPage = [];
     const questionCounters = {};
     let isFirstPage = true;
@@ -1691,7 +1691,8 @@ const CustomPaper = () => {
           // Start new page
           isFirstPage = false;
           currentPage = [];
-          currentHeight = PAGE_DIMENSIONS.HEIGHT; // Full page height for subsequent pages (no header)
+          // Full page height for subsequent pages (no header), minus container padding
+          currentHeight = PAGE_DIMENSIONS.HEIGHT - PAGE_DIMENSIONS.CONTENT_PADDING;
 
           // Recalculate question height for new page (it's now first of its type on this page)
           let newQuestionHeight;
@@ -1715,7 +1716,8 @@ const CustomPaper = () => {
             type: question.type,
             selectedQuestions: [question],
           });
-          currentHeight = PAGE_DIMENSIONS.HEIGHT - newQuestionHeight;
+          currentHeight =
+            PAGE_DIMENSIONS.HEIGHT - PAGE_DIMENSIONS.CONTENT_PADDING - newQuestionHeight;
 
           // Safety check: if question is too large for a single page, still add it
           if (currentHeight < 0) {
