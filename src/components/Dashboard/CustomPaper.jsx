@@ -36,21 +36,23 @@ import { useUserTeaching } from "../../context/UserTeachingContext";
 const PAGE_DIMENSIONS = {
   HEIGHT: 1123,
   WIDTH: 748,
-  MARGIN: 40,
+  MARGIN: 24,
   SAFETY_BUFFER: 24, // Small safety margin; real container padding is handled by CONTENT_PADDING
   CONTENT_PADDING: 64, // p-8 on the page container = 32px top + 32px bottom
 };
 
+// Tuned to the ACTUAL rendered heights (14px question line, 13px options in a
+// 2-col grid) so pages fill properly instead of breaking early.
 const COMPONENT_HEIGHTS = {
   HEADER: 230,
-  QUESTION: 28,
-  OPTION: 32,
+  QUESTION: 24,
+  OPTION: 26,
   IMAGE: 220,
-  SECTION: 32,
-  SPACING: 24, // matches the space-y-6 (1.5rem) gap between questions
-  PASSAGE_LINE: 26,
-  PASSAGE_SUB_Q: 34,
-  MATCH_ROW: 42,
+  SECTION: 36,
+  SPACING: 14, // gap between consecutive questions
+  PASSAGE_LINE: 24,
+  PASSAGE_SUB_Q: 30,
+  MATCH_ROW: 40,
 };
 
 const INITIAL_QUESTION_SECTIONS = [

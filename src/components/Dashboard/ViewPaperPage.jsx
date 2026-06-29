@@ -47,18 +47,20 @@ const PAGE_HEIGHT = 1123;
 const PAGE_WIDTH = 748;
 const HEADER_HEIGHT = 230;
 const CONTENT_PADDING = 64; // p-8 on the page container = 32px top + 32px bottom
-const MARGIN = 40;
+const MARGIN = 24;
 const SAFETY_BUFFER = 24;
 
+// Tuned to the ACTUAL rendered heights so pages fill properly instead of
+// breaking early. Kept in sync with CustomPaper.jsx.
 const COMPONENT_HEIGHTS = {
-  QUESTION: 28,
-  OPTION: 32,
+  QUESTION: 24,
+  OPTION: 26,
   IMAGE: 220,
-  SECTION: 32,
-  SPACING: 24,
-  PASSAGE_LINE: 26,
-  PASSAGE_SUB_Q: 34,
-  MATCH_ROW: 42,
+  SECTION: 36,
+  SPACING: 14,
+  PASSAGE_LINE: 24,
+  PASSAGE_SUB_Q: 30,
+  MATCH_ROW: 40,
 };
 
 const toOptionsArray = (options) => {
