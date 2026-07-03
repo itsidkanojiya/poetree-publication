@@ -128,7 +128,7 @@ const PaperCard = ({
 
   return (
     <>
-      <div className="group bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden border border-gray-200 transform hover:-translate-y-1">
+      <div className="group bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 border border-gray-200 transform hover:-translate-y-1">
         {/* Header with Type Badge */}
         <div
           className={`${
@@ -137,7 +137,7 @@ const PaperCard = ({
               : type === "custom"
               ? "bg-gradient-to-r from-green-500 to-emerald-600"
               : "bg-gradient-to-r from-blue-500 to-indigo-600"
-          } text-white px-4 py-3 flex items-center justify-between`}
+          } text-white px-4 py-3 flex items-center justify-between rounded-t-2xl`}
         >
           <div className="flex items-center gap-2">
             <FileText className="w-5 h-5" />

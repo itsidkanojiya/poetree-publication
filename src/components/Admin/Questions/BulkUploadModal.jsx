@@ -261,14 +261,25 @@ const BulkUploadModal = ({ questionType, onClose, onSuccess }) => {
             row[mapping.option4],
           ].filter(Boolean);
 
-          if (options.length < 4) {
-            newErrors.push(`Row ${index + 2}: MCQ must have 4 options`);
+          if (options.length < 2) {
+            newErrors.push(`Row ${index + 2}: MCQ must have at least 2 options`);
           }
 
           question.options = JSON.stringify(options);
-          // MCQ answer should be the option number (1-4)
+          // MCQ answer should be the option number (1..number of options)
           const answerValue = row[mapping.answer] || "";
           question.answer = String(answerValue).trim();
+          const answerNum = Number(question.answer);
+          if (
+            options.length >= 2 &&
+            (!Number.isInteger(answerNum) ||
+              answerNum < 1 ||
+              answerNum > options.length)
+          ) {
+            newErrors.push(
+              `Row ${index + 2}: MCQ answer must be a number between 1 and ${options.length}`
+            );
+          }
         } else if (questionType === "passage") {
           const passage = row[mapping.passage] || "";
           const passageQuestions = row[mapping.passage_questions] || "";
@@ -1052,7 +1063,12 @@ const BulkUploadModal = ({ questionType, onClose, onSuccess }) => {
                   <li>Board (or Board ID)</li>
                   <li>Chapter ID (name is filled from ID when saved)</li>
                   {questionType === "mcq" && (
-                    <li>Option1, Option2, Option3, Option4</li>
+                    <li>
+                      Option1, Option2, Option3, Option4{" "}
+                      <span className="text-gray-500">
+                        (at least 2 required; leave Option3/Option4 blank for fewer)
+                      </span>
+                    </li>
                   )}
                 </ul>
               </div>

@@ -674,6 +674,26 @@ export const smartProposePaper = async (payload) => {
 };
 
 /**
+ * Per question-type marks breakdown for the current teaching context.
+ * Used to show a live estimated total (count × unit_marks) before generating.
+ */
+export const getMarksBreakdown = async ({ subject_title_id, board_id, standard }) => {
+  try {
+    const response = await apiClient.get("/papers/marks-breakdown", {
+      params: {
+        subject_title_id: Number(subject_title_id),
+        board_id: Number(board_id),
+        standard: Number(standard),
+      },
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching marks breakdown:", error);
+    throw error;
+  }
+};
+
+/**
  * Optional: question bank stats for admin suggestions
  * GET /api/question/stats?subject_title_id=&board_id=&standard=
  */

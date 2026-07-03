@@ -26,6 +26,7 @@ import {
   getChaptersBySubjectTitle,
   smartProposePaper,
   getQuestionsByType,
+  getMarksBreakdown,
 } from "../../services/adminService";
 import Toast from "../Common/Toast";
 import Loader from "../Common/loader/loader";
@@ -173,6 +174,43 @@ const QUESTION_TYPE_CONFIG = {
     color: "bg-rose-500",
     badge: "bg-rose-100 text-rose-700",
   },
+};
+
+// Short labels used in the smart-paper summary line and per-type status.
+const SMART_SECTION_SHORT_LABELS = {
+  mcq: "MCQ",
+  blank: "Fill in the Blanks",
+  true_false: "True/False",
+  onetwo: "One–two sentence",
+  short: "Short answer",
+  long: "Long answer",
+  passage: "Passage",
+  match: "Match",
+};
+
+// Turn machine warning codes from /papers/smart-propose into friendly sentences.
+const humanizeSmartWarning = (w) => {
+  if (typeof w !== "string") return String(w);
+  let m = w.match(/^section:(\w+):insufficient_count:asked_(\d+)_have_(\d+)$/);
+  if (m) {
+    const label = SMART_SECTION_SHORT_LABELS[m[1]] || m[1];
+    return `Only ${m[3]} ${label} question(s) available — you asked for ${m[2]}.`;
+  }
+  m = w.match(/^section:(\w+):insufficient_pool:need_(\d+)_marks$/);
+  if (m) {
+    const label = SMART_SECTION_SHORT_LABELS[m[1]] || m[1];
+    return `Not enough ${label} questions in the bank for this section.`;
+  }
+  m = w.match(/^section:(\w+):underfilled:remaining_(\d+)_marks$/);
+  if (m) {
+    const label = SMART_SECTION_SHORT_LABELS[m[1]] || m[1];
+    return `${label} section couldn't be fully filled from the question bank.`;
+  }
+  m = w.match(/^total_marks:(?:underfilled|overshoot):got_(\d+)_target_(\d+)$/);
+  if (m) {
+    return `Paper total came to ${m[1]} marks (target was ${m[2]}).`;
+  }
+  return w;
 };
 
 // Language-specific question type titles
@@ -399,7 +437,8 @@ const CustomPaper = () => {
   const [smartWizardActive, setSmartWizardActive] = useState(false);
   /** header → subject → targets → generating → preview */
   const [smartWizardStep, setSmartWizardStep] = useState("header");
-  const [smartTotalMarks, setSmartTotalMarks] = useState(80);
+  // total_marks is informational only in count mode; kept for API compatibility.
+  const [smartTotalMarks] = useState(80);
   const [smartDifficulty, setSmartDifficulty] = useState({
     easy: 30,
     medium: 40,
@@ -410,6 +449,10 @@ const CustomPaper = () => {
   }));
   const [smartChapterPercents, setSmartChapterPercents] = useState([]);
   const [smartMeta, setSmartMeta] = useState(null);
+  // Per-type marks info for live estimated total (from GET /papers/marks-breakdown).
+  const [smartMarksByType, setSmartMarksByType] = useState(null);
+  // Optional exact-marks target the teacher wants to hit (0 = no target).
+  const [smartTargetMarks, setSmartTargetMarks] = useState(0);
   const [previewHighlight, setPreviewHighlight] = useState(false);
 
   const [approvedSubjectIds, setApprovedSubjectIds] = useState([]);
@@ -776,6 +819,33 @@ const CustomPaper = () => {
       });
     return () => { cancelled = true; };
   }, [subjectTitleIdForChapters, standardForChapters]);
+
+  // Board id from the teaching context (needed for the marks breakdown).
+  const boardForChapters =
+    effectiveHeaderForChapter?.board != null && effectiveHeaderForChapter?.board !== ""
+      ? effectiveHeaderForChapter.board
+      : null;
+
+  // Fetch per-type marks so we can show a live estimated total before generating.
+  useEffect(() => {
+    if (!subjectTitleIdForChapters || !boardForChapters || standardForChapters == null) {
+      setSmartMarksByType(null);
+      return;
+    }
+    let cancelled = false;
+    getMarksBreakdown({
+      subject_title_id: subjectTitleIdForChapters,
+      board_id: boardForChapters,
+      standard: standardForChapters,
+    })
+      .then((res) => {
+        if (!cancelled) setSmartMarksByType(res?.by_type || null);
+      })
+      .catch(() => {
+        if (!cancelled) setSmartMarksByType(null);
+      });
+    return () => { cancelled = true; };
+  }, [subjectTitleIdForChapters, boardForChapters, standardForChapters]);
 
   useEffect(() => {
     if (!chapters.length) {
@@ -1766,6 +1836,58 @@ const CustomPaper = () => {
   const printedTypes = new Set();
 
   const smartSectionQuestionTotal = getSmartSectionQuestionTotal();
+  // Plain-language parts for the "This paper" summary, e.g. ["15 MCQ", "10 True/False"].
+  const smartSelectedParts = SMART_SECTION_KEYS.filter(
+    (k) => (Number(smartSectionCounts[k]) || 0) > 0
+  ).map((k) => `${Number(smartSectionCounts[k])} ${SMART_SECTION_SHORT_LABELS[k] || k}`);
+
+  // How many of each type can actually be pulled = min(requested, available in bank).
+  const smartAchievableCount = (k) => {
+    const req = Number(smartSectionCounts[k]) || 0;
+    if (!smartMarksByType || !smartMarksByType[k]) return req;
+    const avail = smartMarksByType[k].available ?? req;
+    return Math.min(req, avail);
+  };
+  // Total questions the bank can actually supply for the chosen counts.
+  const smartAchievableTotal = smartMarksByType
+    ? SMART_SECTION_KEYS.reduce((s, k) => s + smartAchievableCount(k), 0)
+    : smartSectionQuestionTotal;
+  // Types where the teacher asked for more than the bank has.
+  const smartShortfallTypes = smartMarksByType
+    ? SMART_SECTION_KEYS.filter(
+        (k) =>
+          (Number(smartSectionCounts[k]) || 0) >
+          (smartMarksByType[k]?.available ?? Infinity)
+      )
+    : [];
+  // Live estimated total marks (achievable count × real marks-per-question).
+  const smartEstimatedMarks = smartMarksByType
+    ? SMART_SECTION_KEYS.reduce(
+        (s, k) => s + smartAchievableCount(k) * (smartMarksByType[k]?.unit_marks || 0),
+        0
+      )
+    : null;
+  // Estimate is approximate when a chosen type has questions with mixed marks.
+  const smartEstimateIsApprox = smartMarksByType
+    ? SMART_SECTION_KEYS.some(
+        (k) =>
+          (Number(smartSectionCounts[k]) || 0) > 0 &&
+          smartMarksByType[k] &&
+          !smartMarksByType[k].uniform
+      )
+    : false;
+  // What the "Total marks (auto)" box shows: real total after generate, else live estimate.
+  const smartTotalMarksDisplay =
+    smartMeta?.totals?.total_marks != null
+      ? `${smartMeta.totals.total_marks} marks`
+      : smartEstimatedMarks != null && smartEstimatedMarks > 0
+      ? `${smartEstimateIsApprox ? "≈ " : ""}${smartEstimatedMarks} marks (estimated)`
+      : "Auto (from questions)";
+  // Difference from an optional target the teacher entered.
+  const smartTargetDiff =
+    Number(smartTargetMarks) > 0 && smartEstimatedMarks != null
+      ? smartEstimatedMarks - Number(smartTargetMarks)
+      : null;
 
   // Show loading state while loading paper data
   if (loadingPaper) {
@@ -2022,62 +2144,63 @@ const CustomPaper = () => {
                 Uses your header (subject title, board, standard) and chapter list. Requires backend{" "}
                 <code className="text-xs bg-gray-100 px-1 rounded">POST /papers/smart-propose</code> and questions with difficulty set.
               </p>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                <div>
+              <div className="space-y-3">
+                <div className="sm:max-w-xs">
                   <label className="block text-xs font-semibold text-gray-700 mb-1">
-                    Total marks <span className="text-gray-400 font-normal">(optional)</span>
+                    Total marks <span className="text-gray-400 font-normal">(auto)</span>
                   </label>
                   <p className="text-[11px] text-gray-500 mb-1">
-                    Paper size follows your question counts below; this value is sent for API compatibility.
+                    Calculated automatically from the questions you choose below.
                   </p>
-                  <input
-                    type="number"
-                    min={1}
-                    value={smartTotalMarks}
-                    onChange={(e) => setSmartTotalMarks(Number(e.target.value) || 0)}
-                    className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl text-sm"
-                  />
+                  <div className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl text-sm bg-gray-50 text-gray-700 font-semibold">
+                    {smartTotalMarksDisplay}
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Easy %</label>
-                  <input
-                    type="number"
-                    min={0}
-                    max={100}
-                    value={smartDifficulty.easy}
-                    onChange={(e) =>
-                      setSmartDifficulty((p) => ({ ...p, easy: Number(e.target.value) || 0 }))
-                    }
-                    className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Medium %</label>
-                  <input
-                    type="number"
-                    min={0}
-                    max={100}
-                    value={smartDifficulty.medium}
-                    onChange={(e) =>
-                      setSmartDifficulty((p) => ({ ...p, medium: Number(e.target.value) || 0 }))
-                    }
-                    className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Hard %</label>
-                  <input
-                    type="number"
-                    min={0}
-                    max={100}
-                    value={smartDifficulty.hard}
-                    onChange={(e) =>
-                      setSmartDifficulty((p) => ({ ...p, hard: Number(e.target.value) || 0 }))
-                    }
-                    className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl text-sm"
-                  />
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">Easy %</label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={smartDifficulty.easy}
+                      onChange={(e) =>
+                        setSmartDifficulty((p) => ({ ...p, easy: Number(e.target.value) || 0 }))
+                      }
+                      className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">Medium %</label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={smartDifficulty.medium}
+                      onChange={(e) =>
+                        setSmartDifficulty((p) => ({ ...p, medium: Number(e.target.value) || 0 }))
+                      }
+                      className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">Hard %</label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={smartDifficulty.hard}
+                      onChange={(e) =>
+                        setSmartDifficulty((p) => ({ ...p, hard: Number(e.target.value) || 0 }))
+                      }
+                      className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl text-sm"
+                    />
+                  </div>
                 </div>
               </div>
+              <p className="text-[11px] text-gray-500 -mt-1">
+                Easy / Medium / Hard set how questions are spread across difficulty levels (best effort, should total 100%).
+              </p>
 
               <div className="rounded-xl border border-indigo-100 bg-gradient-to-br from-indigo-50/80 to-white p-4 space-y-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -2147,6 +2270,44 @@ const CustomPaper = () => {
                               }
                               className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl text-sm"
                             />
+                            {smartMarksByType?.[key] && (
+                              <div className="mt-1 text-[11px] text-gray-500">
+                                {smartMarksByType[key].unit_marks > 0 && (
+                                  <>
+                                    {!smartMarksByType[key].uniform && "≈"}
+                                    {smartMarksByType[key].unit_marks} mark
+                                    {smartMarksByType[key].unit_marks !== 1 ? "s" : ""} each ·{" "}
+                                  </>
+                                )}
+                                {smartMarksByType[key].available} available
+                                {(Number(smartSectionCounts[key]) || 0) >
+                                  smartMarksByType[key].available && (
+                                  <span className="text-amber-700 font-semibold">
+                                    {" "}
+                                    (only {smartMarksByType[key].available} can be added)
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                            {(() => {
+                              const s = smartMeta?.totals?.by_section?.[key];
+                              if (!s || (s.requested_count ?? 0) === 0) return null;
+                              const ok = (s.actual_count ?? 0) >= (s.requested_count ?? 0);
+                              return (
+                                <div
+                                  className={`mt-1 inline-flex items-center gap-1 text-[11px] font-semibold ${
+                                    ok ? "text-emerald-700" : "text-amber-700"
+                                  }`}
+                                >
+                                  {ok ? (
+                                    <CheckCircle2 size={12} />
+                                  ) : (
+                                    <AlertTriangle size={12} />
+                                  )}
+                                  {s.actual_count}/{s.requested_count} added
+                                </div>
+                              );
+                            })()}
                           </div>
                         ))}
                       </div>
@@ -2154,6 +2315,106 @@ const CustomPaper = () => {
                   ))}
                 </div>
               </div>
+
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-4 space-y-3">
+                <div className="flex items-start gap-2">
+                  <CheckCircle2 size={18} className="text-emerald-600 mt-0.5 shrink-0" />
+                  <div className="text-sm text-emerald-900">
+                    {smartSectionQuestionTotal > 0 ? (
+                      <>
+                        {smartMarksByType && smartShortfallTypes.length > 0 ? (
+                          <>
+                            Your paper will have{" "}
+                            <span className="font-bold">
+                              up to {smartAchievableTotal} question
+                              {smartAchievableTotal !== 1 ? "s" : ""}
+                            </span>{" "}
+                            — some types have fewer questions in your bank than you asked for
+                            (see the notes below each box).
+                          </>
+                        ) : (
+                          <>
+                            Your paper will have{" "}
+                            <span className="font-bold">
+                              exactly {smartSectionQuestionTotal} question
+                              {smartSectionQuestionTotal !== 1 ? "s" : ""}
+                            </span>
+                            {smartSelectedParts.length > 0 && (
+                              <> ({smartSelectedParts.join(", ")})</>
+                            )}
+                            .
+                          </>
+                        )}
+                        {smartMeta?.totals?.total_marks != null ? (
+                          <>
+                            {" "}
+                            Total marks:{" "}
+                            <span className="font-bold">
+                              {smartMeta.totals.total_marks}
+                            </span>
+                            .
+                          </>
+                        ) : (
+                          smartEstimatedMarks != null &&
+                          smartEstimatedMarks > 0 && (
+                            <>
+                              {" "}
+                              Estimated marks:{" "}
+                              <span className="font-bold">
+                                {smartEstimateIsApprox ? "≈ " : ""}
+                                {smartEstimatedMarks}
+                              </span>
+                              .
+                            </>
+                          )
+                        )}
+                      </>
+                    ) : (
+                      <>Set at least one question count above to build your paper.</>
+                    )}
+                  </div>
+                </div>
+
+                {/* Optional: aim for an exact marks total */}
+                <div className="flex flex-wrap items-center gap-2 border-t border-emerald-200 pt-3">
+                  <label className="text-xs font-semibold text-emerald-900">
+                    Target marks (optional)
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={smartTargetMarks || ""}
+                    onChange={(e) =>
+                      setSmartTargetMarks(Math.max(0, Math.floor(Number(e.target.value) || 0)))
+                    }
+                    placeholder="e.g. 50"
+                    className="w-24 px-2 py-1 border-2 border-emerald-200 rounded-lg text-sm bg-white"
+                  />
+                  {smartTargetDiff != null && (
+                    <span
+                      className={`text-xs font-semibold ${
+                        smartTargetDiff === 0 ? "text-emerald-700" : "text-amber-700"
+                      }`}
+                    >
+                      {smartTargetDiff === 0
+                        ? "On target ✓"
+                        : smartTargetDiff < 0
+                        ? `Add ~${Math.abs(smartTargetDiff)} more mark${
+                            Math.abs(smartTargetDiff) !== 1 ? "s" : ""
+                          } (adjust counts above)`
+                        : `${smartTargetDiff} mark${
+                            smartTargetDiff !== 1 ? "s" : ""
+                          } over target`}
+                    </span>
+                  )}
+                  {smartEstimateIsApprox && (
+                    <span className="text-[11px] text-emerald-700/80">
+                      (some question marks vary — final total may differ slightly)
+                    </span>
+                  )}
+                </div>
+              </div>
+
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-bold text-gray-800">Chapter mix (%)</span>
@@ -2174,6 +2435,9 @@ const CustomPaper = () => {
                     </button>
                   </div>
                 </div>
+                <p className="text-[11px] text-gray-500 mb-2">
+                  Sets how your chosen questions are spread across chapters (best effort). Use “Normalize to 100%” to balance.
+                </p>
                 {smartChapterPercents.length === 0 ? (
                   <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
                     No chapters assigned to this standard for this subject title. Assign a
@@ -2241,7 +2505,7 @@ const CustomPaper = () => {
                         </div>
                         <ul className="text-sm text-amber-900 list-disc list-inside">
                           {smartMeta.warnings.map((w, i) => (
-                            <li key={i}>{w}</li>
+                            <li key={i}>{humanizeSmartWarning(w)}</li>
                           ))}
                         </ul>
                       </div>
