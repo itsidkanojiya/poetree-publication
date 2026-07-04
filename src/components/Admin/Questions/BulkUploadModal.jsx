@@ -143,7 +143,42 @@ const BulkUploadModal = ({ questionType, onClose, onSuccess }) => {
       sampleRow.push("Option A", "Option B", "Option C", "Option D");
     }
     if (questionType === "passage") {
-      sampleRow.push("Sample passage text", '["Q1?", "Q2?"]', '{"q1": "A1", "q2": "A2"}');
+      // Rich demo: one passage with all four sub-question types so users can
+      // see the exact format for MCQ, fill-in-the-blank, short answer and T/F.
+      const demoPassageQuestions = JSON.stringify([
+        {
+          type: "mcq",
+          question: "What did Rama Natha believe could turn objects into gold?",
+          options: ["A magic potion", "Hard work", "A sage's blessing", "Gold coins"],
+          answer: "1",
+        },
+        {
+          type: "blank",
+          question: "Rama Natha's land became ____ because he neglected it.",
+          answer: "dry",
+        },
+        {
+          type: "short",
+          question: "What lesson did Rama Natha finally learn?",
+          answer: "Hard work brings success",
+        },
+        {
+          type: "truefalse",
+          question: "Rama Natha found the magic potion.",
+          answer: "false",
+        },
+      ]);
+      const demoPassageAnswers = JSON.stringify({
+        q1: "1",
+        q2: "dry",
+        q3: "Hard work brings success",
+        q4: "false",
+      });
+      sampleRow.push(
+        "Rama Natha spent his days searching for a magic potion that could turn objects into gold, while his fields dried up. A wise sage taught him to work hard, and slowly his life improved.",
+        demoPassageQuestions,
+        demoPassageAnswers
+      );
     }
     if (questionType === "match") {
       sampleRow.push('["A", "B"]', '["1", "2"]', '{"A": "1", "B": "2"}');
@@ -152,8 +187,51 @@ const BulkUploadModal = ({ questionType, onClose, onSuccess }) => {
 
     const wsData = [headers, sampleRow];
     const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+    // Widen the JSON-heavy passage columns so the sample is readable
+    if (questionType === "passage") {
+      ws["!cols"] = headers.map((h) => {
+        if (h === "Passage Questions") return { wch: 70 };
+        if (h === "Passage" || h === "Passage Answers") return { wch: 40 };
+        if (h === "Question") return { wch: 28 };
+        return { wch: 14 };
+      });
+    }
+
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Questions");
+
+    // Add a plain-English Instructions sheet for the passage format
+    if (questionType === "passage") {
+      const info = [
+        ["PASSAGE BULK UPLOAD — HOW TO FILL THIS FILE"],
+        [""],
+        ["1. One row per passage. Required: Standard, Subject ID, Subject Title ID, Chapter ID, Board ID, Marks, Difficulty."],
+        ["2. Put the passage paragraph in the 'Passage' column. The 'Question'/'Answer' columns are ignored for passage."],
+        ["3. 'Passage Questions' = a JSON array of sub-questions. 'Passage Answers' = a JSON object {q1, q2, ...} in the same order."],
+        ["4. Use STRAIGHT double-quotes (\") — not curly quotes. Keep each JSON in a single cell."],
+        [""],
+        ["Sub-question formats (put objects like these inside the Passage Questions array):"],
+        ["  Short answer", '{"type":"short","question":"...","answer":"..."}'],
+        ["  Fill in the blank", '{"type":"blank","question":"The city is ____.","answer":"Delhi"}'],
+        ["  MCQ", '{"type":"mcq","question":"...?","options":["A","B","C","D"],"answer":"1"}'],
+        ["  True / False", '{"type":"truefalse","question":"...","answer":"true"}'],
+        [""],
+        ["Answer rules:"],
+        ['  MCQ answer  = correct option NUMBER as text, 1-based ("1"=first option, "2"=second, ...)'],
+        ['  True/False  = "true" or "false"'],
+        ["  Short/Blank = the answer text"],
+        [""],
+        ['Passage Answers object: q1 = first sub-question\'s answer, q2 = second, and so on.'],
+        ['  Example: {"q1":"1","q2":"dry","q3":"Hard work brings success","q4":"false"}'],
+        [""],
+        ["IMPORTANT: Replace the sample Subject ID / Subject Title ID / Chapter ID / Board ID with valid IDs from your app."],
+      ];
+      const wsInfo = XLSX.utils.aoa_to_sheet(info);
+      wsInfo["!cols"] = [{ wch: 22 }, { wch: 80 }];
+      XLSX.utils.book_append_sheet(wb, wsInfo, "Instructions");
+    }
+
     XLSX.writeFile(wb, "BulkUploadQuestions_Template.xlsx");
 
     if (!firstSubject || !firstTitle || !firstBoard) {
