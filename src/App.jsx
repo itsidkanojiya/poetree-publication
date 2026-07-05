@@ -14,6 +14,9 @@ import PdfPreview from "./components/Dashboard/PdfPreview";
 import Worksheets from "./components/Dashboard/Worksheets";
 import Answersheets from "./components/Dashboard/Answersheets";
 import ReadymadePapers from "./components/Dashboard/ReadymadePapers";
+import Planners from "./components/Dashboard/Planners";
+import TimeTables from "./components/Dashboard/TimeTables";
+import PaperStyles from "./components/Dashboard/PaperStyles";
 import CustomPaper from "./components/Dashboard/CustomPaper";
 import History from "./pages/History";
 import ViewPaperPage from "./components/Dashboard/ViewPaperPage";
@@ -34,13 +37,18 @@ import QuestionManagement from "./components/Admin/Questions/QuestionManagement"
 import AnswerSheetManagement from "./components/Admin/AnswerSheets/AnswerSheetManagement";
 import WorksheetManagement from "./components/Admin/Worksheets/WorksheetManagement";
 import ReadymadePaperManagement from "./components/Admin/ReadymadePapers/ReadymadePaperManagement";
-import TemplateList from "./components/Admin/Templates/TemplateList";
-import CreateTemplate from "./components/Admin/Templates/CreateTemplate";
-import TemplateDetails from "./components/Admin/Templates/TemplateDetails";
+import PlannerManagement from "./components/Admin/Planners/PlannerManagement";
+import TimeTableManagement from "./components/Admin/TimeTables/TimeTableManagement";
+import PaperStyleManagement from "./components/Admin/PaperStyles/PaperStyleManagement";
+// Prebuilt Question (templates) feature commented out — not needed for now
+// import TemplateList from "./components/Admin/Templates/TemplateList";
+// import CreateTemplate from "./components/Admin/Templates/CreateTemplate";
+// import TemplateDetails from "./components/Admin/Templates/TemplateDetails";
 import StandardsManagement from "./components/Admin/Standards/StandardsManagement";
 import AnimationsManagement from "./components/Admin/Animations/AnimationsManagement";
-import BrowseTemplates from "./components/Dashboard/BrowseTemplates";
-import ViewTemplate from "./components/Dashboard/ViewTemplate";
+// Prebuilt Question (templates) feature commented out — not needed for now
+// import BrowseTemplates from "./components/Dashboard/BrowseTemplates";
+// import ViewTemplate from "./components/Dashboard/ViewTemplate";
 import CustomizePaper from "./components/Dashboard/CustomizePaper";
 import QuizzesList from "./pages/QuizzesList";
 import CreateQuiz from "./pages/CreateQuiz";
@@ -91,6 +99,9 @@ function App() {
           <Route path="worksheets" element={<Worksheets />} />
           <Route path="answersheets" element={<Answersheets />} />
           <Route path="readymade-papers" element={<ReadymadePapers />} />
+          <Route path="planners" element={<Planners />} />
+          <Route path="timetables" element={<TimeTables />} />
+          <Route path="paper-styles" element={<PaperStyles />} />
           <Route path="custompaper" element={<CustomPaper />} />
         </Route>
         <Route path="history" element={<History />} />
@@ -104,8 +115,9 @@ function App() {
         <Route path="change-password" element={<ChangePassword />} />
         <Route path="subject-requests" element={<SubjectRequests />} />
         <Route path="animations" element={<Animations />} />
-        <Route path="templates" element={<BrowseTemplates />} />
-        <Route path="templates/:id" element={<ViewTemplate />} />
+        {/* Prebuilt Question (templates) feature commented out — not needed for now */}
+        {/* <Route path="templates" element={<BrowseTemplates />} /> */}
+        {/* <Route path="templates/:id" element={<ViewTemplate />} /> */}
         <Route path="papers/:id/customize" element={<CustomizePaper />} />
       </Route>
 
@@ -133,9 +145,13 @@ function App() {
           <Route path="answer-sheets" element={<AnswerSheetManagement />} />
           <Route path="worksheets" element={<WorksheetManagement />} />
           <Route path="readymade-papers" element={<ReadymadePaperManagement />} />
-          <Route path="templates" element={<TemplateList />} />
-          <Route path="templates/create" element={<CreateTemplate />} />
-          <Route path="templates/:id" element={<TemplateDetails />} />
+          <Route path="planners" element={<PlannerManagement />} />
+          <Route path="timetables" element={<TimeTableManagement />} />
+          <Route path="paper-styles" element={<PaperStyleManagement />} />
+          {/* Prebuilt Question (templates) feature commented out — not needed for now */}
+          {/* <Route path="templates" element={<TemplateList />} /> */}
+          {/* <Route path="templates/create" element={<CreateTemplate />} /> */}
+          {/* <Route path="templates/:id" element={<TemplateDetails />} /> */}
           <Route path="profile" element={<Profile />} />
           <Route path="edit-profile" element={<EditProfile />} />
           <Route path="change-password" element={<ChangePassword />} />

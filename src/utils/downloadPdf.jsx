@@ -2,6 +2,10 @@ import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
 
 const downloadPDF = async (pdfPages) => {
+  // Ensure web fonts (incl. KaTeX math fonts) are loaded before screenshotting.
+  if (document.fonts && document.fonts.ready) {
+    try { await document.fonts.ready; } catch { /* noop */ }
+  }
   const pdf = new jsPDF({ orientation: "p", unit: "mm", format: "a4", compress: true });
   const pdfWidth = 210;
   const pdfHeight = 297;

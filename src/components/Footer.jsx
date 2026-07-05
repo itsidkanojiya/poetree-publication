@@ -44,7 +44,8 @@ const Footer = () => {
             <h3 className="text-sm font-semibold mb-4 uppercase tracking-wide text-slate-300">Product</h3>
             <ul className="list-none">
               <li className="mb-2 text-sm text-slate-400">Question Papers</li>
-              <li className="mb-2 text-sm text-slate-400">Prebuilt Questions</li>
+              {/* Prebuilt Questions feature commented out — not needed for now */}
+              {/* <li className="mb-2 text-sm text-slate-400">Prebuilt Questions</li> */}
               <li className="mb-2 text-sm text-slate-400">Worksheets</li>
               <li className="mb-2 text-sm text-slate-400">Answer Sheets</li>
             </ul>

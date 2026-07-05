@@ -29,6 +29,7 @@ import {
   getMarksBreakdown,
 } from "../../services/adminService";
 import Toast from "../Common/Toast";
+import MathText from "../Common/MathText";
 import Loader from "../Common/loader/loader";
 import SmartPaperStepper from "./SmartPaperStepper";
 import { useUserTeaching } from "../../context/UserTeachingContext";
@@ -852,13 +853,11 @@ const CustomPaper = () => {
       setSmartChapterPercents([]);
       return;
     }
-    const n = chapters.length;
-    const base = Math.floor(100 / n);
-    let rem = 100 - base * n;
+    // Default every chapter to 0 — the admin sets the mix (or uses "Normalize to 100%").
     setSmartChapterPercents(
-      chapters.map((ch, i) => ({
+      chapters.map((ch) => ({
         chapter_id: ch.chapter_id,
-        percent: base + (i < rem ? 1 : 0),
+        percent: 0,
       }))
     );
   }, [chapters]);
@@ -1450,6 +1449,11 @@ const CustomPaper = () => {
     
     // Generate and download PDF (sequential so page order is correct)
     try {
+      // Ensure KaTeX (and other) web fonts are fully loaded before screenshotting,
+      // otherwise the first export can capture fallback glyphs for math.
+      if (document.fonts && document.fonts.ready) {
+        try { await document.fonts.ready; } catch { /* noop */ }
+      }
       const pdf = new jsPDF({ orientation: "p", unit: "mm", format: "a4", compress: true });
       const pages = pagesRef.current.children;
 
@@ -1835,6 +1839,16 @@ const CustomPaper = () => {
 
   const printedTypes = new Set();
 
+  // Total questions per type across the WHOLE paper (a section can span multiple
+  // pages, so a page chunk's length is not the section total). Used for the
+  // section-header marks so it reflects every question of that type, not just
+  // the ones on the page where the title prints.
+  const sectionTypeTotals = {};
+  (questionSections || []).forEach((s) => {
+    const t = normalizeQuestionType(s.type);
+    sectionTypeTotals[t] = (sectionTypeTotals[t] || 0) + (s.selectedQuestions?.length || 0);
+  });
+
   const smartSectionQuestionTotal = getSmartSectionQuestionTotal();
   // Plain-language parts for the "This paper" summary, e.g. ["15 MCQ", "10 True/False"].
   const smartSelectedParts = SMART_SECTION_KEYS.filter(
@@ -1860,34 +1874,18 @@ const CustomPaper = () => {
           (smartMarksByType[k]?.available ?? Infinity)
       )
     : [];
-  // Live estimated total marks (achievable count × real marks-per-question).
-  const smartEstimatedMarks = smartMarksByType
-    ? SMART_SECTION_KEYS.reduce(
-        (s, k) => s + smartAchievableCount(k) * (smartMarksByType[k]?.unit_marks || 0),
-        0
-      )
-    : null;
-  // Estimate is approximate when a chosen type has questions with mixed marks.
-  const smartEstimateIsApprox = smartMarksByType
-    ? SMART_SECTION_KEYS.some(
-        (k) =>
-          (Number(smartSectionCounts[k]) || 0) > 0 &&
-          smartMarksByType[k] &&
-          !smartMarksByType[k].uniform
-      )
-    : false;
-  // What the "Total marks (auto)" box shows: real total after generate, else live estimate.
+  // Total marks use the SAME per-type config the paper prints with (marksPerType),
+  // NOT each question's stored marks — so this exactly matches the generated paper.
+  const smartEstimatedMarks = SMART_SECTION_KEYS.reduce(
+    (s, k) => s + smartAchievableCount(k) * (Number(marksPerType[k]) || 0),
+    0
+  );
+  // What the "Total marks (auto)" box shows.
   const smartTotalMarksDisplay =
-    smartMeta?.totals?.total_marks != null
-      ? `${smartMeta.totals.total_marks} marks`
-      : smartEstimatedMarks != null && smartEstimatedMarks > 0
-      ? `${smartEstimateIsApprox ? "≈ " : ""}${smartEstimatedMarks} marks (estimated)`
-      : "Auto (from questions)";
+    smartEstimatedMarks > 0 ? `${smartEstimatedMarks} marks` : "Auto (from questions)";
   // Difference from an optional target the teacher entered.
   const smartTargetDiff =
-    Number(smartTargetMarks) > 0 && smartEstimatedMarks != null
-      ? smartEstimatedMarks - Number(smartTargetMarks)
-      : null;
+    Number(smartTargetMarks) > 0 ? smartEstimatedMarks - Number(smartTargetMarks) : null;
 
   // Show loading state while loading paper data
   if (loadingPaper) {
@@ -2145,17 +2143,6 @@ const CustomPaper = () => {
                 <code className="text-xs bg-gray-100 px-1 rounded">POST /papers/smart-propose</code> and questions with difficulty set.
               </p>
               <div className="space-y-3">
-                <div className="sm:max-w-xs">
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">
-                    Total marks <span className="text-gray-400 font-normal">(auto)</span>
-                  </label>
-                  <p className="text-[11px] text-gray-500 mb-1">
-                    Calculated automatically from the questions you choose below.
-                  </p>
-                  <div className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl text-sm bg-gray-50 text-gray-700 font-semibold">
-                    {smartTotalMarksDisplay}
-                  </div>
-                </div>
                 <div className="grid grid-cols-3 gap-3">
                   <div>
                     <label className="block text-xs font-semibold text-gray-700 mb-1">Easy %</label>
@@ -2207,8 +2194,8 @@ const CustomPaper = () => {
                   <div>
                     <h3 className="text-sm font-bold text-gray-900">Number of questions per type</h3>
                     <p className="text-xs text-gray-500 mt-1">
-                      Set how many questions to pull from each type. Types at 0 are skipped. Total marks on the paper
-                      will match the sum of selected questions.
+                      Set how many questions to pull from each type. Types at 0 are skipped. Marks for each type come
+                      from “Configure Marks”, so total marks = count × marks-per-type.
                     </p>
                   </div>
                   <div
@@ -2261,34 +2248,48 @@ const CustomPaper = () => {
                               min={0}
                               max={500}
                               step={1}
-                              value={smartSectionCounts[key] ?? 0}
-                              onChange={(e) =>
+                              value={smartSectionCounts[key] ?? ""}
+                              onChange={(e) => {
+                                const raw = e.target.value;
                                 setSmartSectionCounts((p) => ({
                                   ...p,
-                                  [key]: Math.max(0, Math.floor(Number(e.target.value) || 0)),
-                                }))
-                              }
+                                  // Allow the field to be empty while typing/backspacing;
+                                  // consumers coerce empty → 0 on submit.
+                                  [key]:
+                                    raw === ""
+                                      ? ""
+                                      : Math.max(0, Math.min(500, Math.floor(Number(raw) || 0))),
+                                }));
+                              }}
+                              onBlur={(e) => {
+                                // Normalize a left-empty field back to 0 on blur.
+                                if (e.target.value === "") {
+                                  setSmartSectionCounts((p) => ({ ...p, [key]: 0 }));
+                                }
+                              }}
                               className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl text-sm"
                             />
-                            {smartMarksByType?.[key] && (
-                              <div className="mt-1 text-[11px] text-gray-500">
-                                {smartMarksByType[key].unit_marks > 0 && (
-                                  <>
-                                    {!smartMarksByType[key].uniform && "≈"}
-                                    {smartMarksByType[key].unit_marks} mark
-                                    {smartMarksByType[key].unit_marks !== 1 ? "s" : ""} each ·{" "}
-                                  </>
-                                )}
-                                {smartMarksByType[key].available} available
-                                {(Number(smartSectionCounts[key]) || 0) >
-                                  smartMarksByType[key].available && (
-                                  <span className="text-amber-700 font-semibold">
-                                    {" "}
-                                    (only {smartMarksByType[key].available} can be added)
-                                  </span>
-                                )}
-                              </div>
-                            )}
+                            <div className="mt-1 text-[11px] text-gray-500">
+                              {(Number(marksPerType[key]) || 0) > 0 && (
+                                <>
+                                  {marksPerType[key]} mark
+                                  {Number(marksPerType[key]) !== 1 ? "s" : ""} each
+                                  {smartMarksByType?.[key] && " · "}
+                                </>
+                              )}
+                              {smartMarksByType?.[key] && (
+                                <>
+                                  {smartMarksByType[key].available} available
+                                  {(Number(smartSectionCounts[key]) || 0) >
+                                    smartMarksByType[key].available && (
+                                    <span className="text-amber-700 font-semibold">
+                                      {" "}
+                                      (only {smartMarksByType[key].available} can be added)
+                                    </span>
+                                  )}
+                                </>
+                              )}
+                            </div>
                             {(() => {
                               const s = smartMeta?.totals?.by_section?.[key];
                               if (!s || (s.requested_count ?? 0) === 0) return null;
@@ -2345,28 +2346,12 @@ const CustomPaper = () => {
                             .
                           </>
                         )}
-                        {smartMeta?.totals?.total_marks != null ? (
+                        {smartEstimatedMarks > 0 && (
                           <>
                             {" "}
                             Total marks:{" "}
-                            <span className="font-bold">
-                              {smartMeta.totals.total_marks}
-                            </span>
-                            .
+                            <span className="font-bold">{smartEstimatedMarks}</span>.
                           </>
-                        ) : (
-                          smartEstimatedMarks != null &&
-                          smartEstimatedMarks > 0 && (
-                            <>
-                              {" "}
-                              Estimated marks:{" "}
-                              <span className="font-bold">
-                                {smartEstimateIsApprox ? "≈ " : ""}
-                                {smartEstimatedMarks}
-                              </span>
-                              .
-                            </>
-                          )
                         )}
                       </>
                     ) : (
@@ -2407,11 +2392,21 @@ const CustomPaper = () => {
                           } over target`}
                     </span>
                   )}
-                  {smartEstimateIsApprox && (
-                    <span className="text-[11px] text-emerald-700/80">
-                      (some question marks vary — final total may differ slightly)
-                    </span>
-                  )}
+                  <span className="text-[11px] text-emerald-700/80">
+                    Marks per type come from “Configure Marks”.
+                  </span>
+                </div>
+              </div>
+
+              <div className="sm:max-w-xs">
+                <label className="block text-xs font-semibold text-gray-700 mb-1">
+                  Total marks <span className="text-gray-400 font-normal">(auto)</span>
+                </label>
+                <p className="text-[11px] text-gray-500 mb-1">
+                  Calculated automatically from the question counts you set above.
+                </p>
+                <div className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl text-sm bg-gray-50 text-gray-700 font-semibold">
+                  {smartTotalMarksDisplay}
                 </div>
               </div>
 
@@ -3406,7 +3401,8 @@ const CustomPaper = () => {
                                     color: "#374151",
                                   }}
                                 >
-                                  {section.selectedQuestions.length *
+                                  {(sectionTypeTotals[sectionTypeNormalized] ??
+                                    section.selectedQuestions.length) *
                                     (marksPerType[sectionTypeNormalized] || 0)}{" "}
                                   marks
                                 </span>
@@ -3437,7 +3433,7 @@ const CustomPaper = () => {
                                       >
                                         ({question.questionNumber}){" "}
                                       </span>
-                                      {question.question}
+                                      <MathText text={question.question} />
                                     </p>
                                     {question.type === "mcq" && (
                                       <div
@@ -3490,7 +3486,7 @@ const CustomPaper = () => {
                                                   fontWeight: "normal",
                                                 }}
                                               >
-                                                {option}
+                                                <MathText text={option} />
                                               </span>
                                             </div>
                                           )
@@ -3555,7 +3551,7 @@ const CustomPaper = () => {
                                                           )}
                                                           ){" "}
                                                         </span>
-                                                        {questionText}
+                                                        <MathText text={questionText} />
                                                         {isBlank && (
                                                           <span
                                                             className="inline-block mx-1 border-b-2 border-gray-400 min-w-[80px]"
@@ -3592,14 +3588,18 @@ const CustomPaper = () => {
                                                                     )
                                                                   </span>
                                                                   <span>
-                                                                    {typeof opt ===
-                                                                    "object"
-                                                                      ? opt.text ||
-                                                                        opt.label ||
-                                                                        JSON.stringify(
-                                                                          opt
-                                                                        )
-                                                                      : opt}
+                                                                    <MathText
+                                                                      text={
+                                                                        typeof opt ===
+                                                                        "object"
+                                                                          ? opt.text ||
+                                                                            opt.label ||
+                                                                            JSON.stringify(
+                                                                              opt
+                                                                            )
+                                                                          : opt
+                                                                      }
+                                                                    />
                                                                   </span>
                                                                 </div>
                                                               )

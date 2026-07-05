@@ -17,6 +17,8 @@ import {
   GraduationCap,
   Film,
   Files,
+  CalendarRange,
+  CalendarClock,
 } from "lucide-react";
 
 const LogoutModal = ({ isOpen, onClose, onConfirm }) => {
@@ -84,8 +86,12 @@ const AdminSidebar = () => {
     { name: "Answer Sheets", href: "/admin/answer-sheets", icon: ClipboardCheck },
     { name: "Worksheets", href: "/admin/worksheets", icon: FilePlus },
     { name: "Readymade Papers", href: "/admin/readymade-papers", icon: Files },
+    { name: "Planners", href: "/admin/planners", icon: CalendarRange },
+    { name: "Time Tables", href: "/admin/timetables", icon: CalendarClock },
+    { name: "Paper Styles", href: "/admin/paper-styles", icon: LayoutTemplate },
     { name: "Questions", href: "/admin/questions", icon: FileText },
-    { name: "Templates", href: "/admin/templates", icon: LayoutTemplate },
+    // Templates (Prebuilt Question) feature commented out — not needed for now
+    // { name: "Templates", href: "/admin/templates", icon: LayoutTemplate },
   ];
 
   const isActive = (path) => {

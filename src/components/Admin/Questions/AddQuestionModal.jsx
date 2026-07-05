@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { X, Plus, Trash2 } from "lucide-react";
 import { addQuestion, editQuestion, getAllSubjects, getAllBoards, getSubjectTitlesBySubjectAndContext, getAllStandards, getChaptersBySubjectTitle, createChapter } from "../../../services/adminService";
 import Toast from "../../Common/Toast";
+import MathTextInput from "../../Common/MathTextInput";
 
 const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
   const [formData, setFormData] = useState({
@@ -677,16 +678,15 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
               <label className="block text-sm font-semibold text-gray-700 mb-2">
                 Question <span className="text-red-500">*</span>
               </label>
-              <textarea
-                name="question"
-                value={formData.question}
-                onChange={handleChange}
+              <MathTextInput
+                multiline
                 rows={questionType === "passage" ? 6 : 3}
-                className={`w-full px-4 py-3 border-2 rounded-lg focus:ring-2 focus:ring-blue-200 transition outline-none ${
-                  errors.question ? "border-red-300" : "border-gray-200 focus:border-blue-500"
-                }`}
+                value={formData.question}
+                onChange={(val) =>
+                  handleChange({ target: { name: "question", value: val } })
+                }
                 placeholder="Enter the question"
-                required
+                error={!!errors.question}
               />
               {errors.question && (
                 <p className="mt-1 text-sm text-red-600">{errors.question}</p>
@@ -704,19 +704,18 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
                     Add up to 4 options; select which one is the correct answer.
                   </p>
                   {mcqOptionList.map((opt, index) => (
-                    <div key={index} className="flex gap-2 mb-2">
-                      <input
-                        type="text"
+                    <div key={index} className="flex gap-2 mb-2 items-start">
+                      <MathTextInput
+                        className="flex-1"
                         value={opt}
-                        onChange={(e) => updateMcqOption(index, e.target.value)}
-                        className="flex-1 px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition outline-none"
+                        onChange={(val) => updateMcqOption(index, val)}
                         placeholder={`Option ${index + 1}`}
                       />
                       <button
                         type="button"
                         onClick={() => removeMcqOption(index)}
                         disabled={mcqOptionList.length <= 1}
-                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition"
+                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition mt-1"
                         title="Remove option"
                       >
                         <Trash2 className="w-5 h-5" />
@@ -803,12 +802,12 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
                         )}
                       </div>
                     </div>
-                    <input
-                      type="text"
+                    <MathTextInput
+                      className="mb-2"
                       value={pq.question || ""}
-                      onChange={(e) => updatePassageQuestion(index, "question", e.target.value)}
+                      onChange={(val) => updatePassageQuestion(index, "question", val)}
                       placeholder="Question text"
-                      className={`w-full mb-2 px-4 py-2 border-2 rounded-lg focus:border-blue-500 ${errors[`passageQ${index}`] ? "border-red-300" : "border-gray-200"}`}
+                      error={!!errors[`passageQ${index}`]}
                     />
                     {errors[`passageQ${index}`] && (
                       <p className="text-sm text-red-600 mb-1">{errors[`passageQ${index}`]}</p>
@@ -823,20 +822,19 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
                       <>
                         <div className="mt-2 mb-1 text-sm font-medium text-gray-700">Options (select correct answer below)</div>
                         {(pq.options || ["", "", "", ""]).map((opt, optIdx) => (
-                          <div key={optIdx} className="flex gap-2 mb-2">
-                            <span className="flex-shrink-0 w-6 text-sm text-gray-500 pt-2">{String.fromCharCode(65 + optIdx)}.</span>
-                            <input
-                              type="text"
+                          <div key={optIdx} className="flex gap-2 mb-2 items-start">
+                            <span className="flex-shrink-0 w-6 text-sm text-gray-500 pt-3">{String.fromCharCode(65 + optIdx)}.</span>
+                            <MathTextInput
+                              className="flex-1"
                               value={opt}
-                              onChange={(e) => updatePassageMcqOption(index, optIdx, e.target.value)}
+                              onChange={(val) => updatePassageMcqOption(index, optIdx, val)}
                               placeholder={`Option ${optIdx + 1}`}
-                              className="flex-1 px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500"
                             />
                             <button
                               type="button"
                               onClick={() => removePassageMcqOption(index, optIdx)}
                               disabled={!(pq.options && pq.options.length > 1)}
-                              className="p-2 text-red-600 hover:bg-red-50 rounded disabled:opacity-40"
+                              className="p-2 text-red-600 hover:bg-red-50 rounded disabled:opacity-40 mt-1"
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
@@ -868,12 +866,10 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
                         </div>
                       </>
                     ) : pq.type === "blank" ? (
-                      <input
-                        type="text"
+                      <MathTextInput
                         value={pq.answer != null ? pq.answer : ""}
-                        onChange={(e) => updatePassageQuestion(index, "answer", e.target.value)}
+                        onChange={(val) => updatePassageQuestion(index, "answer", val)}
                         placeholder="Correct word(s) for the blank"
-                        className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500"
                       />
                     ) : pq.type === "truefalse" ? (
                       <div className="mt-2">
@@ -900,12 +896,10 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
                         </div>
                       </div>
                     ) : (
-                      <input
-                        type="text"
+                      <MathTextInput
                         value={pq.answer != null ? pq.answer : ""}
-                        onChange={(e) => updatePassageQuestion(index, "answer", e.target.value)}
+                        onChange={(val) => updatePassageQuestion(index, "answer", val)}
                         placeholder="Answer (optional)"
-                        className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500"
                       />
                     )}
                   </div>
@@ -1061,15 +1055,15 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   Answer (Optional)
                 </label>
-                <textarea
-                  name="answer"
-                  value={formData.answer}
-                  onChange={handleChange}
+                <MathTextInput
+                  multiline
                   rows={questionType === "long" ? 4 : 2}
-                  className={`w-full px-4 py-3 border-2 rounded-lg focus:ring-2 focus:ring-blue-200 transition outline-none ${
-                    errors.answer ? "border-red-300" : "border-gray-200 focus:border-blue-500"
-                  }`}
+                  value={formData.answer}
+                  onChange={(val) =>
+                    handleChange({ target: { name: "answer", value: val } })
+                  }
                   placeholder="Enter the answer"
+                  error={!!errors.answer}
                 />
                 {errors.answer && (
                   <p className="mt-1 text-sm text-red-600">{errors.answer}</p>
@@ -1082,12 +1076,13 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
               <label className="block text-sm font-semibold text-gray-700 mb-2">
                 Solution (Optional)
               </label>
-              <textarea
-                name="solution"
-                value={formData.solution}
-                onChange={handleChange}
+              <MathTextInput
+                multiline
                 rows={3}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition outline-none"
+                value={formData.solution}
+                onChange={(val) =>
+                  handleChange({ target: { name: "solution", value: val } })
+                }
                 placeholder="Enter solution or explanation"
               />
             </div>

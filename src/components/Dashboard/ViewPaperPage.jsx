@@ -7,6 +7,7 @@ import { getPaperById } from "../../services/paperService";
 import apiClient from "../../services/apiClient";
 import HeaderCard from "../Cards/HeaderCard";
 import Loader from "../Common/loader/loader";
+import MathText from "../Common/MathText";
 
 const QUESTION_TYPE_CONFIG = {
   mcq: { label: "Multiple Choice Questions" },
@@ -330,6 +331,14 @@ const ViewPaperPage = () => {
   const questionCounters = {};
   const pages = buildPages(sections);
 
+  // Total questions per type across the whole paper (a section can span pages,
+  // so a page chunk's length is not the section total). Used for section marks.
+  const sectionTypeTotals = {};
+  (sections || []).forEach((s) => {
+    const t = normalizeQuestionType(s.type);
+    sectionTypeTotals[t] = (sectionTypeTotals[t] || 0) + (s.selectedQuestions?.length || 0);
+  });
+
   return (
     <div className="w-full flex flex-col items-center min-h-screen py-10 bg-gradient-to-b from-slate-50 to-gray-100/50">
       <div className="space-y-8 flex flex-col items-center">
@@ -365,7 +374,8 @@ const ViewPaperPage = () => {
                 }
 
                 const sectionMarks =
-                  section.selectedQuestions.length * (marksPerType[sectionType] || 0);
+                  (sectionTypeTotals[sectionType] ?? section.selectedQuestions.length) *
+                  (marksPerType[sectionType] || 0);
 
                 return (
                   <div key={sectionIndex}>
@@ -417,7 +427,7 @@ const ViewPaperPage = () => {
                                 <span style={{ fontSize: "14px", fontWeight: "bold" }}>
                                   ({qNum}){" "}
                                 </span>
-                                {question.question}
+                                <MathText text={question.question} />
                               </p>
                               {question.type === "mcq" && (
                                 <div
@@ -452,7 +462,7 @@ const ViewPaperPage = () => {
                                       ({String.fromCharCode(97 + optIndex)}){" "}
                                     </span>
                                     <span className="min-w-0 break-words" style={{ fontSize: "13px" }}>
-                                      {typeof option === "object" ? option.text || option.label || JSON.stringify(option) : option}
+                                      <MathText text={typeof option === "object" ? option.text || option.label || JSON.stringify(option) : option} />
                                     </span>
                                   </div>
                                 ))}
@@ -480,7 +490,7 @@ const ViewPaperPage = () => {
                                               <span style={{ fontWeight: "600" }}>
                                                 ({String.fromCharCode(97 + pqIdx)}){" "}
                                               </span>
-                                              {questionText}
+                                              <MathText text={questionText} />
                                               {isBlank && (
                                                 <span className="inline-block mx-1 border-b-2 border-gray-400 min-w-[80px]" style={{ height: "1.2em" }} aria-hidden />
                                               )}
@@ -490,7 +500,7 @@ const ViewPaperPage = () => {
                                                 {options.map((opt, optIdx) => (
                                                   <div key={optIdx} className="flex gap-2">
                                                     <span style={{ fontWeight: "500" }}>({String.fromCharCode(65 + optIdx)})</span>
-                                                    <span>{typeof opt === "object" ? (opt.text || opt.label || JSON.stringify(opt)) : opt}</span>
+                                                    <span><MathText text={typeof opt === "object" ? (opt.text || opt.label || JSON.stringify(opt)) : opt} /></span>
                                                   </div>
                                                 ))}
                                               </div>

@@ -16,6 +16,7 @@ import Loader from "../../Common/loader/loader";
 import AddQuestionModal from "./AddQuestionModal";
 import BulkUploadModal from "./BulkUploadModal";
 import { API_ORIGIN } from "../../../config/api";
+import MathText from "../../Common/MathText";
 
 const QuestionsList = ({ questionType }) => {
   const [questions, setQuestions] = useState([]);
@@ -536,7 +537,7 @@ const QuestionsList = ({ questionType }) => {
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900 max-w-md">
                       <div className="line-clamp-2">
-                        {question.question || "N/A"}
+                        <MathText text={question.question || "N/A"} />
                       </div>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600 max-w-xs">
@@ -660,7 +661,7 @@ const QuestionsList = ({ questionType }) => {
                     {!previewSingleQuestion && (
                       <span className="text-xs font-semibold text-gray-500 mb-2 block">Question {idx + 1}</span>
                     )}
-                    <p className="text-gray-900 font-medium mb-2">{q.question || "N/A"}</p>
+                    <p className="text-gray-900 font-medium mb-2"><MathText text={q.question || "N/A"} /></p>
                     {imageUrl && (
                       <div className="mb-3">
                         <img
@@ -676,12 +677,12 @@ const QuestionsList = ({ questionType }) => {
                     {questionType === "mcq" && optionsList.length > 0 && (
                       <ul className="list-disc list-inside text-gray-700 text-sm mb-2">
                         {optionsList.map((opt, i) => (
-                          <li key={i}>{opt}</li>
+                          <li key={i}><MathText text={opt} /></li>
                         ))}
                       </ul>
                     )}
                     <p className="text-sm text-gray-600">
-                      <span className="font-semibold">Answer:</span> {answerStr || "—"}
+                      <span className="font-semibold">Answer:</span> <MathText text={answerStr || "—"} />
                     </p>
                     <div className="mt-2 flex flex-wrap gap-2 text-xs text-gray-500">
                       <span>Subject: {getSubjectName(q.subject) || "—"}</span>

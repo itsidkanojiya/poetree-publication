@@ -1001,6 +1001,150 @@ export const bulkDeleteReadymadePapers = async (ids) => {
   }
 };
 
+// ==================== PLANNERS ====================
+
+/** Get all planners — GET /api/planners */
+export const getAllPlanners = async () => {
+  try {
+    const response = await apiClient.get("/planners");
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching planners:", error);
+    throw error;
+  }
+};
+
+/** Add planner — POST /api/planners/add (multipart/form-data) */
+export const addPlanner = async (formData) => {
+  try {
+    const response = await apiClient.post("/planners/add", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error adding planner:", error);
+    throw error;
+  }
+};
+
+/** Delete planner — DELETE /api/planners/{id} */
+export const deletePlanner = async (id) => {
+  try {
+    const response = await apiClient.delete(`/planners/${id}`);
+    return response.data;
+  } catch (error) {
+    console.error("Error deleting planner:", error);
+    throw error;
+  }
+};
+
+/** Bulk delete planners — POST /api/planners/bulk-delete { ids: [...] } */
+export const bulkDeletePlanners = async (ids) => {
+  try {
+    const response = await apiClient.post(`/planners/bulk-delete`, { ids });
+    return response.data;
+  } catch (error) {
+    console.error("Error bulk deleting planners:", error);
+    throw error;
+  }
+};
+
+// ==================== TIME TABLES ====================
+
+/** Get all time tables — GET /api/timetables */
+export const getAllTimeTables = async () => {
+  try {
+    const response = await apiClient.get("/timetables");
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching time tables:", error);
+    throw error;
+  }
+};
+
+/** Add time table — POST /api/timetables/add (multipart/form-data) */
+export const addTimeTable = async (formData) => {
+  try {
+    const response = await apiClient.post("/timetables/add", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error adding time table:", error);
+    throw error;
+  }
+};
+
+/** Delete time table — DELETE /api/timetables/{id} */
+export const deleteTimeTable = async (id) => {
+  try {
+    const response = await apiClient.delete(`/timetables/${id}`);
+    return response.data;
+  } catch (error) {
+    console.error("Error deleting time table:", error);
+    throw error;
+  }
+};
+
+/** Bulk delete time tables — POST /api/timetables/bulk-delete { ids: [...] } */
+export const bulkDeleteTimeTables = async (ids) => {
+  try {
+    const response = await apiClient.post(`/timetables/bulk-delete`, { ids });
+    return response.data;
+  } catch (error) {
+    console.error("Error bulk deleting time tables:", error);
+    throw error;
+  }
+};
+
+// ==================== PAPER STYLES ====================
+
+/** Get all paper styles — GET /api/paper-styles */
+export const getAllPaperStyles = async () => {
+  try {
+    const response = await apiClient.get("/paper-styles");
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching paper styles:", error);
+    throw error;
+  }
+};
+
+/** Add paper style — POST /api/paper-styles/add (multipart/form-data) */
+export const addPaperStyle = async (formData) => {
+  try {
+    const response = await apiClient.post("/paper-styles/add", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error adding paper style:", error);
+    throw error;
+  }
+};
+
+/** Delete paper style — DELETE /api/paper-styles/{id} */
+export const deletePaperStyle = async (id) => {
+  try {
+    const response = await apiClient.delete(`/paper-styles/${id}`);
+    return response.data;
+  } catch (error) {
+    console.error("Error deleting paper style:", error);
+    throw error;
+  }
+};
+
+/** Bulk delete paper styles — POST /api/paper-styles/bulk-delete { ids: [...] } */
+export const bulkDeletePaperStyles = async (ids) => {
+  try {
+    const response = await apiClient.post(`/paper-styles/bulk-delete`, { ids });
+    return response.data;
+  } catch (error) {
+    console.error("Error bulk deleting paper styles:", error);
+    throw error;
+  }
+};
+
 // ==================== DEFAULT PAPER TEMPLATES ====================
 
 /**

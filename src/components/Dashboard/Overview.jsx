@@ -361,7 +361,8 @@ const Overview = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Pre-Built Papers */}
+            {/* Pre-Built Papers (Prebuilt Question) card commented out — not needed for now */}
+            {/*
             <div
               onClick={handlePrebuildNavigate}
               className="group relative bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 p-8 cursor-pointer transform hover:-translate-y-2 overflow-hidden"
@@ -385,6 +386,7 @@ const Overview = () => {
                 </div>
               </div>
             </div>
+            */}
 
             {/* Custom Papers */}
             <div

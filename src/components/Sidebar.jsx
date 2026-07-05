@@ -20,6 +20,8 @@ import {
   Wand2,
   Layers,
   Files,
+  CalendarRange,
+  CalendarClock,
 } from "lucide-react";
 
 const LogoutModal = ({ isOpen, onClose, onConfirm }) => {
@@ -119,16 +121,32 @@ const Sidebar = () => {
       href: "/dashboard/generate/readymade-papers",
       icon: Files,
     },
+    {
+      name: "Planner",
+      href: "/dashboard/generate/planners",
+      icon: CalendarRange,
+    },
+    {
+      name: "Time Table",
+      href: "/dashboard/generate/timetables",
+      icon: CalendarClock,
+    },
+    {
+      name: "Paper Style",
+      href: "/dashboard/generate/paper-styles",
+      icon: LayoutTemplate,
+    },
     { name: "Animations", href: "/dashboard/animations", icon: Sparkles },
   ];
 
   // Top-level items shown below the Resources group
   const bottomNavigation = [
-    {
-      name: "Prebuilt Question",
-      href: "/dashboard/templates",
-      icon: LayoutTemplate,
-    },
+    // Prebuilt Question (templates) feature commented out — not needed for now
+    // {
+    //   name: "Prebuilt Question",
+    //   href: "/dashboard/templates",
+    //   icon: LayoutTemplate,
+    // },
     { name: "Quizzes", href: "/dashboard/quizzes", icon: ClipboardList },
     {
       name: "Subject Requests",

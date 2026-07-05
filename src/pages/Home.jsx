@@ -38,14 +38,15 @@ const Home = () => {
       bgLight: "bg-blue-50",
       iconBg: "bg-blue-100",
     },
-    {
-      icon: BookOpen,
-      title: "Prebuilt Questions",
-      description: "Start with ready-made templates. Pick a template, customize questions, and generate papers in minutes.",
-      color: "from-indigo-500 to-indigo-600",
-      bgLight: "bg-indigo-50",
-      iconBg: "bg-indigo-100",
-    },
+    // Prebuilt Questions (templates) feature commented out — not needed for now
+    // {
+    //   icon: BookOpen,
+    //   title: "Prebuilt Questions",
+    //   description: "Start with ready-made templates. Pick a template, customize questions, and generate papers in minutes.",
+    //   color: "from-indigo-500 to-indigo-600",
+    //   bgLight: "bg-indigo-50",
+    //   iconBg: "bg-indigo-100",
+    // },
     {
       icon: FilePlus,
       title: "Practice Worksheets",
@@ -66,7 +67,8 @@ const Home = () => {
 
   const forTeachers = [
     "Create question papers with MCQs, short & long answers, fill-in-blanks",
-    "Use prebuilt templates or build from scratch",
+    // Prebuilt templates mention commented out — feature not needed for now
+    // "Use prebuilt templates or build from scratch",
     "Filter by subject, subject title, board & standard",
     "Manage worksheets and answer sheets in one place",
   ];
