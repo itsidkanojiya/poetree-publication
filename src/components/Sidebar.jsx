@@ -12,11 +12,14 @@ import {
   FilePlus,
   ClipboardCheck,
   ChevronRight,
+  ChevronDown,
   BookOpen,
   Sparkles,
   LayoutTemplate,
   ClipboardList,
   Wand2,
+  Layers,
+  Files,
 } from "lucide-react";
 
 const LogoutModal = ({ isOpen, onClose, onConfirm }) => {
@@ -54,6 +57,7 @@ const Sidebar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
   const [greeting, setGreeting] = useState("");
+  const [resourcesOpen, setResourcesOpen] = useState(true);
 
   const handleLogout = () => {
     localStorage.removeItem("authToken");
@@ -80,8 +84,13 @@ const Sidebar = () => {
     }
   }, []);
 
-  const navigation = [
+  // Top-level items shown above the Resources group
+  const topNavigation = [
     { name: "Dashboard", href: "/dashboard", icon: Home },
+  ];
+
+  // Items grouped under the collapsible "Resources" menu
+  const resourcesChildren = [
     { name: "History", href: "/dashboard/history", icon: History },
     {
       name: "Question Papers",
@@ -90,15 +99,10 @@ const Sidebar = () => {
       state: { from: "prebuild" },
     },
     {
-      name: "Smart paper",
+      name: "AI paper",
       href: "/dashboard/generate/custompaper",
       icon: Wand2,
       state: { smartPaperWizard: true },
-    },
-    {
-      name: "Prebuilt Question",
-      href: "/dashboard/templates",
-      icon: LayoutTemplate,
     },
     {
       name: "Worksheets",
@@ -111,19 +115,25 @@ const Sidebar = () => {
       icon: ClipboardCheck,
     },
     {
-      name: "Quizzes",
-      href: "/dashboard/quizzes",
-      icon: ClipboardList,
+      name: "Readymade Paper",
+      href: "/dashboard/generate/readymade-papers",
+      icon: Files,
     },
+    { name: "Animations", href: "/dashboard/animations", icon: Sparkles },
+  ];
+
+  // Top-level items shown below the Resources group
+  const bottomNavigation = [
+    {
+      name: "Prebuilt Question",
+      href: "/dashboard/templates",
+      icon: LayoutTemplate,
+    },
+    { name: "Quizzes", href: "/dashboard/quizzes", icon: ClipboardList },
     {
       name: "Subject Requests",
       href: "/dashboard/subject-requests",
       icon: BookOpen,
-    },
-    {
-      name: "Animations",
-      href: "/dashboard/animations",
-      icon: Sparkles,
     },
   ];
 
@@ -145,6 +155,13 @@ const Sidebar = () => {
     // For other routes, check exact match
     return location.pathname === path;
   };
+
+  const resourcesActive = resourcesChildren.some((item) => isActive(item.href));
+
+  // Keep the Resources group open when one of its pages is active
+  useEffect(() => {
+    if (resourcesActive) setResourcesOpen(true);
+  }, [resourcesActive]);
 
   return (
     <>
@@ -195,10 +212,102 @@ const Sidebar = () => {
           {/* Navigation */}
           <nav className="flex-1 p-4 overflow-y-auto">
             <div className="space-y-2">
-              {navigation.map((item) => {
+              {/* Top-level items (Dashboard) */}
+              {topNavigation.map((item) => {
                 const Icon = item.icon;
                 const active = isActive(item.href);
+                return (
+                  <Link
+                    key={item.name}
+                    to={item.href}
+                    state={item.state}
+                    onClick={() => setIsOpen(false)}
+                    className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${
+                      active
+                        ? "bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg"
+                        : "text-gray-700 hover:bg-gray-100"
+                    }`}
+                  >
+                    <Icon
+                      size={20}
+                      className={
+                        active
+                          ? "text-white"
+                          : "text-gray-500 group-hover:text-blue-600"
+                      }
+                    />
+                    <span className="font-medium flex-1">{item.name}</span>
+                    {active && <ChevronRight size={18} />}
+                  </Link>
+                );
+              })}
 
+              {/* Resources (collapsible group) */}
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setResourcesOpen((o) => !o)}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${
+                    resourcesActive
+                      ? "bg-blue-50 text-blue-700"
+                      : "text-gray-700 hover:bg-gray-100"
+                  }`}
+                >
+                  <Layers
+                    size={20}
+                    className={
+                      resourcesActive
+                        ? "text-blue-600"
+                        : "text-gray-500 group-hover:text-blue-600"
+                    }
+                  />
+                  <span className="font-medium flex-1 text-left">Resources</span>
+                  <ChevronDown
+                    size={18}
+                    className={`transition-transform duration-200 ${
+                      resourcesOpen ? "rotate-180" : ""
+                    }`}
+                  />
+                </button>
+
+                {resourcesOpen && (
+                  <div className="mt-1 ml-4 pl-3 border-l border-gray-200 space-y-1">
+                    {resourcesChildren.map((item) => {
+                      const Icon = item.icon;
+                      const active = isActive(item.href);
+                      return (
+                        <Link
+                          key={item.name}
+                          to={item.href}
+                          state={item.state}
+                          onClick={() => setIsOpen(false)}
+                          className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200 group ${
+                            active
+                              ? "bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow"
+                              : "text-gray-700 hover:bg-gray-100"
+                          }`}
+                        >
+                          <Icon
+                            size={18}
+                            className={
+                              active
+                                ? "text-white"
+                                : "text-gray-500 group-hover:text-blue-600"
+                            }
+                          />
+                          <span className="font-medium flex-1">{item.name}</span>
+                          {active && <ChevronRight size={16} />}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Top-level items below Resources */}
+              {bottomNavigation.map((item) => {
+                const Icon = item.icon;
+                const active = isActive(item.href);
                 return (
                   <Link
                     key={item.name}

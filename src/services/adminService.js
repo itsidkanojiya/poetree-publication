@@ -934,6 +934,73 @@ export const bulkDeleteWorksheets = async (ids) => {
   }
 };
 
+// ==================== READYMADE PAPERS ====================
+
+/**
+ * Get all readymade papers
+ * GET /api/readymade-papers
+ * @param {Object} filters - Optional { chapter_id: number }
+ */
+export const getAllReadymadePapers = async (filters = {}) => {
+  try {
+    const params = new URLSearchParams();
+    if (filters.chapter_id != null && filters.chapter_id !== "") {
+      params.append("chapter_id", String(filters.chapter_id));
+    }
+    const query = params.toString();
+    const url = query ? `/readymade-papers?${query}` : "/readymade-papers";
+    const response = await apiClient.get(url);
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching readymade papers:", error);
+    throw error;
+  }
+};
+
+/**
+ * Add a readymade paper (PDF and/or Word)
+ * POST /api/readymade-papers/add (multipart/form-data)
+ */
+export const addReadymadePaper = async (formData) => {
+  try {
+    const response = await apiClient.post("/readymade-papers/add", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error adding readymade paper:", error);
+    throw error;
+  }
+};
+
+/**
+ * Delete a readymade paper
+ * DELETE /api/readymade-papers/{id}
+ */
+export const deleteReadymadePaper = async (id) => {
+  try {
+    const response = await apiClient.delete(`/readymade-papers/${id}`);
+    return response.data;
+  } catch (error) {
+    console.error("Error deleting readymade paper:", error);
+    throw error;
+  }
+};
+
+/**
+ * Bulk delete readymade papers
+ * POST /api/readymade-papers/bulk-delete  { ids: [...] }
+ */
+export const bulkDeleteReadymadePapers = async (ids) => {
+  try {
+    const response = await apiClient.post(`/readymade-papers/bulk-delete`, { ids });
+    return response.data;
+  } catch (error) {
+    console.error("Error bulk deleting readymade papers:", error);
+    throw error;
+  }
+};
+
 // ==================== DEFAULT PAPER TEMPLATES ====================
 
 /**

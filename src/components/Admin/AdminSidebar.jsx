@@ -16,6 +16,7 @@ import {
   LayoutTemplate,
   GraduationCap,
   Film,
+  Files,
 } from "lucide-react";
 
 const LogoutModal = ({ isOpen, onClose, onConfirm }) => {
@@ -82,6 +83,7 @@ const AdminSidebar = () => {
     { name: "Animations", href: "/admin/animations", icon: Film },
     { name: "Answer Sheets", href: "/admin/answer-sheets", icon: ClipboardCheck },
     { name: "Worksheets", href: "/admin/worksheets", icon: FilePlus },
+    { name: "Readymade Papers", href: "/admin/readymade-papers", icon: Files },
     { name: "Questions", href: "/admin/questions", icon: FileText },
     { name: "Templates", href: "/admin/templates", icon: LayoutTemplate },
   ];

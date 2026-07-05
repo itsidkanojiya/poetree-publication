@@ -13,6 +13,7 @@ import EditHeader from "./components/Dashboard/EditHeader";
 import PdfPreview from "./components/Dashboard/PdfPreview";
 import Worksheets from "./components/Dashboard/Worksheets";
 import Answersheets from "./components/Dashboard/Answersheets";
+import ReadymadePapers from "./components/Dashboard/ReadymadePapers";
 import CustomPaper from "./components/Dashboard/CustomPaper";
 import History from "./pages/History";
 import ViewPaperPage from "./components/Dashboard/ViewPaperPage";
@@ -32,6 +33,7 @@ import SubjectTitleManagement from "./components/Admin/SubjectTitles/SubjectTitl
 import QuestionManagement from "./components/Admin/Questions/QuestionManagement";
 import AnswerSheetManagement from "./components/Admin/AnswerSheets/AnswerSheetManagement";
 import WorksheetManagement from "./components/Admin/Worksheets/WorksheetManagement";
+import ReadymadePaperManagement from "./components/Admin/ReadymadePapers/ReadymadePaperManagement";
 import TemplateList from "./components/Admin/Templates/TemplateList";
 import CreateTemplate from "./components/Admin/Templates/CreateTemplate";
 import TemplateDetails from "./components/Admin/Templates/TemplateDetails";
@@ -88,6 +90,7 @@ function App() {
           <Route path="pdf-preview" element={<PdfPreview />} />
           <Route path="worksheets" element={<Worksheets />} />
           <Route path="answersheets" element={<Answersheets />} />
+          <Route path="readymade-papers" element={<ReadymadePapers />} />
           <Route path="custompaper" element={<CustomPaper />} />
         </Route>
         <Route path="history" element={<History />} />
@@ -129,6 +132,7 @@ function App() {
           <Route path="questions/:type" element={<QuestionManagement />} />
           <Route path="answer-sheets" element={<AnswerSheetManagement />} />
           <Route path="worksheets" element={<WorksheetManagement />} />
+          <Route path="readymade-papers" element={<ReadymadePaperManagement />} />
           <Route path="templates" element={<TemplateList />} />
           <Route path="templates/create" element={<CreateTemplate />} />
           <Route path="templates/:id" element={<TemplateDetails />} />
