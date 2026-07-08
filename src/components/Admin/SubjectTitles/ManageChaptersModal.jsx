@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
-import { X, Plus, Trash2, Loader2, Pencil, Check } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { X, Plus, Trash2, Loader2, Pencil, Check, Download, Upload } from "lucide-react";
+import * as XLSX from "xlsx";
 import {
   getChaptersBySubjectTitle,
   createChapter,
@@ -25,6 +26,11 @@ const ManageChaptersModal = ({ subjectTitleId, titleName, onClose }) => {
   const [editStandard, setEditStandard] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
   const [standards, setStandards] = useState([]);
+  // Bulk upload state
+  const fileInputRef = useRef(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 });
+  const [uploadResult, setUploadResult] = useState(null); // { added, failed, errors: [] }
 
   useEffect(() => {
     let cancelled = false;
@@ -194,6 +200,132 @@ const ManageChaptersModal = ({ subjectTitleId, titleName, onClose }) => {
     }
   };
 
+  // ---- Bulk download / upload (Excel) ----
+  const EXCEL_HEADERS = ["Chapter Number", "Chapter Name", "Standard ID", "Standard"];
+
+  const handleDownloadExcel = () => {
+    const rows = chapters.map((ch) => [
+      ch.chapter_number ?? "",
+      ch.chapter_name ?? "",
+      ch.standard ?? "",
+      ch.standard != null ? getStandardName(ch.standard) : "",
+    ]);
+    const ws = XLSX.utils.aoa_to_sheet([EXCEL_HEADERS, ...rows]);
+    ws["!cols"] = [{ wch: 15 }, { wch: 45 }, { wch: 12 }, { wch: 18 }];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Chapters");
+
+    // Instructions sheet — this file doubles as the bulk-upload template
+    const info = [
+      ["CHAPTERS — DOWNLOAD / BULK UPLOAD"],
+      [""],
+      ["Re-upload this file (the 'Chapters' sheet) to bulk-add chapters to this subject title."],
+      [""],
+      ["Columns:"],
+      ["  Chapter Name", "required — the chapter title"],
+      ["  Chapter Number", "optional — non-negative whole number (used for ordering)"],
+      ["  Standard ID", "optional — the numeric standard id (preferred)"],
+      ["  Standard", "optional — standard name; used only when Standard ID is empty"],
+      [""],
+      ["Notes:"],
+      ["  * Upload ADDS new chapters. Existing chapters are not updated or removed."],
+      ["  * Rows with an empty Chapter Name are skipped."],
+    ];
+    const wsInfo = XLSX.utils.aoa_to_sheet(info);
+    wsInfo["!cols"] = [{ wch: 18 }, { wch: 70 }];
+    XLSX.utils.book_append_sheet(wb, wsInfo, "Instructions");
+
+    const safeTitle = String(titleName || `SubjectTitle_${subjectTitleId}`).replace(/[\\/:*?"<>|]/g, "_");
+    XLSX.writeFile(wb, `Chapters_${safeTitle}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  };
+
+  // Resolve a standard id from either the "Standard ID" or the "Standard" name column
+  const resolveStandardId = (row) => {
+    const rawId = row["Standard ID"];
+    if (rawId != null && String(rawId).trim() !== "") {
+      const n = parseInt(rawId, 10);
+      if (!isNaN(n)) return n;
+    }
+    const name = row["Standard"];
+    if (name != null && String(name).trim() !== "") {
+      const match = standards.find(
+        (s) => String(s.name).trim().toLowerCase() === String(name).trim().toLowerCase()
+      );
+      if (match) return Number(match.standard_id);
+    }
+    return null;
+  };
+
+  const handleBulkUpload = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-selecting the same file
+    if (!file || !subjectTitleId) return;
+
+    setError(null);
+    setUploadResult(null);
+    setUploading(true);
+    try {
+      const data = new Uint8Array(await file.arrayBuffer());
+      const wb = XLSX.read(data, { type: "array" });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet);
+
+      const valid = rows
+        .map((r) => ({
+          chapter_name: String(r["Chapter Name"] ?? "").trim(),
+          chapter_number: r["Chapter Number"],
+          standard: resolveStandardId(r),
+        }))
+        .filter((r) => r.chapter_name);
+
+      if (valid.length === 0) {
+        setError("No rows with a 'Chapter Name' were found. Check the column headings.");
+        return;
+      }
+
+      setUploadProgress({ current: 0, total: valid.length });
+      const created = [];
+      const errors = [];
+
+      for (let i = 0; i < valid.length; i++) {
+        const row = valid[i];
+        try {
+          const res = await createChapter({
+            chapter_name: row.chapter_name,
+            subject_title_id: Number(subjectTitleId),
+            chapter_number:
+              row.chapter_number === "" || row.chapter_number == null ? null : Number(row.chapter_number),
+            standard: row.standard,
+          });
+          const ch = res?.chapter || res;
+          if (ch?.chapter_id) {
+            created.push({
+              chapter_id: ch.chapter_id,
+              chapter_name: ch.chapter_name,
+              chapter_number: ch.chapter_number ?? null,
+              standard: ch.standard ?? null,
+              subject_title_id: ch.subject_title_id,
+            });
+          }
+        } catch (err) {
+          errors.push(
+            `${row.chapter_name}: ${err.response?.data?.error || err.response?.data?.message || "failed"}`
+          );
+        }
+        setUploadProgress({ current: i + 1, total: valid.length });
+      }
+
+      if (created.length) setChapters((prev) => sortChapters([...prev, ...created]));
+      setUploadResult({ added: created.length, failed: errors.length, errors: errors.slice(0, 5) });
+    } catch (err) {
+      setError("Could not read the Excel file. Make sure it is a valid .xlsx file.");
+    } finally {
+      setUploading(false);
+      setUploadProgress({ current: 0, total: 0 });
+    }
+  };
+
   return (
     <>
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -215,6 +347,56 @@ const ManageChaptersModal = ({ subjectTitleId, titleName, onClose }) => {
         </div>
 
         <div className="p-6 overflow-y-auto flex-1">
+          {/* Bulk actions */}
+          <div className="flex flex-wrap items-center gap-2 mb-4">
+            <button
+              type="button"
+              onClick={handleDownloadExcel}
+              className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition"
+              title="Download all chapters of this subject title as Excel"
+            >
+              <Download className="w-4 h-4" />
+              Download Excel
+            </button>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition disabled:opacity-50"
+              title="Bulk add chapters from an Excel file"
+            >
+              {uploading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Upload className="w-4 h-4" />
+              )}
+              {uploading ? `Uploading ${uploadProgress.current}/${uploadProgress.total}` : "Bulk Upload"}
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx,.xls"
+              onChange={handleBulkUpload}
+              className="hidden"
+            />
+          </div>
+
+          {uploadResult && (
+            <div className="mb-4 text-sm rounded-lg px-3 py-2 bg-gray-50 border border-gray-200">
+              <p className="font-medium text-gray-800">
+                Added {uploadResult.added} chapter(s)
+                {uploadResult.failed ? `, ${uploadResult.failed} failed` : ""}.
+              </p>
+              {uploadResult.errors?.length > 0 && (
+                <ul className="mt-1 list-disc list-inside text-red-600">
+                  {uploadResult.errors.map((msg, i) => (
+                    <li key={i}>{msg}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+
           {/* Add chapter form */}
           <form onSubmit={handleCreate} className="mb-6">
             <label className="block text-sm font-semibold text-gray-700 mb-2">
