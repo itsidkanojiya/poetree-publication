@@ -9,7 +9,7 @@ import {
   getAllStandards,
 } from "../../../services/adminService";
 
-const ManageChaptersModal = ({ subjectTitleId, titleName, onClose }) => {
+const ManageChaptersModal = ({ subjectTitleId, titleName, subjectId, subjectName, onClose }) => {
   const [chapters, setChapters] = useState([]);
   const [loading, setLoading] = useState(true);
   const [newChapterName, setNewChapterName] = useState("");
@@ -201,7 +201,15 @@ const ManageChaptersModal = ({ subjectTitleId, titleName, onClose }) => {
   };
 
   // ---- Bulk download / upload (Excel) ----
-  const EXCEL_HEADERS = ["Chapter Number", "Chapter Name", "Standard ID", "Standard"];
+  const EXCEL_HEADERS = [
+    "Chapter Number",
+    "Chapter Name",
+    "Standard ID",
+    "Standard",
+    "Subject ID",
+    "Subject Name",
+    "Subject Title",
+  ];
 
   const handleDownloadExcel = () => {
     const rows = chapters.map((ch) => [
@@ -209,9 +217,20 @@ const ManageChaptersModal = ({ subjectTitleId, titleName, onClose }) => {
       ch.chapter_name ?? "",
       ch.standard ?? "",
       ch.standard != null ? getStandardName(ch.standard) : "",
+      subjectId ?? "",
+      subjectName ?? "",
+      titleName ?? "",
     ]);
     const ws = XLSX.utils.aoa_to_sheet([EXCEL_HEADERS, ...rows]);
-    ws["!cols"] = [{ wch: 15 }, { wch: 45 }, { wch: 12 }, { wch: 18 }];
+    ws["!cols"] = [
+      { wch: 15 },
+      { wch: 45 },
+      { wch: 12 },
+      { wch: 18 },
+      { wch: 12 },
+      { wch: 24 },
+      { wch: 30 },
+    ];
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Chapters");
@@ -227,10 +246,14 @@ const ManageChaptersModal = ({ subjectTitleId, titleName, onClose }) => {
       ["  Chapter Number", "optional — non-negative whole number (used for ordering)"],
       ["  Standard ID", "optional — the numeric standard id (preferred)"],
       ["  Standard", "optional — standard name; used only when Standard ID is empty"],
+      ["  Subject ID", "informational only — ignored on upload"],
+      ["  Subject Name", "informational only — ignored on upload"],
+      ["  Subject Title", "informational only — ignored on upload"],
       [""],
       ["Notes:"],
       ["  * Upload ADDS new chapters. Existing chapters are not updated or removed."],
       ["  * Rows with an empty Chapter Name are skipped."],
+      ["  * Uploaded chapters always attach to the subject title this file was downloaded from."],
     ];
     const wsInfo = XLSX.utils.aoa_to_sheet(info);
     wsInfo["!cols"] = [{ wch: 18 }, { wch: 70 }];

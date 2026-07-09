@@ -265,6 +265,17 @@ const SubjectTitleManagement = () => {
         <ManageChaptersModal
           subjectTitleId={chaptersTitle.subject_title_id}
           titleName={chaptersTitle.title_name}
+          subjectId={
+            chaptersTitle.subject_id ??
+            subjects.find((s) => s.subject_name === chaptersTitle.subject)?.subject_id ??
+            ""
+          }
+          subjectName={
+            chaptersTitle.subject ??
+            subjects.find((s) => String(s.subject_id) === String(chaptersTitle.subject_id))
+              ?.subject_name ??
+            ""
+          }
           onClose={() => setChaptersTitle(null)}
         />
       )}
