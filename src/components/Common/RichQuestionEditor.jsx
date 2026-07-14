@@ -86,22 +86,39 @@ const ImageNodeView = ({ node, updateAttributes, selected, editor, getPos }) => 
     }
   };
 
+  /**
+   * Resize from the corner handle.
+   *
+   * The node is draggable, so a plain mousedown here would start a ProseMirror
+   * drag instead of a resize. Pointer events + capture keep the gesture ours, and
+   * the handle also blocks dragstart (see the JSX below).
+   */
   const startResize = (e) => {
     e.preventDefault();
     e.stopPropagation();
+
     const startX = e.clientX;
     const startW = imgRef.current?.offsetWidth || 200;
+
+    try {
+      e.currentTarget.setPointerCapture?.(e.pointerId);
+    } catch {
+      /* not supported — fall back to document listeners */
+    }
 
     const onMove = (ev) => {
       const next = Math.max(40, Math.round(startW + (ev.clientX - startX)));
       updateAttributes({ width: next });
     };
     const onUp = () => {
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
+      document.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerup", onUp);
+      document.removeEventListener("pointercancel", onUp);
     };
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
+
+    document.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerup", onUp);
+    document.addEventListener("pointercancel", onUp);
   };
 
   return (
@@ -134,21 +151,33 @@ const ImageNodeView = ({ node, updateAttributes, selected, editor, getPos }) => 
       />
       {selected && (
         <>
-          {/* Drag corner to resize (aspect ratio preserved: height stays auto) */}
+          {/*
+            Corner resize handle. It must NOT be draggable and must swallow
+            dragstart, otherwise the node's drag wins and the image moves
+            instead of resizing. Aspect ratio is preserved (height stays auto).
+          */}
           <span
-            onMouseDown={startResize}
+            onPointerDown={startResize}
+            onDragStart={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+            onMouseDown={(e) => e.stopPropagation()}
+            draggable={false}
             title="Drag to resize"
             style={{
               position: "absolute",
-              right: -6,
-              bottom: -6,
-              width: 14,
-              height: 14,
+              right: -8,
+              bottom: -8,
+              width: 18,
+              height: 18,
               background: "#3b82f6",
               border: "2px solid #fff",
               borderRadius: "50%",
               cursor: "nwse-resize",
-              boxShadow: "0 1px 3px rgba(0,0,0,.3)",
+              boxShadow: "0 1px 4px rgba(0,0,0,.35)",
+              touchAction: "none",
+              zIndex: 2,
             }}
           />
           <span
