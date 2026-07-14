@@ -47,6 +47,18 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
   const [optionHtmlList, setOptionHtmlList] = useState(
     Array.isArray(question?.options_html) ? question.options_html : []
   );
+  // Match pairs keep their {left, right} shape in HTML too, index-aligned with matchPairs.
+  const [matchHtml, setMatchHtml] = useState(() => ({
+    left: Array.isArray(question?.options_html?.left) ? question.options_html.left : [],
+    right: Array.isArray(question?.options_html?.right) ? question.options_html.right : [],
+  }));
+
+  const updateMatchHtml = (side, index, html) =>
+    setMatchHtml((prev) => {
+      const next = { ...prev, [side]: [...(prev[side] || [])] };
+      next[side][index] = html;
+      return next;
+    });
 
   // For Passage and Match types
   // Passage: each item is { type: "short", question, answer } or { type: "mcq", question, options: string[], answer: "1" }
@@ -255,6 +267,13 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
           if (optsHtml.some((h) => h && h.trim())) {
             formDataToSend.append("options_html", JSON.stringify(optsHtml));
           }
+        } else if (questionType === "match") {
+          // Keep the {left,right} shape, index-aligned with the plain matchPairs.
+          const left = matchPairs.left.map((_, i) => matchHtml.left?.[i] || "");
+          const right = matchPairs.right.map((_, i) => matchHtml.right?.[i] || "");
+          if ([...left, ...right].some((h) => h && h.trim())) {
+            formDataToSend.append("options_html", JSON.stringify({ left, right }));
+          }
         }
       } else if (question) {
         // Edited back to the simple editor — drop the rich bodies (plain text stays).
@@ -316,9 +335,16 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
       } else if (questionType === "match") {
         formDataToSend.append("options", JSON.stringify(matchPairs));
         // Match answer format: {"A": "1", "B": "2"}
+        // In rich mode the plain left items are empty (the text lives in the HTML),
+        // so decide "has content" from whichever editor was used.
         const matchAnswer = {};
         matchPairs.left.forEach((left, idx) => {
-          if (left.trim()) {
+          const html = matchHtml.left?.[idx] || "";
+          const hasContent = richMode
+            ? html.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0 ||
+              /<(img|table)\b/i.test(html)
+            : !!left.trim();
+          if (hasContent) {
             const letter = String.fromCharCode(65 + idx); // A, B, C...
             matchAnswer[letter] = String(idx + 1);
           }
@@ -1112,13 +1138,24 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
                     </div>
                     {matchPairs.left.map((item, index) => (
                       <div key={index} className="flex gap-2 mb-2">
-                        <input
-                          type="text"
-                          value={item}
-                          onChange={(e) => updateMatchItem("left", index, e.target.value)}
-                          placeholder={`Left item ${index + 1}`}
-                          className="flex-1 px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500"
-                        />
+                        {richMode ? (
+                          <div className="flex-1">
+                            <RichQuestionEditor
+                              value={matchHtml.left?.[index] || ""}
+                              onChange={(html) => updateMatchHtml("left", index, html)}
+                              questionType={questionType}
+                              placeholder={`Left item ${index + 1}`}
+                            />
+                          </div>
+                        ) : (
+                          <input
+                            type="text"
+                            value={item}
+                            onChange={(e) => updateMatchItem("left", index, e.target.value)}
+                            placeholder={`Left item ${index + 1}`}
+                            className="flex-1 px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500"
+                          />
+                        )}
                         {matchPairs.left.length > 1 && (
                           <button
                             type="button"
@@ -1144,13 +1181,24 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
                     </div>
                     {matchPairs.right.map((item, index) => (
                       <div key={index} className="flex gap-2 mb-2">
-                        <input
-                          type="text"
-                          value={item}
-                          onChange={(e) => updateMatchItem("right", index, e.target.value)}
-                          placeholder={`Right item ${index + 1}`}
-                          className="flex-1 px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500"
-                        />
+                        {richMode ? (
+                          <div className="flex-1">
+                            <RichQuestionEditor
+                              value={matchHtml.right?.[index] || ""}
+                              onChange={(html) => updateMatchHtml("right", index, html)}
+                              questionType={questionType}
+                              placeholder={`Right item ${index + 1}`}
+                            />
+                          </div>
+                        ) : (
+                          <input
+                            type="text"
+                            value={item}
+                            onChange={(e) => updateMatchItem("right", index, e.target.value)}
+                            placeholder={`Right item ${index + 1}`}
+                            className="flex-1 px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500"
+                          />
+                        )}
                         {matchPairs.right.length > 1 && (
                           <button
                             type="button"

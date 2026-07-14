@@ -31,7 +31,7 @@ import {
 import Toast from "../Common/Toast";
 import MathText from "../Common/MathText";
 import { QuestionText, QuestionImageBlock } from "../Common/QuestionImageBlock";
-import { QuestionBody, OptionBody } from "../Common/QuestionBody";
+import { QuestionBody, OptionBody, MatchItemBody } from "../Common/QuestionBody";
 import { estimateImageBlockHeight } from "../../utils/questionImage";
 import Loader from "../Common/loader/loader";
 import SmartPaperStepper from "./SmartPaperStepper";
@@ -3814,7 +3814,13 @@ const CustomPaper = () => {
                                                           border: "1px solid #374151",
                                                         }}
                                                       >
-                                                        {idx + 1}. {leftItems[idx] || ""}
+                                                        {idx + 1}.{" "}
+                                                        <MatchItemBody
+                                                          question={question}
+                                                          side="left"
+                                                          index={idx}
+                                                          value={leftItems[idx] || ""}
+                                                        />
                                                       </td>
                                                       <td
                                                         className="px-3 py-2 text-gray-800"
@@ -3825,7 +3831,13 @@ const CustomPaper = () => {
                                                         {String.fromCharCode(
                                                           97 + idx
                                                         )}
-                                                        . {rightItems[idx] || ""}
+                                                        .{" "}
+                                                        <MatchItemBody
+                                                          question={question}
+                                                          side="right"
+                                                          index={idx}
+                                                          value={rightItems[idx] || ""}
+                                                        />
                                                       </td>
                                                       <td
                                                         className="px-3 py-2 text-gray-800 font-mono"

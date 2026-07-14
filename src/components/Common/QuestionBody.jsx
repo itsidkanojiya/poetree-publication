@@ -127,4 +127,20 @@ export const OptionBody = ({ question, index, option, className }) => {
   return <MathText text={option} className={className} />;
 };
 
+/**
+ * One side of a match pair. Match keeps its {left, right} shape, so options_html
+ * is { left: string[], right: string[] } index-aligned with the plain arrays.
+ */
+export const MatchItemBody = ({ question, side, index, value, className }) => {
+  const html = question?.options_html?.[side]?.[index];
+  if (typeof html === "string" && html.trim()) {
+    return (
+      <span className={`rich-body rich-inline ${className || ""}`.trim()}>
+        {renderRichHtml(html)}
+      </span>
+    );
+  }
+  return <MathText text={value} className={className} />;
+};
+
 export default QuestionBody;
