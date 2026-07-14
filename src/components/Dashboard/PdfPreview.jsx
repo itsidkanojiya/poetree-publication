@@ -1,3 +1,5 @@
+import { estimateImageBlockHeight } from "../../utils/questionImage";
+
 // Use CustomPaper's pagination logic with reduced margin for better space utilization
 const splitQuestionsIntoPages = (questions, maxPageHeight, headerHeight) => {
   const PAGE_DIMENSIONS = {
@@ -61,17 +63,8 @@ const splitQuestionsIntoPages = (questions, maxPageHeight, headerHeight) => {
         // Ignore parsing errors
       }
     }
-    // Check for images in all question types (both image_url and image fields)
-    if (
-      (question.image_url !== null &&
-        question.image_url !== undefined &&
-        question.image_url !== "") ||
-      (question.image !== null &&
-        question.image !== undefined &&
-        question.image !== "")
-    ) {
-      questionHeight += COMPONENT_HEIGHTS.IMAGE;
-    }
+    // Reserve exact height for the image block (composite or legacy).
+    questionHeight += estimateImageBlockHeight(question);
     // Add spacing between questions (except for first question on page)
     const hasQuestionsOnPage = currentPage.length > 0;
     if (hasQuestionsOnPage) {
@@ -108,17 +101,7 @@ const splitQuestionsIntoPages = (questions, maxPageHeight, headerHeight) => {
           // Ignore parsing errors
         }
       }
-      // Check for images in all question types (both image_url and image fields)
-      if (
-        (question.image_url !== null &&
-          question.image_url !== undefined &&
-          question.image_url !== "") ||
-        (question.image !== null &&
-          question.image !== undefined &&
-          question.image !== "")
-      ) {
-        newQuestionHeight += COMPONENT_HEIGHTS.IMAGE;
-      }
+      newQuestionHeight += estimateImageBlockHeight(question);
 
       // Add question to new page
       currentPage.push({ ...question, number: questionNumber });

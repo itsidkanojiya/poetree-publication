@@ -6,6 +6,8 @@ import Loader from "../Common/loader/loader";
 import HeaderCard from "../Cards/HeaderCard";
 // Use CustomPaper's exact pagination logic
 import apiClient from "../../services/apiClient";
+import { QuestionImageBlock } from "../Common/QuestionImageBlock";
+import { estimateImageBlockHeight } from "../../utils/questionImage";
 
 const TemplateDetail = () => {
   const { id } = useParams();
@@ -309,11 +311,8 @@ const TemplateDetail = () => {
         } catch {}
       }
 
-      // image (count once)
-      const hasImage = Boolean(question.image_url || question.image);
-      if (hasImage) {
-        questionHeight += COMPONENT_HEIGHTS.IMAGE;
-      }
+      // image (count once) — exact reservation for composite or legacy
+      questionHeight += estimateImageBlockHeight(question);
 
       // --- BOARD RULE ---
       // If new section → ensure heading + 1 question fit together
@@ -576,20 +575,7 @@ const TemplateDetail = () => {
                                       {q.number || index + 1}. {q.question}
                                     </p>
                                   </div>
-                                  {(q.image_url || q.image) && (
-                                    <div className="mb-2">
-                                      <img
-                                        src={q.image_url || q.image}
-                                        alt="Passage"
-                                        className="border border-gray-200 rounded"
-                                        style={{
-                                          height: "200px",
-                                          width: "auto",
-                                          maxWidth: "100%",
-                                        }}
-                                      />
-                                    </div>
-                                  )}
+                                  <QuestionImageBlock question={q} standalone />
                                   {q.options &&
                                     (() => {
                                       try {
@@ -651,20 +637,7 @@ const TemplateDetail = () => {
                                   <p className="cursor-default py-0.5 px-1 text-gray-800 mb-2">
                                     {q.number || index + 1}. {q.question}
                                   </p>
-                                  {(q.image_url || q.image) && (
-                                    <div className="mb-2">
-                                      <img
-                                        src={q.image_url || q.image}
-                                        alt="Match"
-                                        className="border border-gray-200 rounded"
-                                        style={{
-                                          height: "200px",
-                                          width: "auto",
-                                          maxWidth: "100%",
-                                        }}
-                                      />
-                                    </div>
-                                  )}
+                                  <QuestionImageBlock question={q} standalone />
                                   {q.options &&
                                     (() => {
                                       try {
@@ -742,20 +715,7 @@ const TemplateDetail = () => {
                                   <p className="cursor-default py-0.5 px-1 border-b last:border-none text-gray-800">
                                     {q.number || index + 1}. {q.question}
                                   </p>
-                                  {(q.image_url || q.image) && (
-                                    <div className="mb-2 mt-2">
-                                      <img
-                                        src={q.image_url || q.image}
-                                        alt="Question"
-                                        className="border border-gray-200 rounded"
-                                        style={{
-                                          height: "200px",
-                                          width: "auto",
-                                          maxWidth: "100%",
-                                        }}
-                                      />
-                                    </div>
-                                  )}
+                                  <QuestionImageBlock question={q} standalone />
                                 </>
                               )}
                               {q.type === "mcq" &&
@@ -811,20 +771,7 @@ const TemplateDetail = () => {
                                     );
                                   }
                                 })()}
-                              {(q.image_url || q.image) && (
-                                <div className="mb-2 mt-2">
-                                  <img
-                                    src={q.image_url || q.image}
-                                    alt="Question"
-                                    className="border border-gray-200 rounded"
-                                    style={{
-                                      height: "200px",
-                                      width: "auto",
-                                      maxWidth: "100%",
-                                    }}
-                                  />
-                                </div>
-                              )}
+                              <QuestionImageBlock question={q} standalone />
                             </div>
                           );
 

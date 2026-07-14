@@ -30,6 +30,8 @@ import {
 } from "../../services/adminService";
 import Toast from "../Common/Toast";
 import MathText from "../Common/MathText";
+import { QuestionText, QuestionImageBlock } from "../Common/QuestionImageBlock";
+import { estimateImageBlockHeight } from "../../utils/questionImage";
 import Loader from "../Common/loader/loader";
 import SmartPaperStepper from "./SmartPaperStepper";
 import { useUserTeaching } from "../../context/UserTeachingContext";
@@ -1744,9 +1746,7 @@ const CustomPaper = () => {
         if (isFirstQuestionOfType) {
           questionHeight += COMPONENT_HEIGHTS.SECTION;
         }
-        if (question.image_url != null && question.image_url !== "") {
-          questionHeight += COMPONENT_HEIGHTS.IMAGE;
-        }
+        questionHeight += estimateImageBlockHeight(question);
         // Add spacing between questions (except for first question on page)
         const hasQuestionsOnPage = currentPage.some(
           (s) => s.selectedQuestions.length > 0
@@ -1782,9 +1782,7 @@ const CustomPaper = () => {
               newQuestionHeight += getMcqOptionsHeight(question.options);
             }
           }
-          if (question.image_url != null && question.image_url !== "") {
-            newQuestionHeight += COMPONENT_HEIGHTS.IMAGE;
-          }
+          newQuestionHeight += estimateImageBlockHeight(question);
           // No spacing needed for first question on new page
 
           // Add question to new page
@@ -3414,6 +3412,7 @@ const CustomPaper = () => {
                             {section.selectedQuestions.map(
                               (question, qIndex) => (
                                 <div key={qIndex} className="mb-4">
+                                  <QuestionImageBlock question={question} slot="top" />
                                   <div
                                     className={`flex items-start justify-between gap-4 ${(question.type === "mcq" || question.type === "true_false" || question.type === "truefalse") ? "flex-row" : ""}`}
                                     style={{ lineHeight: "1.7" }}
@@ -3433,7 +3432,7 @@ const CustomPaper = () => {
                                       >
                                         ({question.questionNumber}){" "}
                                       </span>
-                                      <MathText text={question.question} />
+                                      <QuestionText question={question} />
                                     </p>
                                     {question.type === "mcq" && (
                                       <div
@@ -3734,16 +3733,7 @@ const CustomPaper = () => {
                                       return null;
                                     })()}
 
-                                  {question.image_url && (
-                                    <div className="mt-3 ml-6">
-                                      <img
-                                        src={question.image_url}
-                                        alt={`Question ${question.questionNumber}`}
-                                        className="border border-gray-200 max-h-[200px] w-auto"
-                                        style={{ height: "200px" }}
-                                      />
-                                    </div>
-                                  )}
+                                  <QuestionImageBlock question={question} slot="bottom" />
                                 </div>
                               )
                             )}

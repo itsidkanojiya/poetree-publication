@@ -8,6 +8,8 @@ import apiClient from "../../services/apiClient";
 import HeaderCard from "../Cards/HeaderCard";
 import Loader from "../Common/loader/loader";
 import MathText from "../Common/MathText";
+import { QuestionText, QuestionImageBlock } from "../Common/QuestionImageBlock";
+import { estimateImageBlockHeight } from "../../utils/questionImage";
 
 const QUESTION_TYPE_CONFIG = {
   mcq: { label: "Multiple Choice Questions" },
@@ -129,7 +131,7 @@ const estimateQuestionHeight = (question, { isFirstOfType, hasQuestionsOnPage })
     if (type === "mcq") h += getMcqOptionsHeight(question.options);
   }
   if (isFirstOfType) h += COMPONENT_HEIGHTS.SECTION;
-  if (question.image_url != null && question.image_url !== "") h += COMPONENT_HEIGHTS.IMAGE;
+  h += estimateImageBlockHeight(question);
   if (hasQuestionsOnPage) h += COMPONENT_HEIGHTS.SPACING;
   return h;
 };
@@ -410,6 +412,7 @@ const ViewPaperPage = () => {
                         const qNum = questionCounters[sectionType]++;
                         return (
                           <div key={qIndex} className="mb-4">
+                            <QuestionImageBlock question={question} slot="top" />
                             <div
                               className={`flex items-start justify-between gap-4 ${
                                 question.type === "mcq" ||
@@ -427,7 +430,7 @@ const ViewPaperPage = () => {
                                 <span style={{ fontSize: "14px", fontWeight: "bold" }}>
                                   ({qNum}){" "}
                                 </span>
-                                <MathText text={question.question} />
+                                <QuestionText question={question} />
                               </p>
                               {question.type === "mcq" && (
                                 <div
@@ -565,16 +568,7 @@ const ViewPaperPage = () => {
                             })()}
 
                             {/* Question image */}
-                            {question.image_url && (
-                              <div className="mt-3 ml-6">
-                                <img
-                                  src={question.image_url}
-                                  alt={`Question ${qNum}`}
-                                  className="border border-gray-200 max-h-[200px] w-auto"
-                                  style={{ height: "200px" }}
-                                />
-                              </div>
-                            )}
+                            <QuestionImageBlock question={question} slot="bottom" />
                           </div>
                         );
                       })}

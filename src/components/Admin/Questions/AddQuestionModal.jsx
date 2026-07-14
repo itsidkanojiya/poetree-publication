@@ -3,6 +3,8 @@ import { X, Plus, Trash2 } from "lucide-react";
 import { addQuestion, editQuestion, getAllSubjects, getAllBoards, getSubjectTitlesBySubjectAndContext, getAllStandards, getChaptersBySubjectTitle, createChapter } from "../../../services/adminService";
 import Toast from "../../Common/Toast";
 import MathTextInput from "../../Common/MathTextInput";
+import QuestionImageEditor from "../../Common/QuestionImageEditor";
+import { IMG_TOKEN } from "../../../utils/questionImage";
 
 const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
   const [formData, setFormData] = useState({
@@ -31,6 +33,11 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [toast, setToast] = useState({ show: false, message: "", type: "error" });
+
+  // Fabric image editor. `imageData` holds the composite result:
+  // { layout, compositeBlob, compositeDataUrl, width, height, placement, align, sourceFiles }
+  const [showImageEditor, setShowImageEditor] = useState(false);
+  const [imageData, setImageData] = useState(null);
 
   // For Passage and Match types
   // Passage: each item is { type: "short", question, answer } or { type: "mcq", question, options: string[], answer: "1" }
@@ -120,6 +127,20 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
       difficulty: question.difficulty === "easy" || question.difficulty === "hard" ? question.difficulty : "medium",
       image: null,
     });
+
+    // Restore an existing fabric composite image block, if present.
+    if (question.composite_image_url && Number(question.composite_height) > 0) {
+      setImageData({
+        layout: question.image_layout || null,
+        compositeBlob: null, // regenerated only if re-edited
+        compositeDataUrl: question.composite_image_url,
+        width: Number(question.composite_width) || 0,
+        height: Number(question.composite_height) || 0,
+        placement: question.image_placement || "below",
+        align: question.image_align || "center",
+        sourceFiles: [],
+      });
+    }
 
     // Handle Passage type (support short, mcq, blank, truefalse; backward compat: no type = short)
     if (questionType === "passage" && question.options) {
@@ -216,6 +237,30 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
       formDataToSend.append("difficulty", formData.difficulty || "medium");
       if (formData.image) formDataToSend.append("image", formData.image);
 
+      // Fabric composite image block (multi-image + layout + flattened PNG).
+      if (imageData) {
+        formDataToSend.append("image_placement", imageData.placement || "below");
+        formDataToSend.append("image_align", imageData.align || "center");
+        if (imageData.width) formDataToSend.append("composite_width", String(Math.round(imageData.width)));
+        if (imageData.height) formDataToSend.append("composite_height", String(Math.round(imageData.height)));
+        if (imageData.layout) {
+          formDataToSend.append(
+            "image_layout",
+            typeof imageData.layout === "string" ? imageData.layout : JSON.stringify(imageData.layout)
+          );
+        }
+        // Only re-send the flattened PNG + source files when edited this session.
+        if (imageData.compositeBlob) {
+          formDataToSend.append("composite_image", imageData.compositeBlob, "composite.png");
+        }
+        (imageData.sourceFiles || []).forEach((file) => {
+          formDataToSend.append("images[]", file);
+        });
+      } else if (question) {
+        // Editing and the image block was removed — tell the backend to clear it.
+        formDataToSend.append("clear_images", "true");
+      }
+
       // Handle type-specific fields
       if (questionType === "mcq") {
         const optionsArray = mcqOptionList.map((o) => (o && o.trim()) || "").filter(Boolean);
@@ -295,6 +340,15 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
       newErrors.difficulty = "Difficulty is required";
     }
     if (!formData.question.trim()) newErrors.question = "Question is required";
+    // Inline placement renders the image at the {{img}} token. Without the token the
+    // image would silently disappear from the paper, so require it.
+    if (
+      imageData &&
+      imageData.placement === "inline" &&
+      !(formData.question || "").includes(IMG_TOKEN)
+    ) {
+      newErrors.question = `Add the ${IMG_TOKEN} marker in the question text to show the image inline (or change placement).`;
+    }
     // Answer is optional for all question types — user can add a question without an answer
     if (questionType === "mcq") {
       const validOptions = mcqOptionList.map((o) => (o && o.trim()) || "").filter(Boolean);
@@ -1087,18 +1141,62 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
               />
             </div>
 
-            {/* Image Upload */}
+            {/* Images (fabric editor) */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Image (Optional)
+                Images (Optional)
               </label>
-              <input
-                type="file"
-                name="image"
-                onChange={handleChange}
-                accept="image/*"
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition outline-none"
-              />
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowImageEditor(true)}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border-2 border-blue-200 text-blue-700 hover:bg-blue-50 transition font-medium"
+                >
+                  <Plus className="w-4 h-4" />
+                  {imageData ? "Edit images" : "Add images"}
+                </button>
+
+                {imageData && (
+                  <>
+                    {imageData.compositeDataUrl && (
+                      <img
+                        src={imageData.compositeDataUrl}
+                        alt="Question images preview"
+                        className="h-14 w-auto border border-gray-200 rounded"
+                      />
+                    )}
+                    <span className="text-xs text-gray-500">
+                      Placement: <b>{imageData.placement}</b>
+                      {["above", "below"].includes(imageData.placement) && (
+                        <> · Align: <b>{imageData.align}</b></>
+                      )}
+                    </span>
+                    {imageData.placement === "inline" && !(formData.question || "").includes(IMG_TOKEN) && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleChange({
+                            target: {
+                              name: "question",
+                              value: `${(formData.question || "").trimEnd()} ${IMG_TOKEN} `,
+                            },
+                          })
+                        }
+                        className="text-xs px-2.5 py-1.5 rounded border border-amber-300 text-amber-700 hover:bg-amber-50"
+                      >
+                        Insert {"{{img}}"} marker
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setImageData(null)}
+                      className="text-xs px-2.5 py-1.5 rounded border border-red-200 text-red-600 hover:bg-red-50"
+                    >
+                      Remove
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
 
             {/* Buttons */}
@@ -1121,6 +1219,24 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
           </form>
         </div>
       </div>
+
+      {showImageEditor && (
+        <QuestionImageEditor
+          questionText={formData.question}
+          onQuestionTextChange={(val) =>
+            handleChange({ target: { name: "question", value: val } })
+          }
+          initialLayout={imageData?.layout || null}
+          initialHeight={imageData?.height || 300}
+          initialPlacement={imageData?.placement || "below"}
+          initialAlign={imageData?.align || "center"}
+          onCancel={() => setShowImageEditor(false)}
+          onSave={(result) => {
+            setImageData(result.isEmpty ? null : result);
+            setShowImageEditor(false);
+          }}
+        />
+      )}
     </>
   );
 };

@@ -413,6 +413,13 @@ const CreateQuiz = () => {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-gray-800">{q.question || "—"}</p>
+                        {(q.composite_image_url || q.image_url) && (
+                          <img
+                            src={q.composite_image_url || q.image_url}
+                            alt=""
+                            className="mt-2 max-h-24 w-auto border border-gray-200 rounded"
+                          />
+                        )}
                         {opts.length > 0 && (
                           <ul className="mt-2 text-sm text-gray-600 space-y-1">
                             {opts.slice(0, 10).map((o, i) => (

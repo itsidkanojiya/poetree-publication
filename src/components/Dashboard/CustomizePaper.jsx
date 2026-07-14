@@ -8,6 +8,8 @@ import Toast from "../Common/Toast";
 import HeaderCard from "../Cards/HeaderCard";
 // Use CustomPaper's exact pagination logic
 import apiClient from "../../services/apiClient";
+import { QuestionImageBlock } from "../Common/QuestionImageBlock";
+import { estimateImageBlockHeight } from "../../utils/questionImage";
 
 const CustomizePaper = () => {
   const { id } = useParams();
@@ -630,17 +632,8 @@ const CustomizePaper = () => {
         }
       }
 
-      // Add image height
-      if (
-        (question.image_url !== null &&
-          question.image_url !== undefined &&
-          question.image_url !== "") ||
-        (question.image !== null &&
-          question.image !== undefined &&
-          question.image !== "")
-      ) {
-        questionHeight += COMPONENT_HEIGHTS.IMAGE + 12;
-      }
+      // Add image height (composite or legacy) — exact reservation, no clipping
+      questionHeight += estimateImageBlockHeight(question);
 
       // If it doesn't fit, start new page
       if (questionHeight > availableHeight && currentPage.length > 0) {
@@ -679,16 +672,7 @@ const CustomizePaper = () => {
           }
         }
 
-        if (
-          (question.image_url !== null &&
-            question.image_url !== undefined &&
-            question.image_url !== "") ||
-          (question.image !== null &&
-            question.image !== undefined &&
-            question.image !== "")
-        ) {
-          questionHeight += COMPONENT_HEIGHTS.IMAGE + 12;
-        }
+        questionHeight += estimateImageBlockHeight(question);
 
         // Check if question still doesn't fit even on new page (should be rare)
         if (questionHeight > availableHeight) {
@@ -1003,28 +987,7 @@ const CustomizePaper = () => {
                                     </p>
                                   </div>
                                   {/* Image for passage questions */}
-                                  {(q.image_url || q.image) && (
-                                    <div className="mb-3 mt-2">
-                                      <img
-                                        src={
-                                          q.image_url ||
-                                          (q.image instanceof File
-                                            ? URL.createObjectURL(q.image)
-                                            : q.image)
-                                        }
-                                        alt="Passage"
-                                        className="max-w-full"
-                                        style={{
-                                          height: "200px",
-                                          width: "auto",
-                                          objectFit: "contain",
-                                        }}
-                                        onError={(e) => {
-                                          e.target.style.display = "none";
-                                        }}
-                                      />
-                                    </div>
-                                  )}
+                                  <QuestionImageBlock question={q} standalone />
                                   {q.options &&
                                     (() => {
                                       try {
@@ -1069,28 +1032,7 @@ const CustomizePaper = () => {
                                     {questionNumber}. {q.question}
                                   </p>
                                   {/* Image for match questions */}
-                                  {(q.image_url || q.image) && (
-                                    <div className="mb-3 mt-2">
-                                      <img
-                                        src={
-                                          q.image_url ||
-                                          (q.image instanceof File
-                                            ? URL.createObjectURL(q.image)
-                                            : q.image)
-                                        }
-                                        alt="Match"
-                                        className="max-w-full"
-                                        style={{
-                                          height: "200px",
-                                          width: "auto",
-                                          objectFit: "contain",
-                                        }}
-                                        onError={(e) => {
-                                          e.target.style.display = "none";
-                                        }}
-                                      />
-                                    </div>
-                                  )}
+                                  <QuestionImageBlock question={q} standalone />
                                   {q.options &&
                                     (() => {
                                       try {
@@ -1171,28 +1113,7 @@ const CustomizePaper = () => {
                                   </p>
 
                                   {/* Image - Fixed height and width for all question types */}
-                                  {(q.image_url || q.image) && (
-                                    <div className="mb-3 mt-2">
-                                      <img
-                                        src={
-                                          q.image_url ||
-                                          (q.image instanceof File
-                                            ? URL.createObjectURL(q.image)
-                                            : q.image)
-                                        }
-                                        alt="Question"
-                                        className="max-w-full"
-                                        style={{
-                                          height: "200px",
-                                          width: "auto",
-                                          objectFit: "contain",
-                                        }}
-                                        onError={(e) => {
-                                          e.target.style.display = "none";
-                                        }}
-                                      />
-                                    </div>
-                                  )}
+                                  <QuestionImageBlock question={q} standalone />
 
                                   {/* MCQ OPTIONS */}
                                   {q.type === "mcq" &&
