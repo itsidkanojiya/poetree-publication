@@ -71,9 +71,20 @@ const MathNodeView = ({ node }) => {
  * Image node view: draggable, resizable (corner handle), and INLINE so it can sit
  * between words. TipTap's stock Image is a block node with no resize UI.
  */
-const ImageNodeView = ({ node, updateAttributes, selected }) => {
+const ImageNodeView = ({ node, updateAttributes, selected, editor, getPos }) => {
   const { src, alt, width } = node.attrs;
   const imgRef = useRef(null);
+
+  // Select the node on click so the resize handle reappears. Without this the
+  // image stops being selectable once it has been dragged to a new position.
+  const selectSelf = () => {
+    if (typeof getPos !== "function") return;
+    try {
+      editor.commands.setNodeSelection(getPos());
+    } catch {
+      /* position no longer valid — ignore */
+    }
+  };
 
   const startResize = (e) => {
     e.preventDefault();
@@ -99,17 +110,25 @@ const ImageNodeView = ({ node, updateAttributes, selected }) => {
       className="ri-image"
       style={{ display: "inline-block", position: "relative", lineHeight: 0, verticalAlign: "middle" }}
     >
+      {/*
+        data-drag-handle is what ProseMirror uses to start a drag on a custom node
+        view. Without it the image can only be dragged once (the native HTML5 image
+        drag), and afterwards it is neither draggable nor selectable.
+      */}
       <img
         ref={imgRef}
+        data-drag-handle
         src={src}
         alt={alt || ""}
         width={width || undefined}
         draggable={false}
+        onClick={selectSelf}
         style={{
           maxWidth: "100%",
           height: "auto",
           display: "inline-block",
           borderRadius: 2,
+          cursor: selected ? "grab" : "pointer",
           outline: selected ? "2px solid #3b82f6" : "none",
         }}
       />
@@ -158,6 +177,8 @@ const ResizableImage = Image.extend({
   inline: true,
   group: "inline",
   draggable: true,
+  selectable: true, // keeps it clickable/resizable after being dragged
+  atom: true,
 
   addAttributes() {
     return {
