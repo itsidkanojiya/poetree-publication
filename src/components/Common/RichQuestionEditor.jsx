@@ -65,6 +65,121 @@ const MathNodeView = ({ node }) => {
   );
 };
 
+/* --------------------------------- images --------------------------------- */
+
+/**
+ * Image node view: draggable, resizable (corner handle), and INLINE so it can sit
+ * between words. TipTap's stock Image is a block node with no resize UI.
+ */
+const ImageNodeView = ({ node, updateAttributes, selected }) => {
+  const { src, alt, width } = node.attrs;
+  const imgRef = useRef(null);
+
+  const startResize = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const startX = e.clientX;
+    const startW = imgRef.current?.offsetWidth || 200;
+
+    const onMove = (ev) => {
+      const next = Math.max(40, Math.round(startW + (ev.clientX - startX)));
+      updateAttributes({ width: next });
+    };
+    const onUp = () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
+
+  return (
+    <NodeViewWrapper
+      as="span"
+      className="ri-image"
+      style={{ display: "inline-block", position: "relative", lineHeight: 0, verticalAlign: "middle" }}
+    >
+      <img
+        ref={imgRef}
+        src={src}
+        alt={alt || ""}
+        width={width || undefined}
+        draggable={false}
+        style={{
+          maxWidth: "100%",
+          height: "auto",
+          display: "inline-block",
+          borderRadius: 2,
+          outline: selected ? "2px solid #3b82f6" : "none",
+        }}
+      />
+      {selected && (
+        <>
+          {/* Drag corner to resize (aspect ratio preserved: height stays auto) */}
+          <span
+            onMouseDown={startResize}
+            title="Drag to resize"
+            style={{
+              position: "absolute",
+              right: -6,
+              bottom: -6,
+              width: 14,
+              height: 14,
+              background: "#3b82f6",
+              border: "2px solid #fff",
+              borderRadius: "50%",
+              cursor: "nwse-resize",
+              boxShadow: "0 1px 3px rgba(0,0,0,.3)",
+            }}
+          />
+          <span
+            style={{
+              position: "absolute",
+              top: -22,
+              left: 0,
+              background: "#3b82f6",
+              color: "#fff",
+              fontSize: 10,
+              padding: "1px 6px",
+              borderRadius: 4,
+              whiteSpace: "nowrap",
+            }}
+          >
+            {width ? `${width}px` : "auto"} · drag to move
+          </span>
+        </>
+      )}
+    </NodeViewWrapper>
+  );
+};
+
+/** Inline + resizable + draggable image. */
+const ResizableImage = Image.extend({
+  inline: true,
+  group: "inline",
+  draggable: true,
+
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      width: {
+        default: null,
+        parseHTML: (el) => {
+          const w = el.getAttribute("width") || el.style?.width || "";
+          const n = parseInt(String(w), 10);
+          return Number.isFinite(n) ? n : null;
+        },
+        // Persisted as the width attribute (the sanitizer allows it on <img>).
+        renderHTML: (attrs) => (attrs.width ? { width: attrs.width } : {}),
+      },
+    };
+  },
+
+  addNodeView() {
+    return ReactNodeViewRenderer(ImageNodeView);
+  },
+});
+
 const MathInline = Node.create({
   name: "mathInline",
   group: "inline",
@@ -110,7 +225,8 @@ const RichQuestionEditor = ({ value, onChange, questionType = "mcq", placeholder
       StarterKit, // bold, italic, underline, strike, lists, headings, history
       Superscript,
       Subscript,
-      Image.configure({ inline: false, allowBase64: false }),
+      // Inline so it can be placed between words; resizable + draggable via its node view.
+      ResizableImage.configure({ inline: true, allowBase64: false }),
       Table.configure({ resizable: false }),
       TableRow,
       TableHeader,
