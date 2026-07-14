@@ -9,6 +9,7 @@ import HeaderCard from "../Cards/HeaderCard";
 import Loader from "../Common/loader/loader";
 import MathText from "../Common/MathText";
 import { QuestionText, QuestionImageBlock } from "../Common/QuestionImageBlock";
+import { QuestionBody, OptionBody } from "../Common/QuestionBody";
 import { estimateImageBlockHeight } from "../../utils/questionImage";
 
 const QUESTION_TYPE_CONFIG = {
@@ -430,7 +431,7 @@ const ViewPaperPage = () => {
                                 <span style={{ fontSize: "14px", fontWeight: "bold" }}>
                                   ({qNum}){" "}
                                 </span>
-                                <QuestionText question={question} />
+                                <QuestionBody question={question} />
                               </p>
                               {question.type === "mcq" && (
                                 <div
@@ -465,7 +466,11 @@ const ViewPaperPage = () => {
                                       ({String.fromCharCode(97 + optIndex)}){" "}
                                     </span>
                                     <span className="min-w-0 break-words" style={{ fontSize: "13px" }}>
-                                      <MathText text={typeof option === "object" ? option.text || option.label || JSON.stringify(option) : option} />
+                                      <OptionBody
+                                        question={question}
+                                        index={optIndex}
+                                        option={typeof option === "object" ? option.text || option.label || JSON.stringify(option) : option}
+                                      />
                                     </span>
                                   </div>
                                 ))}

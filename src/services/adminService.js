@@ -737,6 +737,26 @@ export const addQuestion = async (formData) => {
 };
 
 /**
+ * Upload one image for the rich-text question editor and get back its URL.
+ * Inline images are referenced by URL (never base64), so question rows stay small.
+ * NOTE: `type` must be appended BEFORE the file — multer's destination reads it.
+ */
+export const uploadQuestionInlineImage = async (file, questionType) => {
+  try {
+    const fd = new FormData();
+    fd.append("type", questionType === "true&false" ? "truefalse" : questionType);
+    fd.append("image", file);
+    const response = await apiClient.post("/question/upload-image", fd, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error uploading inline image:", error);
+    throw error;
+  }
+};
+
+/**
  * Edit question
  * PUT /api/question/edit/{id} (multipart/form-data)
  */

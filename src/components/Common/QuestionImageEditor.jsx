@@ -113,15 +113,16 @@ const QuestionImageEditor = ({
   const [align, setAlign] = useState(initialAlign || "center");
   const [height, setHeight] = useState(clampHeight(initialHeight));
   const [hasSelection, setHasSelection] = useState(false);
+  const [selWidth, setSelWidth] = useState(0); // displayed width (px) of the selected object
   const [previewUrl, setPreviewUrl] = useState(null); // live canvas snapshot
 
   const refreshPreview = useCallback(() => {
     const canvas = fabricRef.current;
     if (!canvas) return;
     try {
-      const url = canvas.getObjects().length
-        ? canvas.toDataURL({ format: "png", multiplier: 1 })
-        : null;
+      // Crop to content, exactly like the saved composite — otherwise the preview
+      // would show the canvas whitespace that never reaches the paper.
+      const url = canvas.getObjects().length ? exportCanvasImpl(canvas, 1).dataUrl : null;
       setPreviewUrl(url);
     } catch {
       /* toDataURL can throw on a tainted canvas; ignore for preview */
@@ -138,13 +139,20 @@ const QuestionImageEditor = ({
     });
     fabricRef.current = canvas;
 
-    const syncSel = () => setHasSelection(!!canvas.getActiveObject());
+    const syncSel = () => {
+      const o = canvas.getActiveObject();
+      setHasSelection(!!o);
+      setSelWidth(o ? Math.round(o.getScaledWidth()) : 0);
+    };
     canvas.on("selection:created", syncSel);
     canvas.on("selection:updated", syncSel);
     canvas.on("selection:cleared", syncSel);
     canvas.on("object:added", refreshPreview);
     canvas.on("object:removed", refreshPreview);
     canvas.on("object:modified", refreshPreview);
+    // Keep the width box in sync while dragging the resize handles.
+    canvas.on("object:scaling", syncSel);
+    canvas.on("object:modified", syncSel);
 
     if (initialLayout) {
       const json = typeof initialLayout === "string" ? initialLayout : JSON.stringify(initialLayout);
@@ -279,6 +287,28 @@ const QuestionImageEditor = ({
       sourceFiles: sourceFilesRef.current.slice(),
       isEmpty: canvas.getObjects().length === 0,
     });
+  };
+
+  /** Resize the selected object to an exact display width (aspect ratio preserved). */
+  const setSelectedWidth = (px) => {
+    const canvas = fabricRef.current;
+    const o = canvas?.getActiveObject();
+    if (!canvas || !o) return;
+    const w = Math.max(20, Math.min(IMAGE_CANVAS_WIDTH, Math.round(Number(px) || 0)));
+    o.scaleToWidth(w);
+    o.setCoords();
+    canvas.requestRenderAll();
+    setSelWidth(Math.round(o.getScaledWidth()));
+    refreshPreview();
+  };
+
+  /** Shrink the canvas height so there is no empty space under the content. */
+  const fitHeightToContent = () => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    const rect = computeContentRect(canvas);
+    if (!rect) return;
+    setHeight(clampHeight(Math.ceil(rect.top + rect.height + 8)));
   };
 
   const toolBtn =
@@ -444,6 +474,40 @@ const QuestionImageEditor = ({
           </button>
           <button className={toolBtn} onClick={flipH} disabled={!hasSelection} title="Flip horizontal">
             <FlipHorizontal className="w-4 h-4" />
+          </button>
+
+          <div className="w-px h-6 bg-gray-200 mx-1" />
+
+          {/* Exact width for the selected item (aspect ratio is preserved). */}
+          <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-600">
+            Width
+            <input
+              type="number"
+              min={20}
+              max={IMAGE_CANVAS_WIDTH}
+              step={10}
+              value={hasSelection ? selWidth : ""}
+              disabled={!hasSelection}
+              onChange={(e) => setSelectedWidth(e.target.value)}
+              title="Width of the selected item in px"
+              className="w-20 px-2 py-1 border border-gray-200 rounded-lg text-sm disabled:opacity-40"
+            />
+            <span className="text-gray-400 font-normal">px</span>
+          </label>
+          <button
+            className={toolBtn + " text-xs font-semibold px-3"}
+            onClick={() => setSelectedWidth(IMAGE_CANVAS_WIDTH - 40)}
+            disabled={!hasSelection}
+            title="Make the selected item span the full width"
+          >
+            Full width
+          </button>
+          <button
+            className={toolBtn + " text-xs font-semibold px-3"}
+            onClick={fitHeightToContent}
+            title="Trim the empty space below the content"
+          >
+            Fit height
           </button>
         </div>
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
@@ -31,6 +31,7 @@ import {
 import Toast from "../Common/Toast";
 import MathText from "../Common/MathText";
 import { QuestionText, QuestionImageBlock } from "../Common/QuestionImageBlock";
+import { QuestionBody, OptionBody } from "../Common/QuestionBody";
 import { estimateImageBlockHeight } from "../../utils/questionImage";
 import Loader from "../Common/loader/loader";
 import SmartPaperStepper from "./SmartPaperStepper";
@@ -1711,6 +1712,33 @@ const CustomPaper = () => {
     handleSavePaper(true);
   };
 
+  /**
+   * Height of a question's body.
+   *
+   * Prefers the REAL height measured off-screen (see the measurement layer below).
+   * Rich-text questions (tables, inline images) have unpredictable height, and the
+   * old constant-based estimate — a flat 24px per question regardless of its text —
+   * caused html2canvas to silently crop content. The estimate is kept only as a
+   * fallback for the first render, before measurement lands.
+   */
+  const questionBodyHeight = (question) => {
+    const measured = measuredHeights[question.question_id];
+    if (measured != null) return measured; // already includes options + image block
+
+    let h;
+    if (question.type === "passage") {
+      h = getPassageQuestionHeight(question);
+    } else if (question.type === "match") {
+      h = getMatchQuestionHeight(question);
+    } else {
+      h = COMPONENT_HEIGHTS.QUESTION;
+      if (question.type === "mcq" && Array.isArray(question.options)) {
+        h += getMcqOptionsHeight(question.options);
+      }
+    }
+    return h + estimateImageBlockHeight(question);
+  };
+
   const renderPages = () => {
     let pages = [];
     let currentHeight =
@@ -1732,21 +1760,10 @@ const CustomPaper = () => {
         );
 
         // Calculate question height including spacing
-        let questionHeight;
-        if (question.type === "passage") {
-          questionHeight = getPassageQuestionHeight(question);
-        } else if (question.type === "match") {
-          questionHeight = getMatchQuestionHeight(question);
-        } else {
-          questionHeight = COMPONENT_HEIGHTS.QUESTION;
-          if (question.type === "mcq" && Array.isArray(question.options)) {
-            questionHeight += getMcqOptionsHeight(question.options);
-          }
-        }
+        let questionHeight = questionBodyHeight(question);
         if (isFirstQuestionOfType) {
           questionHeight += COMPONENT_HEIGHTS.SECTION;
         }
-        questionHeight += estimateImageBlockHeight(question);
         // Add spacing between questions (except for first question on page)
         const hasQuestionsOnPage = currentPage.some(
           (s) => s.selectedQuestions.length > 0
@@ -1771,19 +1788,9 @@ const CustomPaper = () => {
           currentHeight = PAGE_DIMENSIONS.HEIGHT - PAGE_DIMENSIONS.CONTENT_PADDING;
 
           // Recalculate question height for new page (it's now first of its type on this page)
-          let newQuestionHeight;
-          if (question.type === "passage") {
-            newQuestionHeight = getPassageQuestionHeight(question) + COMPONENT_HEIGHTS.SECTION;
-          } else if (question.type === "match") {
-            newQuestionHeight = getMatchQuestionHeight(question) + COMPONENT_HEIGHTS.SECTION;
-          } else {
-            newQuestionHeight = COMPONENT_HEIGHTS.QUESTION + COMPONENT_HEIGHTS.SECTION;
-            if (question.type === "mcq" && Array.isArray(question.options)) {
-              newQuestionHeight += getMcqOptionsHeight(question.options);
-            }
-          }
-          newQuestionHeight += estimateImageBlockHeight(question);
-          // No spacing needed for first question on new page
+          // No spacing needed for first question on new page.
+          const newQuestionHeight =
+            questionBodyHeight(question) + COMPONENT_HEIGHTS.SECTION;
 
           // Add question to new page
           currentPage.push({
@@ -1846,6 +1853,73 @@ const CustomPaper = () => {
     const t = normalizeQuestionType(s.type);
     sectionTypeTotals[t] = (sectionTypeTotals[t] || 0) + (s.selectedQuestions?.length || 0);
   });
+
+  // ---------------------------------------------------------------------------
+  // Pagination measurement layer.
+  //
+  // Question heights used to be guessed from constants (a flat 24px per question,
+  // regardless of its text), and anything that overflowed was silently CROPPED by
+  // the html2canvas export. Rich-text questions (tables, inline images) have
+  // unknowable height under that scheme, so we now render every question off-screen
+  // at the exact page content width and measure its true height.
+  // ---------------------------------------------------------------------------
+  const measureRef = useRef(null);
+  const [measuredHeights, setMeasuredHeights] = useState({});
+
+  const allSelectedQuestions = useMemo(
+    () => questionSections.flatMap((s) => s.selectedQuestions || []),
+    [questionSections]
+  );
+
+  useEffect(() => {
+    const root = measureRef.current;
+    if (!root || allSelectedQuestions.length === 0) {
+      setMeasuredHeights((prev) => (Object.keys(prev).length ? {} : prev));
+      return;
+    }
+    let cancelled = false;
+
+    const measure = async () => {
+      // Fonts and images change layout — measuring before they settle gives wrong
+      // heights (the export path already waits for these before screenshotting).
+      try {
+        if (document.fonts?.ready) await document.fonts.ready;
+      } catch {
+        /* not supported — measure anyway */
+      }
+      const imgs = Array.from(root.querySelectorAll("img"));
+      await Promise.all(
+        imgs.map((img) =>
+          img.complete
+            ? Promise.resolve()
+            : new Promise((res) => {
+                img.onload = res;
+                img.onerror = res;
+              })
+        )
+      );
+      if (cancelled) return;
+
+      const next = {};
+      root.querySelectorAll("[data-measure-qid]").forEach((node) => {
+        const id = node.getAttribute("data-measure-qid");
+        next[id] = Math.ceil(node.getBoundingClientRect().height);
+      });
+
+      setMeasuredHeights((prev) => {
+        const keys = Object.keys(next);
+        const same =
+          keys.length === Object.keys(prev).length &&
+          keys.every((k) => prev[k] === next[k]);
+        return same ? prev : next; // guard against a re-render loop
+      });
+    };
+
+    measure();
+    return () => {
+      cancelled = true;
+    };
+  }, [allSelectedQuestions]);
 
   const smartSectionQuestionTotal = getSmartSectionQuestionTotal();
   // Plain-language parts for the "This paper" summary, e.g. ["15 MCQ", "10 True/False"].
@@ -3318,6 +3392,46 @@ const CustomPaper = () => {
             </p>
           </div>
 
+          {/*
+            Off-screen measurement layer. Renders every selected question at the exact
+            page content width so we can read its REAL height (see measuredHeights).
+            This is what lets rich-text questions — tables, inline images — paginate
+            without being silently cropped by the html2canvas export.
+            Not visible, not printed, and excluded from the PDF (it lives outside pagesRef).
+          */}
+          <div
+            ref={measureRef}
+            aria-hidden="true"
+            style={{
+              position: "absolute",
+              left: "-99999px",
+              top: 0,
+              width: `${PAGE_DIMENSIONS.WIDTH - PAGE_DIMENSIONS.CONTENT_PADDING}px`,
+              visibility: "hidden",
+              pointerEvents: "none",
+              zIndex: -1,
+            }}
+          >
+            {allSelectedQuestions.map((q) => (
+              <div key={q.question_id} data-measure-qid={q.question_id}>
+                <QuestionImageBlock question={q} slot="top" />
+                <div className="text-[14px] leading-relaxed">
+                  <QuestionBody question={q} />
+                </div>
+                {q.type === "mcq" && Array.isArray(q.options) && (
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-1 ml-6 text-[13px]">
+                    {q.options.map((opt, i) => (
+                      <div key={i}>
+                        <OptionBody question={q} index={i} option={opt} />
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <QuestionImageBlock question={q} slot="bottom" />
+              </div>
+            ))}
+          </div>
+
           <div ref={pagesRef} className="space-y-8 flex flex-col items-center">
             {renderPages().map((page, pageIndex) => (
               <div
@@ -3432,7 +3546,7 @@ const CustomPaper = () => {
                                       >
                                         ({question.questionNumber}){" "}
                                       </span>
-                                      <QuestionText question={question} />
+                                      <QuestionBody question={question} />
                                     </p>
                                     {question.type === "mcq" && (
                                       <div
@@ -3485,7 +3599,11 @@ const CustomPaper = () => {
                                                   fontWeight: "normal",
                                                 }}
                                               >
-                                                <MathText text={option} />
+                                                <OptionBody
+                                                  question={question}
+                                                  index={optIndex}
+                                                  option={option}
+                                                />
                                               </span>
                                             </div>
                                           )

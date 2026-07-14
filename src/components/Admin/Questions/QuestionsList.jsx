@@ -17,6 +17,7 @@ import AddQuestionModal from "./AddQuestionModal";
 import BulkUploadModal from "./BulkUploadModal";
 import { API_ORIGIN } from "../../../config/api";
 import MathText from "../../Common/MathText";
+import { QuestionBody, OptionBody } from "../../Common/QuestionBody";
 
 const QuestionsList = ({ questionType }) => {
   const [questions, setQuestions] = useState([]);
@@ -661,7 +662,9 @@ const QuestionsList = ({ questionType }) => {
                     {!previewSingleQuestion && (
                       <span className="text-xs font-semibold text-gray-500 mb-2 block">Question {idx + 1}</span>
                     )}
-                    <p className="text-gray-900 font-medium mb-2"><MathText text={q.question || "N/A"} /></p>
+                    <div className="text-gray-900 font-medium mb-2">
+                      <QuestionBody question={q} />
+                    </div>
                     {imageUrl && (
                       <div className="mb-3">
                         <img
@@ -677,7 +680,9 @@ const QuestionsList = ({ questionType }) => {
                     {questionType === "mcq" && optionsList.length > 0 && (
                       <ul className="list-disc list-inside text-gray-700 text-sm mb-2">
                         {optionsList.map((opt, i) => (
-                          <li key={i}><MathText text={opt} /></li>
+                          <li key={i}>
+                            <OptionBody question={q} index={i} option={opt} />
+                          </li>
                         ))}
                       </ul>
                     )}

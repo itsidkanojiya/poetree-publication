@@ -22,3 +22,49 @@
     }
   }
   
+/* ---------------------------------------------------------------------------
+   Rich-text question bodies (the "Word-like" editor output).
+   Used by <QuestionBody> on every surface AND inside the TipTap editor, so the
+   paper preview/PDF matches what the author sees.
+   --------------------------------------------------------------------------- */
+.rich-body > *:first-child { margin-top: 0; }
+.rich-body > *:last-child { margin-bottom: 0; }
+.rich-body p { margin: 0 0 0.35em; }
+.rich-body ul,
+.rich-body ol { margin: 0.25em 0 0.35em 1.25em; }
+.rich-body ul { list-style: disc; }
+.rich-body ol { list-style: decimal; }
+.rich-body img { max-width: 100%; height: auto; }
+
+/* Tables must show borders in the printed paper (html2canvas screenshots the DOM). */
+.rich-body table {
+  border-collapse: collapse;
+  margin: 0.4em 0;
+  table-layout: fixed;
+  width: auto;
+  max-width: 100%;
+}
+.rich-body th,
+.rich-body td {
+  border: 1px solid #374151;
+  padding: 4px 8px;
+  vertical-align: top;
+  word-break: break-word;
+}
+.rich-body th { background: #f3f4f6; font-weight: 600; }
+
+/* Options render inline, so drop the block spacing. */
+.rich-inline p { display: inline; margin: 0; }
+
+/* TipTap editing surface */
+.ProseMirror { outline: none; min-height: 120px; }
+.ProseMirror:focus { outline: none; }
+.ProseMirror .selectedCell:after {
+  background: rgba(59, 130, 246, 0.18);
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.ProseMirror table { position: relative; }
+.ProseMirror td, .ProseMirror th { position: relative; }

@@ -4,6 +4,7 @@ import { addQuestion, editQuestion, getAllSubjects, getAllBoards, getSubjectTitl
 import Toast from "../../Common/Toast";
 import MathTextInput from "../../Common/MathTextInput";
 import QuestionImageEditor from "../../Common/QuestionImageEditor";
+import RichQuestionEditor from "../../Common/RichQuestionEditor";
 import { IMG_TOKEN } from "../../../utils/questionImage";
 
 const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
@@ -38,6 +39,14 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
   // { layout, compositeBlob, compositeDataUrl, width, height, placement, align, sourceFiles }
   const [showImageEditor, setShowImageEditor] = useState(false);
   const [imageData, setImageData] = useState(null);
+
+  // Rich ("Word-like") editor. When on, question_html/options_html are sent and the
+  // backend regenerates the plain-text mirror from them.
+  const [richMode, setRichMode] = useState(!!question?.question_html);
+  const [questionHtml, setQuestionHtml] = useState(question?.question_html || "");
+  const [optionHtmlList, setOptionHtmlList] = useState(
+    Array.isArray(question?.options_html) ? question.options_html : []
+  );
 
   // For Passage and Match types
   // Passage: each item is { type: "short", question, answer } or { type: "mcq", question, options: string[], answer: "1" }
@@ -237,6 +246,21 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
       formDataToSend.append("difficulty", formData.difficulty || "medium");
       if (formData.image) formDataToSend.append("image", formData.image);
 
+      // Rich ("Word-like") body. The backend sanitizes it and regenerates the plain
+      // `question`/`options` from it, so the PDF and exports keep working.
+      if (richMode) {
+        formDataToSend.append("question_html", questionHtml || "");
+        if (questionType === "mcq") {
+          const optsHtml = mcqOptionList.map((_, i) => optionHtmlList[i] || "");
+          if (optsHtml.some((h) => h && h.trim())) {
+            formDataToSend.append("options_html", JSON.stringify(optsHtml));
+          }
+        }
+      } else if (question) {
+        // Edited back to the simple editor — drop the rich bodies (plain text stays).
+        formDataToSend.append("clear_rich", "true");
+      }
+
       // Fabric composite image block (multi-image + layout + flattened PNG).
       if (imageData) {
         formDataToSend.append("image_placement", imageData.placement || "below");
@@ -339,19 +363,33 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
     if (!formData.difficulty || !["easy", "medium", "hard"].includes(formData.difficulty)) {
       newErrors.difficulty = "Difficulty is required";
     }
-    if (!formData.question.trim()) newErrors.question = "Question is required";
-    // Inline placement renders the image at the {{img}} token. Without the token the
-    // image would silently disappear from the paper, so require it.
-    if (
-      imageData &&
-      imageData.placement === "inline" &&
-      !(formData.question || "").includes(IMG_TOKEN)
-    ) {
-      newErrors.question = `Add the ${IMG_TOKEN} marker in the question text to show the image inline (or change placement).`;
+    if (richMode) {
+      // Rich mode: the plain text is derived server-side, so validate the HTML body.
+      // It counts as non-empty if it has text OR an image/table.
+      const html = questionHtml || "";
+      const hasText = html.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0;
+      const hasBlock = /<(img|table)\b/i.test(html);
+      if (!hasText && !hasBlock) newErrors.question = "Question is required";
+    } else {
+      if (!formData.question.trim()) newErrors.question = "Question is required";
+      // Inline placement renders the image at the {{img}} token. Without the token the
+      // image would silently disappear from the paper, so require it.
+      if (
+        imageData &&
+        imageData.placement === "inline" &&
+        !(formData.question || "").includes(IMG_TOKEN)
+      ) {
+        newErrors.question = `Add the ${IMG_TOKEN} marker in the question text to show the image inline (or change placement).`;
+      }
     }
     // Answer is optional for all question types — user can add a question without an answer
     if (questionType === "mcq") {
-      const validOptions = mcqOptionList.map((o) => (o && o.trim()) || "").filter(Boolean);
+      // In rich mode the option text lives in the HTML editors, not mcqOptionList.
+      const validOptions = richMode
+        ? optionHtmlList
+            .map((h) => (h || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim())
+            .filter(Boolean)
+        : mcqOptionList.map((o) => (o && o.trim()) || "").filter(Boolean);
       if (validOptions.length === 0) newErrors.options = "At least one option is required";
       // If user provided an answer, it must be a valid option index
       if (formData.answer && validOptions.length > 0) {
@@ -729,19 +767,59 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
 
             {/* Question Field */}
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Question <span className="text-red-500">*</span>
-              </label>
-              <MathTextInput
-                multiline
-                rows={questionType === "passage" ? 6 : 3}
-                value={formData.question}
-                onChange={(val) =>
-                  handleChange({ target: { name: "question", value: val } })
-                }
-                placeholder="Enter the question"
-                error={!!errors.question}
-              />
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                <label className="block text-sm font-semibold text-gray-700">
+                  Question <span className="text-red-500">*</span>
+                </label>
+                {/* Simple = plain text + $math$ + the drag/drop image editor.
+                    Rich   = Word-like editor (formatting, tables, inline images, math). */}
+                <div className="inline-flex rounded-lg border border-gray-200 overflow-hidden text-xs font-semibold">
+                  <button
+                    type="button"
+                    onClick={() => setRichMode(false)}
+                    className={`px-3 py-1.5 transition ${
+                      !richMode ? "bg-blue-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50"
+                    }`}
+                  >
+                    Simple
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRichMode(true)}
+                    className={`px-3 py-1.5 transition ${
+                      richMode ? "bg-blue-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50"
+                    }`}
+                  >
+                    Rich editor
+                  </button>
+                </div>
+              </div>
+
+              {richMode ? (
+                <>
+                  <RichQuestionEditor
+                    value={questionHtml}
+                    onChange={setQuestionHtml}
+                    questionType={questionType}
+                    placeholder="Type the question. Use the toolbar for tables, images and formulas."
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Formatting, tables, inline images and formulas are supported. A plain-text
+                    version is saved automatically for exports and the quiz PDF.
+                  </p>
+                </>
+              ) : (
+                <MathTextInput
+                  multiline
+                  rows={questionType === "passage" ? 6 : 3}
+                  value={formData.question}
+                  onChange={(val) =>
+                    handleChange({ target: { name: "question", value: val } })
+                  }
+                  placeholder="Enter the question"
+                  error={!!errors.question}
+                />
+              )}
               {errors.question && (
                 <p className="mt-1 text-sm text-red-600">{errors.question}</p>
               )}
@@ -759,15 +837,35 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
                   </p>
                   {mcqOptionList.map((opt, index) => (
                     <div key={index} className="flex gap-2 mb-2 items-start">
-                      <MathTextInput
-                        className="flex-1"
-                        value={opt}
-                        onChange={(val) => updateMcqOption(index, val)}
-                        placeholder={`Option ${index + 1}`}
-                      />
+                      {richMode ? (
+                        <div className="flex-1">
+                          <RichQuestionEditor
+                            value={optionHtmlList[index] || ""}
+                            onChange={(html) =>
+                              setOptionHtmlList((prev) => {
+                                const next = [...prev];
+                                next[index] = html;
+                                return next;
+                              })
+                            }
+                            questionType={questionType}
+                            placeholder={`Option ${index + 1}`}
+                          />
+                        </div>
+                      ) : (
+                        <MathTextInput
+                          className="flex-1"
+                          value={opt}
+                          onChange={(val) => updateMcqOption(index, val)}
+                          placeholder={`Option ${index + 1}`}
+                        />
+                      )}
                       <button
                         type="button"
-                        onClick={() => removeMcqOption(index)}
+                        onClick={() => {
+                          removeMcqOption(index);
+                          setOptionHtmlList((prev) => prev.filter((_, i) => i !== index));
+                        }}
                         disabled={mcqOptionList.length <= 1}
                         className="p-2 text-red-600 hover:bg-red-50 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition mt-1"
                         title="Remove option"
