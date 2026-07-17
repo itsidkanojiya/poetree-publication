@@ -242,18 +242,33 @@ function estimateAnswerBlockHeight(question, mode) {
   return h + 10;
 }
 
-const estimateQuestionHeight = (question, { isFirstOfType, hasQuestionsOnPage, exportMode = "paper" }) => {
-  const type = normalizeQuestionType(question.type);
+const estimateQuestionHeight = (
+  question,
+  { isFirstOfType, hasQuestionsOnPage, exportMode = "paper", measuredHeights }
+) => {
+  // Prefer the REAL measured height (see the measurement layer in the component);
+  // the constant-based estimate is only a first-paint fallback before measurement
+  // lands. Measured height already includes options, images and the answer block.
+  const measured = measuredHeights && question.question_id != null
+    ? measuredHeights[question.question_id]
+    : undefined;
+
   let h;
-  if (type === "passage") h = getPassageQuestionHeight(question);
-  else if (type === "match") h = getMatchQuestionHeight(question);
-  else {
-    h = COMPONENT_HEIGHTS.QUESTION;
-    if (type === "mcq") h += getMcqOptionsHeight(question.options);
+  if (measured != null) {
+    h = measured;
+  } else {
+    const type = normalizeQuestionType(question.type);
+    if (type === "passage") h = getPassageQuestionHeight(question);
+    else if (type === "match") h = getMatchQuestionHeight(question);
+    else {
+      h = COMPONENT_HEIGHTS.QUESTION;
+      if (type === "mcq") h += getMcqOptionsHeight(question.options);
+    }
+    h += estimateImageBlockHeight(question);
+    h += estimateAnswerBlockHeight(question, exportMode);
   }
+
   if (isFirstOfType) h += COMPONENT_HEIGHTS.SECTION;
-  h += estimateImageBlockHeight(question);
-  h += estimateAnswerBlockHeight(question, exportMode);
   if (hasQuestionsOnPage) h += COMPONENT_HEIGHTS.SPACING;
   return h;
 };
@@ -261,7 +276,7 @@ const estimateQuestionHeight = (question, { isFirstOfType, hasQuestionsOnPage, e
 // Per-question pagination (mirrors CustomPaper.renderPages): a question that
 // doesn't fit is pushed to the next page instead of being clipped, and a single
 // section can span multiple pages (its title is printed once via printedTypes).
-function buildPages(sections, exportMode = "paper") {
+function buildPages(sections, exportMode = "paper", measuredHeights = null) {
   let pages = [];
   let currentHeight = PAGE_HEIGHT - HEADER_HEIGHT - CONTENT_PADDING;
   let currentPage = [];
@@ -277,6 +292,7 @@ function buildPages(sections, exportMode = "paper") {
         isFirstOfType,
         hasQuestionsOnPage,
         exportMode,
+        measuredHeights,
       });
 
       const availableHeight = currentHeight - MARGIN - SAFETY_BUFFER;
@@ -289,6 +305,7 @@ function buildPages(sections, exportMode = "paper") {
           isFirstOfType: true,
           hasQuestionsOnPage: false,
           exportMode,
+          measuredHeights,
         });
         currentPage.push({ type: question.type, selectedQuestions: [question] });
         currentHeight = PAGE_HEIGHT - CONTENT_PADDING - newQuestionHeight;
@@ -339,6 +356,10 @@ const ViewPaperPage = () => {
     : "paper";
   const autoExport = !!location.state?.autoExport;
   const autoExportedRef = React.useRef(false);
+  // Real per-question heights (question_id -> px), measured off the rendered DOM so
+  // pagination packs pages tightly without clipping. Estimate is only a fallback.
+  const [measuredHeights, setMeasuredHeights] = useState({});
+  const [measurePassDone, setMeasurePassDone] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -446,14 +467,49 @@ const ViewPaperPage = () => {
     if (pdfPages.length) await downloadPDF(pdfPages, buildFileName());
   };
 
-  // When opened from a card's Export menu, render the requested mode then auto-download once.
+  // Measure every rendered question's REAL height (after fonts + images settle) and
+  // feed it back into pagination, so pages pack tightly with no clipping. Runs once
+  // per load/mode; the setState guard stops it re-triggering.
   useEffect(() => {
-    if (!autoExport || loading || autoExportedRef.current) return;
+    if (loading || !sections.length) return;
+    let cancelled = false;
+    const run = async () => {
+      try { if (document.fonts?.ready) await document.fonts.ready; } catch { /* noop */ }
+      const imgs = Array.from(document.querySelectorAll("[id^=pdf-content-] img"));
+      await Promise.all(
+        imgs.map((img) =>
+          img.complete ? Promise.resolve() : new Promise((res) => { img.onload = res; img.onerror = res; })
+        )
+      );
+      if (cancelled) return;
+      const next = {};
+      document.querySelectorAll("[data-measure-qid]").forEach((node) => {
+        const qid = node.getAttribute("data-measure-qid");
+        if (qid == null || qid === "undefined") return;
+        next[qid] = Math.ceil(node.getBoundingClientRect().height);
+      });
+      if (cancelled) return;
+      setMeasuredHeights((prev) => {
+        const keys = Object.keys(next);
+        const same = keys.length === Object.keys(prev).length && keys.every((k) => prev[k] === next[k]);
+        return same ? prev : next;
+      });
+      setMeasurePassDone(true);
+    };
+    run();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, exportMode, sections]);
+
+  // When opened from a card's Export menu, wait for the measurement pass (so pages are
+  // final) then auto-download once.
+  useEffect(() => {
+    if (!autoExport || loading || !measurePassDone || autoExportedRef.current) return;
     autoExportedRef.current = true;
-    const t = setTimeout(() => { runDownload(); }, 500); // let pages + images paint
+    const t = setTimeout(() => { runDownload(); }, 300); // let re-paginated pages settle
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoExport, loading]);
+  }, [autoExport, loading, measurePassDone]);
 
   const getHeader = () => {
     if (!paper) return {};
@@ -491,7 +547,7 @@ const ViewPaperPage = () => {
 
   const printedTypes = new Set();
   const questionCounters = {};
-  const pages = buildPages(sections, exportMode);
+  const pages = buildPages(sections, exportMode, measuredHeights);
 
   // Total questions per type across the whole paper (a section can span pages,
   // so a page chunk's length is not the section total). Used for section marks.
@@ -576,7 +632,7 @@ const ViewPaperPage = () => {
                       {section.selectedQuestions.map((question, qIndex) => {
                         const qNum = questionCounters[sectionType]++;
                         return (
-                          <div key={qIndex} className="mb-4">
+                          <div key={qIndex} className="mb-4" data-measure-qid={question.question_id}>
                             <QuestionImageBlock question={question} slot="top" />
                             <div
                               className={`flex items-start justify-between gap-4 ${
