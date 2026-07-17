@@ -36,12 +36,18 @@
 .rich-body ol { list-style: decimal; }
 .rich-body img { max-width: 100%; height: auto; }
 /* RENDERED paper only (NOT the editor, which owns width via its resize handle):
-   cap image size so a natural-size image can't blow up the line/page. width:auto
-   preserves aspect ratio when the height cap applies. */
+   KEEP the author's resized width so the paper matches the editor (an image sized
+   to sit inline between words stays inline instead of wrapping). */
 .rich-body:not(.ProseMirror) img {
+  max-width: 100%;
+  height: auto;
+  vertical-align: middle;
+}
+/* Only cap images that were NOT resized (no width attr) so a natural-size image
+   can't blow up the line/page. width:auto keeps the aspect ratio. */
+.rich-body:not(.ProseMirror) img:not([width]) {
   max-height: 300px;
   width: auto;
-  vertical-align: middle;
 }
 /* A question image alone on its line reads better centered as a block. */
 .rich-body:not(.ProseMirror) p:only-child > img:only-child {
@@ -79,11 +85,15 @@
    (two classes) beats the generic .rich-body:not(.ProseMirror) cap above. */
 .rich-body.rich-inline img {
   display: block;
-  max-height: 120px;
   max-width: 100%;
-  width: auto;
+  height: auto;
   margin: 2px 0;
   vertical-align: middle;
+}
+/* Un-resized option images: cap so they line up neatly and never dominate a row. */
+.rich-body.rich-inline img:not([width]) {
+  max-height: 120px;
+  width: auto;
 }
 
 /* TipTap editing surface */
