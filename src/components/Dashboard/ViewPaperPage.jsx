@@ -719,9 +719,6 @@ const ViewPaperPage = () => {
                                                 <span style={{ fontWeight: "600" }}>({String.fromCharCode(97 + pqIdx)})</span>
                                                 <div className="rich-body" style={{ flex: 1 }}>
                                                   {renderRichHtml(pq.question_html)}
-                                                  {isBlank && (
-                                                    <span className="inline-block mx-1 border-b-2 border-gray-400 min-w-[80px]" style={{ height: "1.2em" }} aria-hidden />
-                                                  )}
                                                 </div>
                                               </div>
                                             ) : (
@@ -730,9 +727,6 @@ const ViewPaperPage = () => {
                                                 ({String.fromCharCode(97 + pqIdx)}){" "}
                                               </span>
                                               <MathText text={questionText} />
-                                              {isBlank && (
-                                                <span className="inline-block mx-1 border-b-2 border-gray-400 min-w-[80px]" style={{ height: "1.2em" }} aria-hidden />
-                                              )}
                                             </p>
                                             )}
                                             {isMcq && options.length > 0 && (
