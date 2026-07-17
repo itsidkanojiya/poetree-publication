@@ -3418,7 +3418,7 @@ const CustomPaper = () => {
                 <QuestionImageBlock question={q} slot="top" />
                 <div className="text-[14px] leading-relaxed">
                   <span style={{ fontSize: "14px", fontWeight: "bold" }}>(1) </span>
-                  <QuestionBody question={q} inline />
+                  <QuestionBody question={q} inline={q.type === "passage" ? "lead" : "flow"} />
                 </div>
                 {q.type === "mcq" && Array.isArray(q.options) && (
                   <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-1 ml-6 text-[13px]">
@@ -3548,7 +3548,7 @@ const CustomPaper = () => {
                                       >
                                         ({question.questionNumber}){" "}
                                       </span>
-                                      <QuestionBody question={question} inline />
+                                      <QuestionBody question={question} inline={question.type === "passage" ? "lead" : "flow"} />
                                     </p>
                                     {question.type === "mcq" && (
                                       <div

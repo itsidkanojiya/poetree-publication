@@ -105,11 +105,21 @@ export const renderRichHtml = (html) => parse(sanitize(html), parseOptions);
  */
 export const QuestionBody = ({ question, className, inline = false }) => {
   if (hasRichBody(question)) {
-    const Tag = inline ? "span" : "div";
+    if (inline) {
+      // "flow" = the WHOLE body flows inline (single-line questions, incl. an inline
+      // image between words). "lead" = first paragraph inline then later blocks break
+      // (passage prose / multi-paragraph). Both sit on the same line as the "(1)".
+      const flowClass = inline === "lead" ? "rich-flow" : "rich-flow-all";
+      return (
+        <span className={`rich-body ${flowClass} ${className || ""}`.trim()}>
+          {renderRichHtml(question.question_html)}
+        </span>
+      );
+    }
     return (
-      <Tag className={`rich-body ${inline ? "rich-flow" : ""} ${className || ""}`.trim()}>
+      <div className={`rich-body ${className || ""}`.trim()}>
         {renderRichHtml(question.question_html)}
-      </Tag>
+      </div>
     );
   }
   // Legacy: plain text + $math$ + the {{img}} composite image.

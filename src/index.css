@@ -77,9 +77,16 @@
 
 /* Rich question body that must sit on the same line as the "(1)" number:
    the container and its FIRST paragraph flow inline; later blocks (extra
-   paragraphs, lists, tables) still break onto their own lines. */
+   paragraphs, lists, tables) still break onto their own lines. (Passages.) */
 .rich-flow { display: inline; }
 .rich-flow > p:first-child { display: inline; margin: 0; }
+
+/* Single-line questions (MCQ / short / blank / …): the WHOLE body flows inline so
+   an inline image between words stays inline ("… in the [img] figure?") instead of
+   the image and trailing text dropping to new lines. */
+.rich-flow-all { display: inline; }
+.rich-flow-all p { display: inline; margin: 0; }
+.rich-flow-all p + p::before { content: " "; } /* keep a space where paragraphs joined */
 /* Option / match-pair images are smaller so they line up neatly and never
    dominate a grid row. Shown as a block under the (a)/(b) label. Specificity
    (two classes) beats the generic .rich-body:not(.ProseMirror) cap above. */

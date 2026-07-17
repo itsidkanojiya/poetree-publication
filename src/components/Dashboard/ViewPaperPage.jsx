@@ -651,7 +651,7 @@ const ViewPaperPage = () => {
                                 <span style={{ fontSize: "14px", fontWeight: "bold" }}>
                                   ({qNum}){" "}
                                 </span>
-                                <QuestionBody question={question} inline />
+                                <QuestionBody question={question} inline={question.type === "passage" ? "lead" : "flow"} />
                               </p>
                               {question.type === "mcq" && (
                                 <div
