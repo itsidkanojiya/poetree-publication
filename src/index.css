@@ -83,9 +83,13 @@
 
 /* Single-line questions (MCQ / short / blank / …): the WHOLE body flows inline so
    an inline image between words stays inline ("… in the [img] figure?") instead of
-   the image and trailing text dropping to new lines. */
+   the image and trailing text dropping to new lines. Force every descendant inline
+   (incl. an image that ended up alone in its own paragraph) so nothing block-breaks. */
 .rich-flow-all { display: inline; }
-.rich-flow-all p { display: inline; margin: 0; }
+.rich-flow-all p,
+.rich-flow-all div,
+.rich-flow-all figure { display: inline; margin: 0; }
+.rich-flow-all img { display: inline !important; margin: 0 4px; vertical-align: middle; }
 .rich-flow-all p + p::before { content: " "; } /* keep a space where paragraphs joined */
 /* Option / match-pair images are smaller so they line up neatly and never
    dominate a grid row. Shown as a block under the (a)/(b) label. Specificity
