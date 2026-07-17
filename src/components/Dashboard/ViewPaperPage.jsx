@@ -203,17 +203,43 @@ const renderSolutionContent = (question) => {
   return <span><strong>Solution: </strong><MathText text={String(sol)} /></span>;
 };
 
-/** Reserved height (px) for the appended answer/solution block, by export mode. */
+/** Reserved height (px) for the appended answer/solution block, by export mode.
+ * Content-aware: long answers wrap to multiple lines, so height is estimated from
+ * the answer/solution text length (else a long answer overflows and gets clipped
+ * at the fixed page height). CHARS_PER_LINE is conservative (wide scripts like
+ * Devanagari fit fewer chars), so we over- rather than under-reserve. */
 function estimateAnswerBlockHeight(question, mode) {
   if (mode !== "answers" && mode !== "solutions") return 0;
+  const CHARS_PER_LINE = 70;
+  const LINE = 22;
+  const linesFor = (s) => Math.max(1, Math.ceil((String(s ?? "").length + 8) / CHARS_PER_LINE));
   const type = normalizeQuestionType(question.type);
-  let h = 30; // "Answer:" line
-  if (type === "passage") h += toOptionsArray(question.options).length * 22;
+  let h = 16; // block padding + label baseline
+
+  if (type === "passage") {
+    const ansObj = parseAnswerObject(question.answer) || {};
+    const subs = toOptionsArray(question.options);
+    h += LINE; // "Answers:" label
+    subs.forEach((_, i) => { h += linesFor(ansObj[`q${i + 1}`]) * LINE; });
+  } else if (type === "match") {
+    let data = question.options;
+    if (typeof data === "string") { try { data = JSON.parse(data); } catch { data = null; } }
+    const left = (data && data.left) || [];
+    h += linesFor(left.map((_, i) => `${i + 1} -> x`).join(",   ")) * LINE;
+  } else if (type === "mcq") {
+    const opts = toOptionsArray(question.options);
+    const idx = parseInt(question.answer, 10);
+    const text = Number.isFinite(idx) && idx >= 1 ? opts[idx - 1] : question.answer;
+    h += linesFor(text) * LINE;
+  } else {
+    h += linesFor(question.answer) * LINE;
+  }
+
   if (mode === "solutions") {
     const sol = String(question.solution || "");
-    if (sol.trim()) h += 26 + Math.ceil(sol.length / 60) * 22;
+    if (sol.trim()) h += 26 + linesFor(`Solution: ${sol}`) * LINE;
   }
-  return h + 8;
+  return h + 10;
 }
 
 const estimateQuestionHeight = (question, { isFirstOfType, hasQuestionsOnPage, exportMode = "paper" }) => {
