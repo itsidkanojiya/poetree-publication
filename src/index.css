@@ -35,6 +35,19 @@
 .rich-body ul { list-style: disc; }
 .rich-body ol { list-style: decimal; }
 .rich-body img { max-width: 100%; height: auto; }
+/* RENDERED paper only (NOT the editor, which owns width via its resize handle):
+   cap image size so a natural-size image can't blow up the line/page. width:auto
+   preserves aspect ratio when the height cap applies. */
+.rich-body:not(.ProseMirror) img {
+  max-height: 300px;
+  width: auto;
+  vertical-align: middle;
+}
+/* A question image alone on its line reads better centered as a block. */
+.rich-body:not(.ProseMirror) p:only-child > img:only-child {
+  display: block;
+  margin: 0.4em auto;
+}
 
 /* Tables must show borders in the printed paper (html2canvas screenshots the DOM). */
 .rich-body table {
@@ -55,6 +68,17 @@
 
 /* Options render inline, so drop the block spacing. */
 .rich-inline p { display: inline; margin: 0; }
+/* Option / match-pair images are smaller so they line up neatly and never
+   dominate a grid row. Shown as a block under the (a)/(b) label. Specificity
+   (two classes) beats the generic .rich-body:not(.ProseMirror) cap above. */
+.rich-body.rich-inline img {
+  display: block;
+  max-height: 120px;
+  max-width: 100%;
+  width: auto;
+  margin: 2px 0;
+  vertical-align: middle;
+}
 
 /* TipTap editing surface */
 .ProseMirror { outline: none; min-height: 120px; }
