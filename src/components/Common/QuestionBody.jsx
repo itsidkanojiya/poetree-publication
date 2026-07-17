@@ -98,13 +98,18 @@ export const renderRichHtml = (html) => parse(sanitize(html), parseOptions);
 
 /**
  * Question body — rich HTML when present, else the existing plain renderer.
+ *
+ * `inline` makes the body flow on the SAME line as a preceding label (the "(1)"
+ * question number): the container and its first paragraph render inline, while
+ * later blocks (extra paragraphs, lists, tables) still break normally.
  */
-export const QuestionBody = ({ question, className }) => {
+export const QuestionBody = ({ question, className, inline = false }) => {
   if (hasRichBody(question)) {
+    const Tag = inline ? "span" : "div";
     return (
-      <div className={`rich-body ${className || ""}`.trim()}>
+      <Tag className={`rich-body ${inline ? "rich-flow" : ""} ${className || ""}`.trim()}>
         {renderRichHtml(question.question_html)}
-      </div>
+      </Tag>
     );
   }
   // Legacy: plain text + $math$ + the {{img}} composite image.

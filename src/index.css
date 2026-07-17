@@ -68,6 +68,12 @@
 
 /* Options render inline, so drop the block spacing. */
 .rich-inline p { display: inline; margin: 0; }
+
+/* Rich question body that must sit on the same line as the "(1)" number:
+   the container and its FIRST paragraph flow inline; later blocks (extra
+   paragraphs, lists, tables) still break onto their own lines. */
+.rich-flow { display: inline; }
+.rich-flow > p:first-child { display: inline; margin: 0; }
 /* Option / match-pair images are smaller so they line up neatly and never
    dominate a grid row. Shown as a block under the (a)/(b) label. Specificity
    (two classes) beats the generic .rich-body:not(.ProseMirror) cap above. */

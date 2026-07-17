@@ -3417,7 +3417,8 @@ const CustomPaper = () => {
               <div key={q.question_id} data-measure-qid={q.question_id}>
                 <QuestionImageBlock question={q} slot="top" />
                 <div className="text-[14px] leading-relaxed">
-                  <QuestionBody question={q} />
+                  <span style={{ fontSize: "14px", fontWeight: "bold" }}>(1) </span>
+                  <QuestionBody question={q} inline />
                 </div>
                 {q.type === "mcq" && Array.isArray(q.options) && (
                   <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-1 ml-6 text-[13px]">
@@ -3547,7 +3548,7 @@ const CustomPaper = () => {
                                       >
                                         ({question.questionNumber}){" "}
                                       </span>
-                                      <QuestionBody question={question} />
+                                      <QuestionBody question={question} inline />
                                     </p>
                                     {question.type === "mcq" && (
                                       <div
