@@ -8,6 +8,7 @@ import HeaderCard from "../Cards/HeaderCard";
 import apiClient from "../../services/apiClient";
 import { QuestionImageBlock } from "../Common/QuestionImageBlock";
 import { estimateImageBlockHeight } from "../../utils/questionImage";
+import { seededMatchOrder } from "../../utils/matchShuffle";
 
 const TemplateDetail = () => {
   const { id } = useParams();
@@ -657,6 +658,10 @@ const TemplateDetail = () => {
                                             leftItems.length,
                                             rightItems.length
                                           );
+                                          const rightOrder = seededMatchOrder(
+                                            rightItems.length,
+                                            q.question_id ?? q.number ?? rightItems.join("|")
+                                          );
                                           return (
                                             <div className="pl-4 mt-2">
                                               <table className="w-full border-collapse border border-gray-800 text-sm">
@@ -687,7 +692,7 @@ const TemplateDetail = () => {
                                                           97 + idx
                                                         )}
                                                         .{" "}
-                                                        {rightItems[idx] || ""}
+                                                        {rightItems[rightOrder[idx]] ?? ""}
                                                       </td>
                                                       <td className="border border-gray-800 px-3 py-2 text-gray-800">
                                                         <span className="font-mono">

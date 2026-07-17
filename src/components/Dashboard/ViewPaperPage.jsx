@@ -9,7 +9,8 @@ import HeaderCard from "../Cards/HeaderCard";
 import Loader from "../Common/loader/loader";
 import MathText from "../Common/MathText";
 import { QuestionText, QuestionImageBlock } from "../Common/QuestionImageBlock";
-import { QuestionBody, OptionBody } from "../Common/QuestionBody";
+import { QuestionBody, OptionBody, renderRichHtml } from "../Common/QuestionBody";
+import { seededMatchOrder } from "../../utils/matchShuffle";
 import { estimateImageBlockHeight } from "../../utils/questionImage";
 
 const QUESTION_TYPE_CONFIG = {
@@ -494,6 +495,17 @@ const ViewPaperPage = () => {
                                         const options = isMcq && Array.isArray(pq.options) ? pq.options.filter((o) => o != null && String(o).trim() !== "") : [];
                                         return (
                                           <div key={pqIdx}>
+                                            {pq && pq.question_html ? (
+                                              <div className="text-gray-800" style={{ display: "flex", gap: "4px", fontSize: "14px", lineHeight: "1.7" }}>
+                                                <span style={{ fontWeight: "600" }}>({String.fromCharCode(97 + pqIdx)})</span>
+                                                <div className="rich-body" style={{ flex: 1 }}>
+                                                  {renderRichHtml(pq.question_html)}
+                                                  {isBlank && (
+                                                    <span className="inline-block mx-1 border-b-2 border-gray-400 min-w-[80px]" style={{ height: "1.2em" }} aria-hidden />
+                                                  )}
+                                                </div>
+                                              </div>
+                                            ) : (
                                             <p className="text-gray-800" style={{ fontSize: "14px", lineHeight: "1.7" }}>
                                               <span style={{ fontWeight: "600" }}>
                                                 ({String.fromCharCode(97 + pqIdx)}){" "}
@@ -503,6 +515,7 @@ const ViewPaperPage = () => {
                                                 <span className="inline-block mx-1 border-b-2 border-gray-400 min-w-[80px]" style={{ height: "1.2em" }} aria-hidden />
                                               )}
                                             </p>
+                                            )}
                                             {isMcq && options.length > 0 && (
                                               <div className="ml-4 mt-1 space-y-1" style={{ fontSize: "13px" }}>
                                                 {options.map((opt, optIdx) => (
@@ -538,6 +551,7 @@ const ViewPaperPage = () => {
                                 const leftItems = matchData.left || [];
                                 const rightItems = matchData.right || [];
                                 const maxLength = Math.max(leftItems.length, rightItems.length);
+                                const rightOrder = seededMatchOrder(rightItems.length, question.question_id ?? rightItems.join("|"));
                                 if (leftItems.length > 0 || rightItems.length > 0) {
                                   return (
                                     <div className="ml-6 mt-3 overflow-x-auto">
@@ -556,7 +570,7 @@ const ViewPaperPage = () => {
                                                 {idx + 1}. {leftItems[idx] || ""}
                                               </td>
                                               <td className="px-3 py-2 text-gray-800" style={{ border: "1px solid #374151" }}>
-                                                {String.fromCharCode(97 + idx)}. {rightItems[idx] || ""}
+                                                {String.fromCharCode(97 + idx)}. {rightItems[rightOrder[idx]] ?? ""}
                                               </td>
                                               <td className="px-3 py-2 text-gray-800 font-mono" style={{ border: "1px solid #374151" }}>
                                                 ({idx + 1}) (_____)

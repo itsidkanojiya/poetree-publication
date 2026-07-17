@@ -64,6 +64,9 @@ export const getQuizPaperPdf = (paperId, filename = "quiz-student.pdf") =>
 export const getQuizAnswerKey = (paperId, filename = "quiz-answer-key.pdf") =>
   downloadQuizPdf(paperId, "answer-key", filename);
 
+export const getQuizAnswerSolution = (paperId, filename = "quiz-answer-solution.pdf") =>
+  downloadQuizPdf(paperId, "answer-solution", filename);
+
 export const getQuizOmrSheet = (paperId, filename = "quiz-omr-sheet.pdf") =>
   downloadQuizPdf(paperId, "omr-sheet", filename);
 

@@ -3,7 +3,7 @@ import { Eye, Trash2, Edit, Calendar, FileText, FileDown, ChevronDown } from "lu
 import { useNavigate } from "react-router-dom";
 import { API_ORIGIN } from "../../config/api";
 import { usePaper } from "../../context/PaperContext";
-import { getQuizPaperPdf, getQuizAnswerKey, getQuizOmrSheet } from "../../services/quizService";
+import { getQuizPaperPdf, getQuizAnswerKey, getQuizAnswerSolution, getQuizOmrSheet } from "../../services/quizService";
 
 const PaperCard = ({
   id,
@@ -248,7 +248,7 @@ const PaperCard = ({
                 {exportOpen && (
                   <>
                     <div className="fixed inset-0 z-10" onClick={() => setExportOpen(false)} />
-                    <div className="absolute right-0 top-full mt-1 py-1 w-44 bg-white rounded-lg shadow-xl border border-gray-200 z-20">
+                    <div className="absolute right-0 bottom-full mb-1 py-1 w-44 bg-white rounded-lg shadow-xl border border-gray-200 z-20">
                       <button
                         onClick={async () => {
                           setDownloading(true);
@@ -282,6 +282,23 @@ const PaperCard = ({
                       >
                         <FileText className="w-4 h-4" />
                         Answer Key
+                      </button>
+                      <button
+                        onClick={async () => {
+                          setDownloading(true);
+                          setExportOpen(false);
+                          try {
+                            await getQuizAnswerSolution(id, "quiz-answer-solution.pdf");
+                          } catch (e) {
+                            alert(e.message || "Download failed");
+                          } finally {
+                            setDownloading(false);
+                          }
+                        }}
+                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                      >
+                        <FileText className="w-4 h-4" />
+                        Answer + Solution
                       </button>
                       <button
                         onClick={async () => {

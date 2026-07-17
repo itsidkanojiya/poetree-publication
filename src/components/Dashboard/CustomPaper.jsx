@@ -31,7 +31,8 @@ import {
 import Toast from "../Common/Toast";
 import MathText from "../Common/MathText";
 import { QuestionText, QuestionImageBlock } from "../Common/QuestionImageBlock";
-import { QuestionBody, OptionBody, MatchItemBody } from "../Common/QuestionBody";
+import { QuestionBody, OptionBody, MatchItemBody, renderRichHtml } from "../Common/QuestionBody";
+import { seededMatchOrder } from "../../utils/matchShuffle";
 import { estimateImageBlockHeight } from "../../utils/questionImage";
 import Loader from "../Common/loader/loader";
 import SmartPaperStepper from "./SmartPaperStepper";
@@ -3650,6 +3651,33 @@ const CustomPaper = () => {
                                                       : [];
                                                   return (
                                                     <div key={pqIdx}>
+                                                      {pq && pq.question_html ? (
+                                                        // Rich ("Word-like") sub-question prompt. Rendered as a flex
+                                                        // row so the block HTML never nests inside a <p>.
+                                                        <div
+                                                          className="text-gray-800"
+                                                          style={{
+                                                            display: "flex",
+                                                            gap: "4px",
+                                                            fontSize: "14px",
+                                                            lineHeight: "1.7",
+                                                          }}
+                                                        >
+                                                          <span style={{ fontWeight: "600" }}>
+                                                            ({String.fromCharCode(97 + pqIdx)})
+                                                          </span>
+                                                          <div className="rich-body" style={{ flex: 1 }}>
+                                                            {renderRichHtml(pq.question_html)}
+                                                            {isBlank && (
+                                                              <span
+                                                                className="inline-block mx-1 border-b-2 border-gray-400 min-w-[80px]"
+                                                                style={{ height: "1.2em" }}
+                                                                aria-hidden
+                                                              />
+                                                            )}
+                                                          </div>
+                                                        </div>
+                                                      ) : (
                                                       <p
                                                         className="text-gray-800"
                                                         style={{
@@ -3677,6 +3705,7 @@ const CustomPaper = () => {
                                                           />
                                                         )}
                                                       </p>
+                                                      )}
                                                       {isMcq &&
                                                         options.length > 0 && (
                                                           <div
@@ -3759,6 +3788,11 @@ const CustomPaper = () => {
                                           leftItems.length,
                                           rightItems.length
                                         );
+                                        // Shuffle the right column so aligned rows don't reveal the answer.
+                                        const rightOrder = seededMatchOrder(
+                                          rightItems.length,
+                                          question.question_id ?? rightItems.join("|")
+                                        );
                                         if (
                                           leftItems.length > 0 ||
                                           rightItems.length > 0
@@ -3835,8 +3869,8 @@ const CustomPaper = () => {
                                                         <MatchItemBody
                                                           question={question}
                                                           side="right"
-                                                          index={idx}
-                                                          value={rightItems[idx] || ""}
+                                                          index={rightOrder[idx] ?? idx}
+                                                          value={rightItems[rightOrder[idx]] ?? ""}
                                                         />
                                                       </td>
                                                       <td

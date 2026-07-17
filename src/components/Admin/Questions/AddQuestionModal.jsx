@@ -42,7 +42,20 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
 
   // Rich ("Word-like") editor. When on, question_html/options_html are sent and the
   // backend regenerates the plain-text mirror from them.
-  const [richMode, setRichMode] = useState(!!question?.question_html);
+  const [richMode, setRichMode] = useState(() => {
+    if (question?.question_html) return true;
+    // Also turn on rich mode if any passage sub-question was authored with HTML.
+    try {
+      const opts = Array.isArray(question?.options)
+        ? question.options
+        : question?.options
+        ? JSON.parse(question.options)
+        : [];
+      return Array.isArray(opts) && opts.some((o) => o && o.question_html);
+    } catch {
+      return false;
+    }
+  });
   const [questionHtml, setQuestionHtml] = useState(question?.question_html || "");
   const [optionHtmlList, setOptionHtmlList] = useState(
     Array.isArray(question?.options_html) ? question.options_html : []
@@ -168,25 +181,28 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
       try {
         const parsed = Array.isArray(question.options) ? question.options : JSON.parse(question.options);
         const normalized = (Array.isArray(parsed) ? parsed : []).map((pq) => {
+          const html = (pq && pq.question_html) || "";
           if (pq && pq.type === "mcq") {
             const opts = Array.isArray(pq.options) ? pq.options : [];
             return {
               type: "mcq",
               question: pq.question || "",
+              question_html: html,
               options: opts.length ? opts : ["", "", "", ""],
               answer: pq.answer != null ? String(pq.answer) : "1",
             };
           }
           if (pq && pq.type === "blank") {
-            return { type: "blank", question: (pq.question != null ? pq.question : ""), answer: (pq.answer != null ? pq.answer : "") };
+            return { type: "blank", question: (pq.question != null ? pq.question : ""), question_html: html, answer: (pq.answer != null ? pq.answer : "") };
           }
           if (pq && (pq.type === "truefalse" || pq.type === "true&false")) {
             const ans = pq.answer === "true" || pq.answer === "false" ? pq.answer : "true";
-            return { type: "truefalse", question: (pq.question != null ? pq.question : ""), answer: ans };
+            return { type: "truefalse", question: (pq.question != null ? pq.question : ""), question_html: html, answer: ans };
           }
           return {
             type: "short",
             question: (pq && pq.question) != null ? pq.question : "",
+            question_html: html,
             answer: (pq && pq.answer) != null ? pq.answer : "",
           };
         });
@@ -311,17 +327,21 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
         formDataToSend.append("answer", formData.answer);
       } else if (questionType === "passage") {
         const optionsToSend = passageQuestions.map((pq) => {
+          // In rich mode the sub-question prompt lives in question_html; the backend
+          // sanitizes it and regenerates the plain `question` mirror.
+          const html = richMode && pq.question_html && pq.question_html.trim() ? pq.question_html : undefined;
+          const withHtml = (obj) => (html ? { ...obj, question_html: html } : obj);
           if (pq.type === "mcq") {
             const opts = (pq.options || []).map((o) => (o && o.trim()) || "").filter(Boolean);
-            return { type: "mcq", question: pq.question || "", options: opts, answer: pq.answer != null ? String(pq.answer) : "1" };
+            return withHtml({ type: "mcq", question: pq.question || "", options: opts, answer: pq.answer != null ? String(pq.answer) : "1" });
           }
           if (pq.type === "blank") {
-            return { type: "blank", question: pq.question || "", answer: pq.answer != null ? pq.answer : "" };
+            return withHtml({ type: "blank", question: pq.question || "", answer: pq.answer != null ? pq.answer : "" });
           }
           if (pq.type === "truefalse") {
-            return { type: "truefalse", question: pq.question || "", answer: pq.answer === "true" || pq.answer === "false" ? pq.answer : "true" };
+            return withHtml({ type: "truefalse", question: pq.question || "", answer: pq.answer === "true" || pq.answer === "false" ? pq.answer : "true" });
           }
-          return { type: "short", question: pq.question || "", answer: pq.answer != null ? pq.answer : "" };
+          return withHtml({ type: "short", question: pq.question || "", answer: pq.answer != null ? pq.answer : "" });
         });
         formDataToSend.append("options", JSON.stringify(optionsToSend));
         const answerObj = passageQuestions.reduce((acc, q, idx) => {
@@ -426,7 +446,10 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
     if (questionType === "passage") {
       if (!passageQuestions.length) newErrors.passageQuestions = "At least one sub-question is required";
       passageQuestions.forEach((pq, idx) => {
-        if (!(pq.question && String(pq.question).trim())) newErrors[`passageQ${idx}`] = "Question text is required";
+        // In rich mode the prompt text lives in HTML; check for any non-tag content.
+        const richText = (pq.question_html || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
+        const hasPrompt = richMode ? richText.length > 0 : !!(pq.question && String(pq.question).trim());
+        if (!hasPrompt) newErrors[`passageQ${idx}`] = "Question text is required";
         if (pq.type === "mcq") {
           const opts = (pq.options || []).map((o) => (o && o.trim()) || "").filter(Boolean);
           if (opts.length === 0) newErrors[`passageMcq${idx}`] = "MCQ must have at least one option";
@@ -466,19 +489,21 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
   const setPassageQuestionType = (index, newType) => {
     const updated = [...passageQuestions];
     const prev = updated[index];
+    const html = (prev && prev.question_html) || ""; // keep the rich prompt across type changes
     if (newType === "mcq") {
       updated[index] = {
         type: "mcq",
         question: (prev && prev.question) || "",
+        question_html: html,
         options: Array.isArray(prev?.options) && prev.options.length ? prev.options : ["", "", "", ""],
         answer: "1",
       };
     } else if (newType === "blank") {
-      updated[index] = { type: "blank", question: (prev && prev.question) || "", answer: (prev && prev.answer) != null ? prev.answer : "" };
+      updated[index] = { type: "blank", question: (prev && prev.question) || "", question_html: html, answer: (prev && prev.answer) != null ? prev.answer : "" };
     } else if (newType === "truefalse") {
-      updated[index] = { type: "truefalse", question: (prev && prev.question) || "", answer: (prev && prev.answer) === "false" ? "false" : "true" };
+      updated[index] = { type: "truefalse", question: (prev && prev.question) || "", question_html: html, answer: (prev && prev.answer) === "false" ? "false" : "true" };
     } else {
-      updated[index] = { type: "short", question: (prev && prev.question) || "", answer: (prev && prev.answer) != null ? prev.answer : "" };
+      updated[index] = { type: "short", question: (prev && prev.question) || "", question_html: html, answer: (prev && prev.answer) != null ? prev.answer : "" };
     }
     setPassageQuestions(updated);
   };
@@ -980,13 +1005,24 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
                         )}
                       </div>
                     </div>
-                    <MathTextInput
-                      className="mb-2"
-                      value={pq.question || ""}
-                      onChange={(val) => updatePassageQuestion(index, "question", val)}
-                      placeholder="Question text"
-                      error={!!errors[`passageQ${index}`]}
-                    />
+                    {richMode ? (
+                      <div className="mb-2">
+                        <RichQuestionEditor
+                          value={pq.question_html || ""}
+                          onChange={(html) => updatePassageQuestion(index, "question_html", html)}
+                          questionType="passage"
+                          placeholder="Question text"
+                        />
+                      </div>
+                    ) : (
+                      <MathTextInput
+                        className="mb-2"
+                        value={pq.question || ""}
+                        onChange={(val) => updatePassageQuestion(index, "question", val)}
+                        placeholder="Question text"
+                        error={!!errors[`passageQ${index}`]}
+                      />
+                    )}
                     {errors[`passageQ${index}`] && (
                       <p className="text-sm text-red-600 mb-1">{errors[`passageQ${index}`]}</p>
                     )}
