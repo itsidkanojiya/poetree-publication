@@ -430,11 +430,15 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
     }
     // Answer is optional for all question types — user can add a question without an answer
     if (questionType === "mcq") {
-      // In rich mode the option text lives in the HTML editors, not mcqOptionList.
+      // In rich mode the option content lives in the HTML editors, not mcqOptionList.
+      // An option counts as filled if it has text OR an image/table (image-only options
+      // are valid — e.g. "pick the correct diagram").
       const validOptions = richMode
-        ? optionHtmlList
-            .map((h) => (h || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim())
-            .filter(Boolean)
+        ? optionHtmlList.filter((h) => {
+            const s = String(h || "");
+            const hasText = s.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0;
+            return hasText || /<(img|table)\b/i.test(s);
+          })
         : mcqOptionList.map((o) => (o && o.trim()) || "").filter(Boolean);
       if (validOptions.length === 0) newErrors.options = "At least one option is required";
       // If user provided an answer, it must be a valid option index
