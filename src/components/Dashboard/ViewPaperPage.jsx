@@ -123,7 +123,100 @@ const getMatchQuestionHeight = (question) => {
   return h;
 };
 
-const estimateQuestionHeight = (question, { isFirstOfType, hasQuestionsOnPage }) => {
+// ---- Answer / solution rendering (used by the "Answer Key" + "Answer + Solution"
+// export modes). The paper renders identically to the plain paper; these blocks are
+// appended under each question and their height is reserved by the paginator. ----
+
+const parseAnswerObject = (answer) => {
+  if (answer && typeof answer === "object") return answer;
+  if (typeof answer === "string" && answer.trim().startsWith("{")) {
+    try { return JSON.parse(answer); } catch { return null; }
+  }
+  return null;
+};
+
+/** JSX for a question's correct answer, per type. Returns null when unavailable. */
+const renderAnswerContent = (question) => {
+  const type = normalizeQuestionType(question.type);
+  const opts = toOptionsArray(question.options);
+
+  if (type === "mcq") {
+    const idx = parseInt(question.answer, 10);
+    const valid = Number.isFinite(idx) && idx >= 1;
+    const text = valid ? opts[idx - 1] : null;
+    return (
+      <span>
+        <strong>Answer: </strong>
+        {valid ? `(${String.fromCharCode(96 + idx)}) ` : ""}
+        <MathText text={typeof text === "string" ? text : String(question.answer ?? "")} />
+      </span>
+    );
+  }
+  if (type === "truefalse" || type === "true_false") {
+    const a = String(question.answer);
+    return <span><strong>Answer: </strong>{a === "true" ? "True" : a === "false" ? "False" : String(question.answer ?? "")}</span>;
+  }
+  if (type === "passage") {
+    const ansObj = parseAnswerObject(question.answer) || {};
+    return (
+      <div>
+        <strong>Answers:</strong>
+        {opts.map((sub, i) => {
+          let val = ansObj[`q${i + 1}`];
+          if (sub && sub.type === "mcq" && Array.isArray(sub.options)) {
+            const si = parseInt(val, 10);
+            if (Number.isFinite(si) && si >= 1) val = `(${String.fromCharCode(96 + si)}) ${sub.options[si - 1] ?? ""}`;
+          } else if (sub && sub.type === "truefalse") {
+            val = val === "true" ? "True" : val === "false" ? "False" : val;
+          }
+          return (
+            <div key={i}>
+              <span style={{ fontWeight: 600 }}>({String.fromCharCode(97 + i)}) </span>
+              <MathText text={String(val ?? "")} />
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+  if (type === "match") {
+    let data = question.options;
+    if (typeof data === "string") { try { data = JSON.parse(data); } catch { data = null; } }
+    const left = (data && data.left) || [];
+    const right = (data && data.right) || [];
+    const order = seededMatchOrder(right.length, question.question_id ?? right.join("|"));
+    // left row i (correct right = index i by construction) sits at display position order.indexOf(i)
+    const pairs = left.map((_, i) => {
+      const pos = order.indexOf(i);
+      return `${i + 1} → ${pos >= 0 ? String.fromCharCode(97 + pos) : "?"}`;
+    });
+    return <span><strong>Answer: </strong>{pairs.join(",   ")}</span>;
+  }
+  // short / long / onetwo / blank / default
+  return <span><strong>Answer: </strong><MathText text={String(question.answer ?? "")} /></span>;
+};
+
+/** JSX for a question's solution/explanation, or null when empty. */
+const renderSolutionContent = (question) => {
+  const sol = question.solution;
+  if (!sol || !String(sol).trim()) return null;
+  return <span><strong>Solution: </strong><MathText text={String(sol)} /></span>;
+};
+
+/** Reserved height (px) for the appended answer/solution block, by export mode. */
+function estimateAnswerBlockHeight(question, mode) {
+  if (mode !== "answers" && mode !== "solutions") return 0;
+  const type = normalizeQuestionType(question.type);
+  let h = 30; // "Answer:" line
+  if (type === "passage") h += toOptionsArray(question.options).length * 22;
+  if (mode === "solutions") {
+    const sol = String(question.solution || "");
+    if (sol.trim()) h += 26 + Math.ceil(sol.length / 60) * 22;
+  }
+  return h + 8;
+}
+
+const estimateQuestionHeight = (question, { isFirstOfType, hasQuestionsOnPage, exportMode = "paper" }) => {
   const type = normalizeQuestionType(question.type);
   let h;
   if (type === "passage") h = getPassageQuestionHeight(question);
@@ -134,6 +227,7 @@ const estimateQuestionHeight = (question, { isFirstOfType, hasQuestionsOnPage })
   }
   if (isFirstOfType) h += COMPONENT_HEIGHTS.SECTION;
   h += estimateImageBlockHeight(question);
+  h += estimateAnswerBlockHeight(question, exportMode);
   if (hasQuestionsOnPage) h += COMPONENT_HEIGHTS.SPACING;
   return h;
 };
@@ -141,7 +235,7 @@ const estimateQuestionHeight = (question, { isFirstOfType, hasQuestionsOnPage })
 // Per-question pagination (mirrors CustomPaper.renderPages): a question that
 // doesn't fit is pushed to the next page instead of being clipped, and a single
 // section can span multiple pages (its title is printed once via printedTypes).
-function buildPages(sections) {
+function buildPages(sections, exportMode = "paper") {
   let pages = [];
   let currentHeight = PAGE_HEIGHT - HEADER_HEIGHT - CONTENT_PADDING;
   let currentPage = [];
@@ -156,6 +250,7 @@ function buildPages(sections) {
       const questionHeight = estimateQuestionHeight(question, {
         isFirstOfType,
         hasQuestionsOnPage,
+        exportMode,
       });
 
       const availableHeight = currentHeight - MARGIN - SAFETY_BUFFER;
@@ -167,6 +262,7 @@ function buildPages(sections) {
         const newQuestionHeight = estimateQuestionHeight(question, {
           isFirstOfType: true,
           hasQuestionsOnPage: false,
+          exportMode,
         });
         currentPage.push({ type: question.type, selectedQuestions: [question] });
         currentHeight = PAGE_HEIGHT - CONTENT_PADDING - newQuestionHeight;
@@ -198,6 +294,12 @@ function parseBodyToQuestionIds(body) {
   }
 }
 
+const EXPORT_MODE_META = {
+  paper: { label: "Question Paper", suffix: "" },
+  answers: { label: "Answer Key", suffix: " — Answer Key" },
+  solutions: { label: "Answers & Solutions", suffix: " — Answers & Solutions" },
+};
+
 const ViewPaperPage = () => {
   const { id } = useParams();
   const location = useLocation();
@@ -205,6 +307,12 @@ const ViewPaperPage = () => {
   const [paper, setPaper] = useState(null);
   const [sections, setSections] = useState([]);
   const [marksPerType, setMarksPerType] = useState({});
+  // Export mode: "paper" (plain), "answers" (answer key), "solutions" (answers + solutions).
+  const exportMode = ["answers", "solutions"].includes(location.state?.exportMode)
+    ? location.state.exportMode
+    : "paper";
+  const autoExport = !!location.state?.autoExport;
+  const autoExportedRef = React.useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -297,6 +405,30 @@ const ViewPaperPage = () => {
     return () => { cancelled = true; };
   }, [id]);
 
+  // Build a mode-suffixed filename for downloads (e.g. "My Paper — Answer Key.pdf").
+  const buildFileName = () => {
+    const meta = EXPORT_MODE_META[exportMode] || EXPORT_MODE_META.paper;
+    const base = String(paper?.paper_title || paper?.title || "paper").replace(/[\\/:*?"<>|]/g, "_");
+    return `${base}${meta.suffix}.pdf`;
+  };
+
+  const runDownload = async () => {
+    if (document.fonts && document.fonts.ready) {
+      try { await document.fonts.ready; } catch { /* noop */ }
+    }
+    const pdfPages = document.querySelectorAll("[id^=pdf-content-]");
+    if (pdfPages.length) await downloadPDF(pdfPages, buildFileName());
+  };
+
+  // When opened from a card's Export menu, render the requested mode then auto-download once.
+  useEffect(() => {
+    if (!autoExport || loading || autoExportedRef.current) return;
+    autoExportedRef.current = true;
+    const t = setTimeout(() => { runDownload(); }, 500); // let pages + images paint
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoExport, loading]);
+
   const getHeader = () => {
     if (!paper) return {};
     return {
@@ -333,7 +465,7 @@ const ViewPaperPage = () => {
 
   const printedTypes = new Set();
   const questionCounters = {};
-  const pages = buildPages(sections);
+  const pages = buildPages(sections, exportMode);
 
   // Total questions per type across the whole paper (a section can span pages,
   // so a page chunk's length is not the section total). Used for section marks.
@@ -345,6 +477,11 @@ const ViewPaperPage = () => {
 
   return (
     <div className="w-full flex flex-col items-center min-h-screen py-10 bg-gradient-to-b from-slate-50 to-gray-100/50">
+      {exportMode !== "paper" && (
+        <div className="mb-6 px-4 py-2 rounded-lg bg-emerald-100 text-emerald-800 font-semibold text-sm shadow-sm">
+          {EXPORT_MODE_META[exportMode].label} view{autoExport ? " — downloading…" : ""}
+        </div>
+      )}
       <div className="space-y-8 flex flex-col items-center">
         {pages.map((pageSections, pageIndex) => (
           <div
@@ -588,6 +725,19 @@ const ViewPaperPage = () => {
 
                             {/* Question image */}
                             <QuestionImageBlock question={question} slot="bottom" />
+
+                            {/* Answer / solution block (only in the answer-key / solution export modes) */}
+                            {exportMode !== "paper" && (
+                              <div
+                                className="ml-6 mt-2 pl-3 py-1 border-l-4 border-emerald-400 bg-emerald-50/60 rounded-r text-gray-800"
+                                style={{ fontSize: "13px", lineHeight: "1.6" }}
+                              >
+                                <div className="text-emerald-800">{renderAnswerContent(question)}</div>
+                                {exportMode === "solutions" && renderSolutionContent(question) && (
+                                  <div className="mt-1 text-gray-600">{renderSolutionContent(question)}</div>
+                                )}
+                              </div>
+                            )}
                           </div>
                         );
                       })}
@@ -603,12 +753,9 @@ const ViewPaperPage = () => {
 
       <div className="mt-8">
         <Button
-          text="Download PDF"
+          text={exportMode === "paper" ? "Download PDF" : `Download ${EXPORT_MODE_META[exportMode].label}`}
           icon={FileDown}
-          onClick={() => {
-            const pdfPages = document.querySelectorAll("[id^=pdf-content-]");
-            downloadPDF(pdfPages);
-          }}
+          onClick={runDownload}
           color="bg-blue-600"
         />
       </div>

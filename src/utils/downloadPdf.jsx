@@ -1,7 +1,7 @@
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
 
-const downloadPDF = async (pdfPages) => {
+const downloadPDF = async (pdfPages, filename = "paper.pdf") => {
   // Ensure web fonts (incl. KaTeX math fonts) are loaded before screenshotting.
   if (document.fonts && document.fonts.ready) {
     try { await document.fonts.ready; } catch { /* noop */ }
@@ -70,7 +70,7 @@ const downloadPDF = async (pdfPages) => {
     });
   }
 
-  pdf.save("paper.pdf");
+  pdf.save(filename || "paper.pdf");
 };
 
 export default downloadPDF;

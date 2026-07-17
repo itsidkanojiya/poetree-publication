@@ -70,6 +70,21 @@ const PaperCard = ({
     });
   };
 
+  // Custom papers render client-side, so "export" opens the view page in the
+  // requested mode and auto-downloads there (mode: "paper" | "answers" | "solutions").
+  const handleCustomExport = (mode) => {
+    setExportOpen(false);
+    const htmlBody = body ?? paper.paper_body ?? paper.body ?? "";
+    navigate(`/dashboard/view/${id}`, {
+      state: {
+        paperBody: htmlBody,
+        paperData: { id, title, type, subject, ...paper },
+        exportMode: mode,
+        autoExport: true,
+      },
+    });
+  };
+
   const handleEdit = () => {
     if (type === "quiz") {
       navigate(`/dashboard/quizzes/${id}/edit`);
@@ -316,6 +331,47 @@ const PaperCard = ({
                       >
                         <FileText className="w-4 h-4" />
                         OMR Sheet
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            {type === "custom" && (
+              <div className="relative">
+                <button
+                  onClick={() => setExportOpen((o) => !o)}
+                  className="flex items-center justify-center gap-1 px-4 py-2 bg-amber-100 hover:bg-amber-200 text-amber-800 font-semibold rounded-lg transition"
+                >
+                  <FileDown className="w-4 h-4" />
+                  Export
+                  <ChevronDown className="w-4 h-4" />
+                </button>
+                {exportOpen && (
+                  <>
+                    <div className="fixed inset-0 z-10" onClick={() => setExportOpen(false)} />
+                    <div className="absolute right-0 bottom-full mb-1 py-1 w-48 bg-white rounded-lg shadow-xl border border-gray-200 z-20">
+                      <button
+                        onClick={() => handleCustomExport("paper")}
+                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                      >
+                        <FileText className="w-4 h-4" />
+                        Question Paper
+                      </button>
+                      <button
+                        onClick={() => handleCustomExport("answers")}
+                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                      >
+                        <FileText className="w-4 h-4" />
+                        Answer Key
+                      </button>
+                      <button
+                        onClick={() => handleCustomExport("solutions")}
+                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                      >
+                        <FileText className="w-4 h-4" />
+                        Answer + Solution
                       </button>
                     </div>
                   </>
