@@ -181,9 +181,15 @@ const HeaderCard = ({
               <div>
                 <strong>Class:</strong>{" "}
                 {(() => {
-                  const classValue = header.class || "Standard 1";
+                  // Prefer the explicit class; else derive from the real standard
+                  // (the teaching context's Std) instead of a hardcoded "1".
+                  const classValue =
+                    header.class ||
+                    (header.standard != null && header.standard !== ""
+                      ? `Standard ${header.standard}`
+                      : "");
                   // Extract just the number from "Standard X" or return the number if it's just a number
-                  const match = classValue.match(/\d+/);
+                  const match = String(classValue).match(/\d+/);
                   return match ? match[0] : classValue;
                 })()}
               </div>

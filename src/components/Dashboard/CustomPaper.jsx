@@ -1010,6 +1010,29 @@ const CustomPaper = () => {
     });
   }, [smartWizardActive, contextSelection]);
 
+  // Ensure the header's standard/class reflect the chosen teaching context (e.g. Std 6)
+  // for EVERY paper flow (not just the smart wizard), so the printed "Class:" isn't a
+  // stale default. Only fills gaps; never overrides a standard/class already set.
+  useEffect(() => {
+    if (!contextSelection) return;
+    setPaperHeader((prev) => {
+      if (!prev) return prev;
+      const hasStd = prev.standard != null && prev.standard !== "";
+      const hasClass = prev.class != null && prev.class !== "";
+      if (hasStd && hasClass) return prev;
+      const ctxClass =
+        contextSelection.standard_name ||
+        (contextSelection.standard != null && contextSelection.standard !== ""
+          ? `Standard ${contextSelection.standard}`
+          : "");
+      return {
+        ...prev,
+        standard: hasStd ? prev.standard : contextSelection.standard ?? "",
+        class: hasClass ? prev.class : ctxClass,
+      };
+    });
+  }, [contextSelection]);
+
   const sumSmartPercents = (obj) =>
     Object.values(obj).reduce((a, b) => a + (Number(b) || 0), 0);
 
