@@ -4,7 +4,7 @@ import { FileDown } from "lucide-react";
 import Button from "../Common/Buttons/Button";
 import downloadPDF from "../../utils/downloadPdf";
 import { getPaperById } from "../../services/paperService";
-import apiClient from "../../services/apiClient";
+import { getQuestionsByIds } from "../../services/adminService";
 import HeaderCard from "../Cards/HeaderCard";
 import Loader from "../Common/loader/loader";
 import MathText from "../Common/MathText";
@@ -387,21 +387,19 @@ const ViewPaperPage = () => {
           return;
         }
 
-        const response = await apiClient.get("/question");
+        // Fetch ONLY this paper's questions instead of the whole bank.
+        const list = await getQuestionsByIds(questionIds);
         if (cancelled) return;
-        const allQuestions = response.data?.questions || response.data || [];
-        const list = Array.isArray(allQuestions) ? allQuestions : [];
+        const byId = new Map(
+          (Array.isArray(list) ? list : []).map((q) => [
+            Number(q.question_id ?? q.id),
+            q,
+          ])
+        );
 
+        // Preserve the paper's stored order.
         const fetched = questionIds
-          .map((qid) =>
-            list.find(
-              (q) =>
-                q.question_id === qid ||
-                q.id === qid ||
-                q.question_id === parseInt(qid, 10) ||
-                q.id === parseInt(qid, 10)
-            )
-          )
+          .map((qid) => byId.get(Number(qid)))
           .filter(Boolean);
 
         const grouped = {};

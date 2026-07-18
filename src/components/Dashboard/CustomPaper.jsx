@@ -26,6 +26,7 @@ import {
   getChaptersBySubjectTitle,
   smartProposePaper,
   getQuestionsByType,
+  getQuestionsByIds,
   getMarksBreakdown,
 } from "../../services/adminService";
 import Toast from "../Common/Toast";
@@ -599,13 +600,18 @@ const CustomPaper = () => {
   // Function to load questions by IDs
   const loadQuestionsByIds = async (questionIds, marksData = null) => {
     try {
-      // Fetch all questions and filter by IDs
-      const response = await apiClient.get(`/question`);
-      const allQuestions = response.data?.questions || response.data || [];
-      
+      // Fetch ONLY this paper's questions (not the whole bank).
+      const allQuestions = await getQuestionsByIds(questionIds);
+      const byId = new Map(
+        (Array.isArray(allQuestions) ? allQuestions : []).map((q) => [
+          Number(q.question_id ?? q.id),
+          q,
+        ])
+      );
+
       // Filter questions by IDs and maintain order
       const fetchedQuestions = questionIds
-        .map((id) => allQuestions.find((q) => q.question_id === id))
+        .map((id) => byId.get(Number(id)))
         .filter((q) => q !== undefined); // Remove any undefined (questions not found)
       
       // Group questions by type and populate questionSections

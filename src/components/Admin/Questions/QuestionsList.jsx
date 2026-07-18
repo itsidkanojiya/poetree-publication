@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import * as XLSX from "xlsx";
 import {
   getQuestionsByType,
+  getQuestionById,
   deleteQuestion,
   bulkDeleteQuestions,
   getAllSubjects,
@@ -338,6 +339,22 @@ const QuestionsList = ({ questionType }) => {
     fetchQuestions();
   };
 
+  // The list no longer carries the heavy image_layout; when a question has a
+  // composite image, fetch the full row so the fabric editor can rehydrate.
+  const openEdit = async (question) => {
+    if (question?.composite_image_url) {
+      try {
+        const full = await getQuestionById(question.question_id);
+        setSelectedQuestion(full || question);
+      } catch {
+        setSelectedQuestion(question);
+      }
+    } else {
+      setSelectedQuestion(question);
+    }
+    setShowAddModal(true);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -573,10 +590,7 @@ const QuestionsList = ({ questionType }) => {
                           <Eye className="w-4 h-4" />
                         </button>
                         <button
-                          onClick={() => {
-                            setSelectedQuestion(question);
-                            setShowAddModal(true);
-                          }}
+                          onClick={() => openEdit(question)}
                           className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
                           title="Edit"
                         >

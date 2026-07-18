@@ -656,6 +656,38 @@ export const getQuestionsByType = async (type, filters = {}) => {
 };
 
 /**
+ * Fetch only the given questions by id (paper View/Edit/Export).
+ * Avoids downloading the whole question bank via GET /question.
+ * POST /api/question/by-ids  { ids: number[] }
+ */
+export const getQuestionsByIds = async (ids) => {
+  try {
+    const clean = [...new Set((ids || []).map((x) => Number(x)).filter((x) => !Number.isNaN(x)))];
+    if (clean.length === 0) return [];
+    const response = await apiClient.post("/question/by-ids", { ids: clean });
+    return response.data?.questions || response.data || [];
+  } catch (error) {
+    console.error("Error fetching questions by ids:", error);
+    throw error;
+  }
+};
+
+/**
+ * Full single question incl editor-only fields (image_layout) — for rehydrating
+ * the composite-image editor when editing a question.
+ * GET /api/question/:id
+ */
+export const getQuestionById = async (id) => {
+  try {
+    const response = await apiClient.get(`/question/${Number(id)}`);
+    return response.data?.question || response.data || null;
+  } catch (error) {
+    console.error("Error fetching question by id:", error);
+    throw error;
+  }
+};
+
+/**
  * Smart paper proposal: balanced chapters, difficulty, sections (marks %)
  * POST /api/papers/smart-propose
  * @param {Object} payload - see docs/PROMPT_BACKEND_SMART_PAPER.md

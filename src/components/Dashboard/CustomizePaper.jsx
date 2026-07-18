@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, Save, X, Plus, Eye, Trash2 } from "lucide-react";
 import Loader from "../Common/loader/loader";
 import { getPaperById, updatePaper } from "../../services/paperService";
-import { getAllStandards } from "../../services/adminService";
+import { getAllStandards, getQuestionsByIds } from "../../services/adminService";
 import Toast from "../Common/Toast";
 import HeaderCard from "../Cards/HeaderCard";
 // Use CustomPaper's exact pagination logic
@@ -64,24 +64,19 @@ const CustomizePaper = () => {
         return;
       }
 
-      console.log("Fetching questions for IDs:", questionIds);
-
-      // Fetch all questions
-      const response = await apiClient.get(`/question`);
-      const allQuestions = response.data?.questions || response.data || [];
-
-      console.log("Total questions fetched:", allQuestions.length);
+      // Fetch ONLY these questions (not the whole bank).
+      const allQuestions = await getQuestionsByIds(questionIds);
+      const byId = new Map(
+        (Array.isArray(allQuestions) ? allQuestions : []).map((q) => [
+          Number(q.question_id ?? q.id),
+          q,
+        ])
+      );
 
       // Filter questions by IDs and maintain order
       const fetchedQuestions = questionIds
         .map((id) => {
-          const question = allQuestions.find(
-            (q) =>
-              q.question_id === id ||
-              q.id === id ||
-              q.question_id === parseInt(id) ||
-              q.id === parseInt(id)
-          );
+          const question = byId.get(Number(id));
           if (!question) {
             console.warn(`Question with ID ${id} not found`);
           }
@@ -305,15 +300,11 @@ const CustomizePaper = () => {
         body: JSON.stringify(bodyArray),
       }));
 
-      // Fetch the new question details
-      const response = await apiClient.get(`/question`);
-      const allQuestions = response.data?.questions || response.data || [];
-      const selectedQuestion = allQuestions.find(
+      // Fetch just the new question.
+      const fetched = await getQuestionsByIds([questionId]);
+      const selectedQuestion = (Array.isArray(fetched) ? fetched : []).find(
         (q) =>
-          q.question_id === questionId ||
-          q.id === questionId ||
-          q.question_id === parseInt(questionId) ||
-          q.id === parseInt(questionId)
+          Number(q.question_id ?? q.id) === Number(questionId)
       );
 
       if (selectedQuestion) {
