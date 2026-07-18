@@ -6,6 +6,7 @@ import Loader from "../Common/loader/loader";
 import HeaderCard from "../Cards/HeaderCard";
 // Use CustomPaper's exact pagination logic
 import apiClient from "../../services/apiClient";
+import { getQuestionsByIds } from "../../services/adminService";
 import { QuestionImageBlock } from "../Common/QuestionImageBlock";
 import { estimateImageBlockHeight } from "../../utils/questionImage";
 import { seededMatchOrder } from "../../utils/matchShuffle";
@@ -37,14 +38,15 @@ const TemplateDetail = () => {
         return;
       }
 
-      // Fetch all questions
-      const response = await apiClient.get(`/question`);
-      const allQuestions = response.data?.questions || response.data || [];
-
-      // Filter questions by IDs and maintain order
+      // Fetch ONLY these questions (not the whole bank).
+      const list = await getQuestionsByIds(questionIds);
+      const byId = new Map(
+        (Array.isArray(list) ? list : []).map((q) => [Number(q.question_id ?? q.id), q])
+      );
+      // Maintain the template's stored order.
       const fetchedQuestions = questionIds
-        .map((id) => allQuestions.find((q) => q.question_id === id))
-        .filter((q) => q !== undefined);
+        .map((qid) => byId.get(Number(qid)))
+        .filter(Boolean);
 
       // Add number property for proper numbering
       const numberedQuestions = fetchedQuestions.map((q, index) => ({

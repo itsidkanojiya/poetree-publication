@@ -5,6 +5,7 @@ import { viewTemplate, cloneTemplate } from "../../services/paperService";
 import Toast from "../Common/Toast";
 import Loader from "../Common/loader/loader";
 import apiClient from "../../services/apiClient";
+import { getQuestionsByIds } from "../../services/adminService";
 
 const ViewTemplate = () => {
   const { id } = useParams();
@@ -27,30 +28,16 @@ const ViewTemplate = () => {
         return;
       }
 
-      console.log("Fetching questions for IDs:", questionIds);
-
-      // Fetch all questions
-      const response = await apiClient.get(`/question`);
-      const allQuestions = response.data?.questions || response.data || [];
-      
-      console.log("Total questions fetched:", allQuestions.length);
-      
-      // Filter questions by IDs and maintain order
-      // Try both question_id and id fields for matching
+      // Fetch ONLY these questions (not the whole bank).
+      const list = await getQuestionsByIds(questionIds);
+      const byId = new Map(
+        (Array.isArray(list) ? list : []).map((q) => [Number(q.question_id ?? q.id), q])
+      );
+      // Maintain the template's stored order.
       const fetchedQuestions = questionIds
-        .map((id) => {
-          const question = allQuestions.find((q) => 
-            q.question_id === id || q.id === id || q.question_id === parseInt(id) || q.id === parseInt(id)
-          );
-          if (!question) {
-            console.warn(`Question with ID ${id} not found`);
-          }
-          return question;
-        })
-        .filter((q) => q !== undefined);
-      
-      console.log("Questions found:", fetchedQuestions.length, "out of", questionIds.length);
-      
+        .map((qid) => byId.get(Number(qid)))
+        .filter(Boolean);
+
       // Add number property for proper numbering
       const numberedQuestions = fetchedQuestions.map((q, index) => ({
         ...q,
