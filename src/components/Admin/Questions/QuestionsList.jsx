@@ -8,6 +8,7 @@ import {
   getAllSubjects,
   getAllBoards,
   getAllSubjectTitles,
+  getSubjectTitlesFiltered,
   getAllStandards,
   getChaptersBySubjectTitle,
 } from "../../../services/adminService";
@@ -29,6 +30,7 @@ const QuestionsList = ({ questionType }) => {
   const [filterSubjectTitleId, setFilterSubjectTitleId] = useState("");
   const [filterChapterId, setFilterChapterId] = useState("");
   const [filterBoardId, setFilterBoardId] = useState("");
+  const [filterStandard, setFilterStandard] = useState("");
   const [subjects, setSubjects] = useState([]);
   const [boards, setBoards] = useState([]);
   const [standards, setStandards] = useState([]);
@@ -60,15 +62,14 @@ const QuestionsList = ({ questionType }) => {
   useEffect(() => {
     const fetchFilters = async () => {
       try {
-        const [subjectsData, boardsData, titlesData, standardsData] = await Promise.all([
+        // Subject titles are loaded separately (they cascade off subject + standard).
+        const [subjectsData, boardsData, standardsData] = await Promise.all([
           getAllSubjects(),
           getAllBoards(),
-          getAllSubjectTitles(),
           getAllStandards(),
         ]);
         setSubjects(Array.isArray(subjectsData) ? subjectsData : []);
         setBoards(Array.isArray(boardsData) ? boardsData : []);
-        setSubjectTitles(Array.isArray(titlesData) ? titlesData : []);
         const stdList = Array.isArray(standardsData) ? standardsData : [];
         setStandards(stdList.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)));
       } catch (e) {
@@ -80,7 +81,29 @@ const QuestionsList = ({ questionType }) => {
 
   useEffect(() => {
     filterQuestions();
-  }, [questions, searchTerm, filterSubjectId, filterSubjectTitleId, filterChapterId, filterBoardId]);
+  }, [questions, searchTerm, filterSubjectId, filterSubjectTitleId, filterChapterId, filterBoardId, filterStandard]);
+
+  // Subject titles cascade off Subject + Standard: only titles belonging to the
+  // chosen subject/standard are offered (all titles when neither is set).
+  useEffect(() => {
+    let cancelled = false;
+    const loadTitles = async () => {
+      try {
+        const list =
+          filterSubjectId || filterStandard
+            ? await getSubjectTitlesFiltered({
+                subject_id: filterSubjectId || undefined,
+                standard: filterStandard || undefined,
+              })
+            : await getAllSubjectTitles();
+        if (!cancelled) setSubjectTitles(Array.isArray(list) ? list : []);
+      } catch (e) {
+        if (!cancelled) console.error("Error fetching subject titles:", e);
+      }
+    };
+    loadTitles();
+    return () => { cancelled = true; };
+  }, [filterSubjectId, filterStandard]);
 
   // Fetch chapters when subject title filter is set (for chapter filter dropdown)
   useEffect(() => {
@@ -153,6 +176,10 @@ const QuestionsList = ({ questionType }) => {
     if (filterChapterId) {
       const cid = Number(filterChapterId);
       filtered = filtered.filter((q) => Number(q.chapter_id) === cid);
+    }
+    if (filterStandard) {
+      const st = Number(filterStandard);
+      filtered = filtered.filter((q) => Number(q.standard) === st);
     }
     if (filterBoardId) {
       const bid = Number(filterBoardId);
@@ -378,9 +405,28 @@ const QuestionsList = ({ questionType }) => {
         <div className="flex flex-col lg:flex-row lg:items-center gap-3">
           {/* Filters inline in toolbar */}
           <div className="flex flex-wrap items-center gap-2 shrink-0">
+            {/* Cascading filters: Board → Subject → Standard → Title → Chapter.
+                Changing one clears the ones below it so the selection stays valid. */}
+            <select
+              value={filterBoardId}
+              onChange={(e) => setFilterBoardId(e.target.value)}
+              className="px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-white min-w-[120px]"
+              title="Filter by Board"
+            >
+              <option value="">Board: All</option>
+              {boards.map((b) => (
+                <option key={b.board_id} value={b.board_id}>
+                  {b.board_name}
+                </option>
+              ))}
+            </select>
             <select
               value={filterSubjectId}
-              onChange={(e) => setFilterSubjectId(e.target.value)}
+              onChange={(e) => {
+                setFilterSubjectId(e.target.value);
+                setFilterSubjectTitleId("");
+                setFilterChapterId("");
+              }}
               className="px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-white min-w-[120px]"
               title="Filter by Subject"
             >
@@ -388,6 +434,23 @@ const QuestionsList = ({ questionType }) => {
               {subjects.map((s) => (
                 <option key={s.subject_id} value={s.subject_id}>
                   {s.subject_name}
+                </option>
+              ))}
+            </select>
+            <select
+              value={filterStandard}
+              onChange={(e) => {
+                setFilterStandard(e.target.value);
+                setFilterSubjectTitleId("");
+                setFilterChapterId("");
+              }}
+              className="px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-white min-w-[110px]"
+              title="Filter by Standard"
+            >
+              <option value="">Std: All</option>
+              {standards.map((s) => (
+                <option key={s.standard_id} value={s.standard_id}>
+                  {s.name ?? `Std ${s.standard_id}`}
                 </option>
               ))}
             </select>
@@ -418,19 +481,6 @@ const QuestionsList = ({ questionType }) => {
               {chapters.map((ch) => (
                 <option key={ch.chapter_id} value={ch.chapter_id}>
                   {ch.chapter_name}
-                </option>
-              ))}
-            </select>
-            <select
-              value={filterBoardId}
-              onChange={(e) => setFilterBoardId(e.target.value)}
-              className="px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-white min-w-[120px]"
-              title="Filter by Board"
-            >
-              <option value="">Board: All</option>
-              {boards.map((b) => (
-                <option key={b.board_id} value={b.board_id}>
-                  {b.board_name}
                 </option>
               ))}
             </select>
