@@ -3557,28 +3557,22 @@ const CustomPaper = () => {
                                 >
                                   {sectionLetter}){" "}
                                   {(() => {
-                                    // Get subject name from first question in section
+                                    // Language comes from the subject name: prefer the
+                                    // section's own questions, else the paper header's
+                                    // subject. getQuestionTypeTitle always falls back to
+                                    // the full English title (never the short label).
                                     const firstQuestion =
                                       section.selectedQuestions[0];
-                                    if (
-                                      firstQuestion &&
-                                      firstQuestion.subject_id
-                                    ) {
-                                      const subjectName =
-                                        approvedSubjectsMap.get(
-                                          firstQuestion.subject_id
-                                        );
-
-                                      if (subjectName) {
-                                        const title = getQuestionTypeTitle(
-                                          sectionTypeNormalized,
-                                          null,
-                                          subjectName
-                                        );
-                                        return title || QUESTION_TYPE_CONFIG[sectionTypeNormalized]?.label || "";
-                                      }
-                                    }
-                                    return QUESTION_TYPE_CONFIG[sectionTypeNormalized]?.label || "";
+                                    const subjectName =
+                                      (firstQuestion?.subject_id &&
+                                        approvedSubjectsMap.get(firstQuestion.subject_id)) ||
+                                      (paperHeader || header)?.subject ||
+                                      "";
+                                    return getQuestionTypeTitle(
+                                      sectionTypeNormalized,
+                                      null,
+                                      subjectName
+                                    );
                                   })()}
                                 </h3>
                                 <span
