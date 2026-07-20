@@ -2,12 +2,13 @@ import { Check } from "lucide-react";
 
 const STEPS = [
   { key: "header", label: "Paper header" },
-  { key: "targets", label: "Smart settings" },
+  { key: "chapters", label: "Chapters" },
+  { key: "targets", label: "Questions & difficulty" },
 ];
 
 /**
  * Horizontal stepper for the Smart paper wizard configuration steps.
- * @param {0|1} activeIndex — 0 = header, 1 = targets (smart settings)
+ * @param {0|1|2} activeIndex — 0 = header, 1 = chapters (%), 2 = questions & difficulty
  */
 export default function SmartPaperStepper({ activeIndex = 0 }) {
   return (

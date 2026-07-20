@@ -441,7 +441,7 @@ const CustomPaper = () => {
   const [loadingChapters, setLoadingChapters] = useState(false);
 
   const [smartWizardActive, setSmartWizardActive] = useState(false);
-  /** header → subject → targets → generating → preview */
+  /** header → chapters → targets → generating → preview */
   const [smartWizardStep, setSmartWizardStep] = useState("header");
   // total_marks is informational only in count mode; kept for API compatibility.
   const [smartTotalMarks] = useState(80);
@@ -2009,9 +2009,9 @@ const CustomPaper = () => {
       });
       return;
     }
-    // Subject context comes from the chosen teaching context, so skip straight
-    // to the smart settings step.
-    setSmartWizardStep("targets");
+    // Subject context comes from the chosen teaching context, so the next step is
+    // the chapter mix (%), then questions & difficulty.
+    setSmartWizardStep("chapters");
   };
 
   if (smartWizardActive && smartWizardStep === "header") {
@@ -2185,6 +2185,171 @@ const CustomPaper = () => {
     );
   }
 
+  // Step 2 — Chapter mix. The percentages must add up to 100 before continuing;
+  // Submit only advances (the paper is generated on the next step).
+  if (smartWizardActive && smartWizardStep === "chapters") {
+    const chapterPercentTotal = smartChapterPercents.reduce(
+      (s, c) => s + (Number(c.percent) || 0),
+      0
+    );
+    const chapterTotalRounded = Math.round(chapterPercentTotal * 100) / 100;
+    const chapterTotalOk = Math.abs(chapterPercentTotal - 100) <= 0.01;
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40">
+        <div className="bg-white/80 backdrop-blur-lg border-b border-gray-200/50 px-6 py-4 sticky top-0 z-50 shadow-lg shadow-gray-200/50">
+          <div className="flex flex-wrap items-center justify-between gap-3 w-full max-w-5xl mx-auto">
+            <div className="flex items-center gap-4">
+              <button
+                type="button"
+                onClick={() => setShowBackConfirm(true)}
+                className="group flex items-center gap-2 px-3 py-2 text-gray-700 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200 font-medium"
+              >
+                <ChevronLeft
+                  size={20}
+                  className="group-hover:-translate-x-1 transition-transform"
+                />
+                <span>Back to Dashboard</span>
+              </button>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Sparkles size={22} className="text-indigo-600" />
+                <span className="font-bold text-gray-800">Smart paper</span>
+                <span className="text-xs font-semibold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-full border border-indigo-100">
+                  Step 2 — Chapters
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="max-w-3xl mx-auto px-6 py-8 pb-16">
+          <SmartPaperStepper activeIndex={1} />
+          <p className="text-gray-600 text-sm mb-6">
+            Choose how much of the paper comes from each chapter. The percentages must add up to 100%.
+          </p>
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+            <div className="px-6 py-4 bg-gradient-to-r from-indigo-500 to-violet-600 text-white flex items-center gap-3">
+              <Sparkles size={22} />
+              <div>
+                <div className="font-bold text-base">Chapter mix</div>
+                <div className="text-xs text-indigo-100">
+                  Share of the paper taken from each chapter
+                </div>
+              </div>
+            </div>
+            <div className="p-6 space-y-5 border-t border-gray-100 bg-gradient-to-b from-white to-slate-50/80">
+              {!subjectTitleIdForChapters && (
+                <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
+                  <p className="font-bold mb-1">Header required</p>
+                  <p className="mb-2">
+                    Your <strong>paper header</strong> must include <strong>Subject title, Board, and Standard</strong>.
+                  </p>
+                  <p>
+                    Go to <strong>Generate → Edit header</strong>, fill those fields, then open <strong>Smart paper</strong> again from the sidebar.
+                  </p>
+                </div>
+              )}
+
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-bold text-gray-800">Chapter mix (%)</span>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={resetSmartChapterPercents}
+                      className="text-xs font-semibold text-gray-500 hover:underline"
+                    >
+                      Set all to 0
+                    </button>
+                    <button
+                      type="button"
+                      onClick={normalizeSmartChapterPercents}
+                      className="text-xs font-semibold text-indigo-600 hover:underline"
+                    >
+                      Normalize to 100%
+                    </button>
+                  </div>
+                </div>
+                <p className="text-[11px] text-gray-500 mb-2">
+                  Sets how your chosen questions are spread across chapters (best effort). Use “Normalize to 100%” to balance.
+                </p>
+                {smartChapterPercents.length === 0 ? (
+                  <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                    No chapters assigned to this standard for this subject title. Assign a
+                    standard to chapters under Subject Titles → Manage Chapters.
+                  </p>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {smartChapterPercents.map((row) => {
+                        const ch = chapters.find((c) => c.chapter_id === row.chapter_id);
+                        const chapterLabel = `${
+                          ch?.chapter_number != null ? `${ch.chapter_number}. ` : ""
+                        }${ch?.chapter_name || `Chapter ${row.chapter_id}`}`;
+                        return (
+                          <div key={row.chapter_id} className="flex items-center gap-2">
+                            <span className="text-sm text-gray-700 flex-1 truncate" title={chapterLabel}>
+                              {chapterLabel}
+                            </span>
+                            <input
+                              type="number"
+                              min={0}
+                              max={100}
+                              value={row.percent}
+                              onChange={(e) =>
+                                updateSmartChapterPercent(row.chapter_id, e.target.value)
+                              }
+                              className="w-16 px-2 py-1.5 border-2 border-gray-200 rounded-lg text-sm"
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {/* Live total — Submit stays disabled until this is exactly 100% */}
+                    <div
+                      className={`mt-4 flex items-center justify-between rounded-xl border-2 px-4 py-3 ${
+                        chapterTotalOk
+                          ? "border-emerald-300 bg-emerald-50"
+                          : "border-amber-300 bg-amber-50"
+                      }`}
+                    >
+                      <span className="text-sm font-bold text-gray-800">Total</span>
+                      <span
+                        className={`text-sm font-bold ${
+                          chapterTotalOk ? "text-emerald-700" : "text-amber-800"
+                        }`}
+                      >
+                        {chapterTotalRounded}%{chapterTotalOk ? "" : " — must be 100%"}
+                      </span>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <div className="flex flex-col-reverse sm:flex-row gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setSmartWizardStep("header")}
+                  className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl border-2 border-gray-300 font-semibold text-gray-700 hover:bg-gray-50"
+                >
+                  <ChevronLeft size={18} />
+                  Back to paper header
+                </button>
+                <button
+                  type="button"
+                  disabled={!chapterTotalOk || smartChapterPercents.length === 0}
+                  onClick={() => setSmartWizardStep("targets")}
+                  className="flex-1 inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-bold text-white bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 disabled:opacity-50 shadow-lg"
+                >
+                  Submit
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (smartWizardActive && smartWizardStep === "targets") {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40">
@@ -2206,7 +2371,7 @@ const CustomPaper = () => {
                 <Sparkles size={22} className="text-indigo-600" />
                 <span className="font-bold text-gray-800">Smart paper</span>
                 <span className="text-xs font-semibold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-full border border-indigo-100">
-                  Step 3 — Smart settings
+                  Step 3 — Questions &amp; difficulty
                 </span>
               </div>
             </div>
@@ -2214,17 +2379,17 @@ const CustomPaper = () => {
         </div>
 
         <div className="max-w-3xl mx-auto px-6 py-8 pb-16">
-          <SmartPaperStepper activeIndex={1} />
+          <SmartPaperStepper activeIndex={2} />
           <p className="text-gray-600 text-sm mb-6">
-            Set targets for your paper. After you submit, you will see a brief generating screen, then the full preview with download and save.
+            Choose how many questions of each type, and the easy/medium/hard mix. After you generate, you will see a brief generating screen, then the full preview with download and save.
           </p>
           <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
             <div className="px-6 py-4 bg-gradient-to-r from-indigo-500 to-violet-600 text-white flex items-center gap-3">
               <Sparkles size={22} />
               <div>
-                <div className="font-bold text-base">Smart paper settings</div>
+                <div className="font-bold text-base">Questions &amp; difficulty</div>
                 <div className="text-xs text-indigo-100">
-                  Question counts per type, difficulty mix, and chapter balance
+                  Number of questions per type and the easy/medium/hard mix
                 </div>
               </div>
             </div>
@@ -2512,77 +2677,25 @@ const CustomPaper = () => {
                 </div>
               </div>
 
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-bold text-gray-800">Chapter mix (%)</span>
-                  <div className="flex items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={resetSmartChapterPercents}
-                      className="text-xs font-semibold text-gray-500 hover:underline"
-                    >
-                      Set all to 0
-                    </button>
-                    <button
-                      type="button"
-                      onClick={normalizeSmartChapterPercents}
-                      className="text-xs font-semibold text-indigo-600 hover:underline"
-                    >
-                      Normalize to 100%
-                    </button>
-                  </div>
-                </div>
-                <p className="text-[11px] text-gray-500 mb-2">
-                  Sets how your chosen questions are spread across chapters (best effort). Use “Normalize to 100%” to balance.
-                </p>
-                {smartChapterPercents.length === 0 ? (
-                  <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
-                    No chapters assigned to this standard for this subject title. Assign a
-                    standard to chapters under Subject Titles → Manage Chapters.
-                  </p>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {smartChapterPercents.map((row) => {
-                      const ch = chapters.find((c) => c.chapter_id === row.chapter_id);
-                      const chapterLabel = `${
-                        ch?.chapter_number != null ? `${ch.chapter_number}. ` : ""
-                      }${ch?.chapter_name || `Chapter ${row.chapter_id}`}`;
-                      return (
-                        <div key={row.chapter_id} className="flex items-center gap-2">
-                          <span className="text-sm text-gray-700 flex-1 truncate" title={chapterLabel}>
-                            {chapterLabel}
-                          </span>
-                          <input
-                            type="number"
-                            min={0}
-                            max={100}
-                            value={row.percent}
-                            onChange={(e) =>
-                              updateSmartChapterPercent(row.chapter_id, e.target.value)
-                            }
-                            className="w-16 px-2 py-1.5 border-2 border-gray-200 rounded-lg text-sm"
-                          />
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
               <div className="flex flex-col-reverse sm:flex-row gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => setSmartWizardStep("header")}
+                  onClick={() => setSmartWizardStep("chapters")}
                   className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl border-2 border-gray-300 font-semibold text-gray-700 hover:bg-gray-50"
                 >
                   <ChevronLeft size={18} />
-                  Back to paper header
+                  Back to chapters
                 </button>
                 <button
                   type="button"
                   disabled={
                     approvedSubjectIds.length === 0 ||
                     !subjectTitleIdForChapters ||
-                    smartSectionQuestionTotal < 1
+                    smartSectionQuestionTotal < 1 ||
+                    // Safety net — the chapter step already enforces this.
+                    Math.abs(
+                      smartChapterPercents.reduce((s, c) => s + (Number(c.percent) || 0), 0) - 100
+                    ) > 0.01
                   }
                   onClick={handleSmartPaperGenerate}
                   className="flex-1 inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-bold text-white bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 disabled:opacity-50 shadow-lg"
