@@ -709,13 +709,24 @@ export const smartProposePaper = async (payload) => {
  * Per question-type marks breakdown for the current teaching context.
  * Used to show a live estimated total (count × unit_marks) before generating.
  */
-export const getMarksBreakdown = async ({ subject_title_id, board_id, standard }) => {
+export const getMarksBreakdown = async ({
+  subject_title_id,
+  board_id,
+  standard,
+  chapter_ids,
+}) => {
   try {
+    // chapter_ids (optional) scopes the "available" counts to the chapters actually
+    // chosen for the paper; omitted = every chapter of the subject title.
+    const ids = Array.isArray(chapter_ids)
+      ? chapter_ids.map((n) => Number(n)).filter((n) => Number.isFinite(n))
+      : [];
     const response = await apiClient.get("/papers/marks-breakdown", {
       params: {
         subject_title_id: Number(subject_title_id),
         board_id: Number(board_id),
         standard: Number(standard),
+        ...(ids.length > 0 ? { chapter_ids: ids.join(",") } : {}),
       },
     });
     return response.data;

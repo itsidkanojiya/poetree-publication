@@ -837,6 +837,20 @@ const CustomPaper = () => {
       ? effectiveHeaderForChapter.board
       : null;
 
+  // Chapters the teacher actually allocated (percent > 0). The "N available" counts
+  // are scoped to these so they reflect the chosen chapters, not the whole subject
+  // title. Keyed by the id SET, so editing a percentage doesn't refetch.
+  const smartSelectedChapterIds = useMemo(
+    () =>
+      smartChapterPercents
+        .filter((c) => (Number(c.percent) || 0) > 0)
+        .map((c) => Number(c.chapter_id))
+        .filter((n) => Number.isFinite(n))
+        .sort((a, b) => a - b),
+    [smartChapterPercents]
+  );
+  const smartSelectedChapterKey = smartSelectedChapterIds.join(",");
+
   // Fetch per-type marks so we can show a live estimated total before generating.
   useEffect(() => {
     if (!subjectTitleIdForChapters || !boardForChapters || standardForChapters == null) {
@@ -844,10 +858,14 @@ const CustomPaper = () => {
       return;
     }
     let cancelled = false;
+    const chapterIds = smartSelectedChapterKey
+      ? smartSelectedChapterKey.split(",").map((s) => Number(s))
+      : [];
     getMarksBreakdown({
       subject_title_id: subjectTitleIdForChapters,
       board_id: boardForChapters,
       standard: standardForChapters,
+      chapter_ids: chapterIds,
     })
       .then((res) => {
         if (!cancelled) setSmartMarksByType(res?.by_type || null);
@@ -856,7 +874,7 @@ const CustomPaper = () => {
         if (!cancelled) setSmartMarksByType(null);
       });
     return () => { cancelled = true; };
-  }, [subjectTitleIdForChapters, boardForChapters, standardForChapters]);
+  }, [subjectTitleIdForChapters, boardForChapters, standardForChapters, smartSelectedChapterKey]);
 
   useEffect(() => {
     if (!chapters.length) {
@@ -2547,6 +2565,7 @@ const CustomPaper = () => {
                               {smartMarksByType?.[key] && (
                                 <>
                                   {smartMarksByType[key].available} available
+                                  {smartSelectedChapterIds.length > 0 && " in selected chapters"}
                                   {(Number(smartSectionCounts[key]) || 0) >
                                     smartMarksByType[key].available && (
                                     <span className="text-amber-700 font-semibold">
