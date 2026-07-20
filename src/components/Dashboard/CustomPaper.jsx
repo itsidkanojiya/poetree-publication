@@ -34,6 +34,7 @@ import MathText from "../Common/MathText";
 import { QuestionText, QuestionImageBlock } from "../Common/QuestionImageBlock";
 import { QuestionBody, OptionBody, MatchItemBody, renderRichHtml } from "../Common/QuestionBody";
 import { seededMatchOrder } from "../../utils/matchShuffle";
+import { getSectionTitle, DEFAULT_MARKS_PER_TYPE } from "../../utils/sectionTitles";
 import { estimateImageBlockHeight } from "../../utils/questionImage";
 import Loader from "../Common/loader/loader";
 import SmartPaperStepper from "./SmartPaperStepper";
@@ -219,59 +220,8 @@ const humanizeSmartWarning = (w) => {
   return w;
 };
 
-// Language-specific question type titles
-const titles = {
-  mcq: "Multiple Choice Questions (MCQs). Tick the correct options.",
-  blanks: "Fill in the blanks in each sentence with an appropriate word.",
-  true_false: "Write (T) for True and (F) for False.",
-  onetwo: "Answer the following questions in one or two sentences.",
-  short: "Short Answer Questions.",
-  long: "Long Answer Questions.",
-  passage: "Read the passage and answer the following questions.",
-  match: "Match the following.",
-};
-
-const hindiTitles = {
-  mcq: "⁠बहुविकल्पीय प्रश्न (MCQs)। सही विकल्पों पर टिक कीजिए।",
-  blanks: "⁠प्रत्येक वाक्य में रिक्त स्थानों को एक उपयुक्त शब्द से भरें।",
-  true_false: "⁠सत्य के लिए (T) और असत्य के लिए (F) लिखें।",
-  onetwo: "⁠निम्नलिखित प्रश्नों के उत्तर एक या दो वाक्यों में दीजिए।",
-  short: "⁠लघु उत्तरीय प्रश्न।",
-  long: "दीर्घ उत्तरीय प्रश्न।",
-  passage: "⁠गद्यांश पढ़कर निम्नलिखित प्रश्नों के उत्तर दीजिए।",
-  match: "⁠सुमेलित कीजिए।",
-};
-
-const gujaratiTitles = {
-  mcq: "નીચે આપેલા વિકલ્પોમાંથી યોગ્ય વિકલ્પ પસંદ કરી ખરાં ✓ ની નિશાની કરો.",
-  blanks: "યોગ્ય શબ્દ પસંદ કરી ખાલી જગ્યા પૂરો.",
-  true_false:
-    "ખરાં વાક્ય સામે ખરાં  ✓ અને ખોટાં વાક્ય સામે ખોટાં × ની નિશાની કરો.",
-  onetwo: "નીચે આપેલા પ્રશ્નોના બે ત્રણ વાક્યમાં જવાબ લખો. ",
-  short: "નીચે આપેલા પ્રશ્નોના જવાબ ટૂંકમાં લખો.",
-  long: "નીચે આપેલા પ્રશ્નોના જવાબ વિસ્તારપૂર્વક લખો.",
-  passage: "અંશ વાંચી નીચેના પ્રશ્નોના જવાબ લખો.",
-  match: "જોડકાં જોડો.",
-};
-
-// Function to detect language from subject name
-const detectLanguage = (subjectName) => {
-  if (!subjectName) return "english";
-
-  // Check for Gujarati script (Unicode range: 0x0A80-0x0AFF)
-  if (/[\u0A80-\u0AFF]/.test(subjectName)) {
-    return "gujarati";
-  }
-
-  // Check for Hindi/Devanagari script (Unicode range: 0x0900-0x097F)
-  if (/[\u0900-\u097F]/.test(subjectName)) {
-    return "hindi";
-  }
-
-  // Default to English for subjects like Mathematics, Science, English, etc.
-  // All subjects with English names (no Indic script) default to English
-  return "english";
-};
+// Section titles + language detection are shared across every paper renderer:
+// see src/utils/sectionTitles.js (imported as getSectionTitle above).
 
 // Shuffle array (mixed order) for "all questions" view
 const shuffleArray = (arr) => {
@@ -369,39 +319,10 @@ const normalizeQuestionType = (type) => {
   return type === "truefalse" ? "true_false" : type;
 };
 
-// Function to get question type title based on language
-const getQuestionTypeTitle = (questionType, language, subjectName) => {
-  // Determine language if not provided
-  const lang = language || detectLanguage(subjectName);
-
-  // Map question types to title keys
-  const typeMapping = {
-    mcq: "mcq",
-    blank: "blanks",
-    short: "short",
-    long: "long",
-  };
-
-  const titleKey = typeMapping[questionType] || questionType;
-
-  // Get appropriate title based on language
-  switch (lang) {
-    case "gujarati":
-      return (
-        gujaratiTitles[titleKey] ||
-        titles[titleKey] ||
-        QUESTION_TYPE_CONFIG[questionType]?.label
-      );
-    case "hindi":
-      return (
-        hindiTitles[titleKey] ||
-        titles[titleKey] ||
-        QUESTION_TYPE_CONFIG[questionType]?.label
-      );
-    default:
-      return titles[titleKey] || QUESTION_TYPE_CONFIG[questionType]?.label;
-  }
-};
+// Section title for a question type, in the paper's language (shared resolver).
+const getQuestionTypeTitle = (questionType, language, subjectName) =>
+  getSectionTitle(questionType, subjectName, language) ||
+  QUESTION_TYPE_CONFIG[questionType]?.label;
 
 const CustomPaper = () => {
   const { user } = useAuth();
@@ -474,20 +395,11 @@ const CustomPaper = () => {
     const storedData = localStorage.getItem("questionSections");
     return storedData ? JSON.parse(storedData) : INITIAL_QUESTION_SECTIONS;
   });
+  // v2 key: the standard marks per type changed (onetwo 1, short 2, passage 3,
+  // match 4), so the old cached values must not stick.
   const [marksPerType, setMarksPerType] = useState(() => {
-    const storedMarks = localStorage.getItem("marksPerType");
-    return storedMarks
-      ? JSON.parse(storedMarks)
-      : {
-          mcq: 1,
-          blank: 1,
-          true_false: 1,
-          onetwo: 2,
-          short: 3,
-          long: 5,
-          passage: 2,
-          match: 2,
-        };
+    const storedMarks = localStorage.getItem("marksPerType_v2");
+    return storedMarks ? JSON.parse(storedMarks) : { ...DEFAULT_MARKS_PER_TYPE };
   });
 
   // Save to localStorage whenever sections change
@@ -497,7 +409,7 @@ const CustomPaper = () => {
 
   // Save marks to localStorage whenever they change
   useEffect(() => {
-    localStorage.setItem("marksPerType", JSON.stringify(marksPerType));
+    localStorage.setItem("marksPerType_v2", JSON.stringify(marksPerType));
   }, [marksPerType]);
 
   // Load paper data in edit mode

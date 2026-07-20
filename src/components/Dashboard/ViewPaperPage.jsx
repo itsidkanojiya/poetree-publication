@@ -11,6 +11,7 @@ import MathText from "../Common/MathText";
 import { QuestionText, QuestionImageBlock } from "../Common/QuestionImageBlock";
 import { QuestionBody, OptionBody, renderRichHtml } from "../Common/QuestionBody";
 import { seededMatchOrder } from "../../utils/matchShuffle";
+import { getSectionTitle as resolveSectionTitle } from "../../utils/sectionTitles";
 import { estimateImageBlockHeight } from "../../utils/questionImage";
 
 const QUESTION_TYPE_CONFIG = {
@@ -24,26 +25,15 @@ const QUESTION_TYPE_CONFIG = {
   match: { label: "Match the Following" },
 };
 
-const titles = {
-  mcq: "Multiple Choice Questions (MCQs). Tick the correct options.",
-  blanks: "Fill in the blanks in each sentence with an appropriate word.",
-  true_false: "Write (T) for True and (F) for False.",
-  onetwo: "Answer the following questions in one or two sentences.",
-  short: "Short Answer Questions.",
-  long: "Long Answer Questions.",
-  passage: "Read the passage and answer the following questions.",
-  match: "Match the following.",
-};
-
 const normalizeQuestionType = (type) => {
   if (!type) return type;
   return type === "truefalse" ? "true_false" : type;
 };
 
-const getSectionTitle = (type) => {
-  const key = type === "blank" ? "blanks" : type;
-  return titles[key] || QUESTION_TYPE_CONFIG[type]?.label || type;
-};
+// Section title in the paper's language (resolved from the subject name).
+// Previously this was English-only, so a Hindi/Gujarati paper printed English headings.
+const getSectionTitle = (type, subjectName) =>
+  resolveSectionTitle(type, subjectName) || QUESTION_TYPE_CONFIG[type]?.label || type;
 
 // Fixed page size for PDF (no header cut, multi-page).
 // These constants + the per-question pagination below are kept in sync with
@@ -611,7 +601,7 @@ const ViewPaperPage = () => {
                               color: "#2563eb",
                             }}
                           >
-                            {sectionLetter}) {getSectionTitle(sectionType)}
+                            {sectionLetter}) {getSectionTitle(sectionType, paper?.subject)}
                           </h3>
                           <span
                             style={{
