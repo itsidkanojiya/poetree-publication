@@ -948,8 +948,9 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
               </div>
             </div>
 
-            {/* Question Field */}
-            <div>
+            {/* Question Field — hidden for synonyms/antonyms, where the WORDS are the
+                question (asking for both would be redundant and doubly mandatory). */}
+            <div className={isWordListType ? "hidden" : ""}>
               <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                 <label className="block text-sm font-semibold text-gray-700">
                   Question <span className="text-red-500">*</span>
@@ -1015,10 +1016,9 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
                   Words <span className="text-red-500">*</span>
                 </label>
                 <p className="mb-3 text-sm text-gray-500">
-                  Add as many words as you like — they print together as one question
-                  ({getType(questionType)?.defaultMarks ?? 3} marks by default), side by
-                  side on the paper. The answer column is optional and only shows in the
-                  answer key.
+                  The words <strong>are</strong> the question — add as many as you like.
+                  They print side by side on the paper as one question worth the marks
+                  above. The answer column is optional and only shows in the answer key.
                 </p>
                 {wordList.map((row, index) => (
                   <div key={index} className="flex gap-2 mb-2 items-start">
