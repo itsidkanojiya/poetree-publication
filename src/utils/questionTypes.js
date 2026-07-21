@@ -202,10 +202,11 @@ export const QUESTION_TYPES = [
     // Words print side-by-side in a wrapping row: (1) સુંદર  (2) નદી  (3) મિત્ર
     layout: "row",
     group: "language",
-    // 1 mark each x 3 words => the section prints "3 marks". Marks may be
-    // fractional (e.g. 0.5) — the DB columns are DECIMAL for this reason.
-    defaultMarks: 1,
-    defaultCount: 3,
+    // 0.5 per WORD, so the section total is 0.5 x word count
+    // (4 words => 2 marks, 6 words => 3 marks). This is why marks are DECIMAL —
+    // as INTEGER, 0.5 truncated to 0.
+    defaultMarks: 0.5,
+    defaultCount: 4,
     color: "bg-lime-500",
     badge: "bg-lime-100 text-lime-700",
     languages: LANG_SUBJECTS,
@@ -223,8 +224,9 @@ export const QUESTION_TYPES = [
     short: "Antonyms",
     layout: "row",
     group: "language",
+    // 0.5 per WORD, same as synonyms (4 words => 2 marks).
     defaultMarks: 0.5,
-    defaultCount: 3,
+    defaultCount: 4,
     color: "bg-pink-500",
     badge: "bg-pink-100 text-pink-700",
     languages: LANG_SUBJECTS,
