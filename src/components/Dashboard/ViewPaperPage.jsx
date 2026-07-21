@@ -59,6 +59,17 @@ const COMPONENT_HEIGHTS = {
   MATCH_ROW: 40,
 };
 
+/** Gap between sections on a page (the content area uses space-y-6 = 24px). */
+const SECTION_GAP = 24;
+
+/** Height a section heading actually takes (16px title that wraps, plus margins). */
+const sectionHeaderHeight = (type, subjectName) => {
+  const title = getSectionTitle(type, subjectName) || "";
+  // ~610px of title width (page minus padding minus the marks label) at 16px.
+  const lines = Math.max(1, Math.ceil(String(title).length / 58));
+  return lines * 26 + 20;
+};
+
 const toOptionsArray = (options) => {
   if (Array.isArray(options)) return options;
   if (typeof options === "string") {
@@ -235,7 +246,7 @@ function estimateAnswerBlockHeight(question, mode) {
 
 const estimateQuestionHeight = (
   question,
-  { isFirstOfType, hasQuestionsOnPage, exportMode = "paper", measuredHeights }
+  { isFirstOfType, hasQuestionsOnPage, exportMode = "paper", measuredHeights, subjectName }
 ) => {
   // Prefer the REAL measured height (see the measurement layer in the component);
   // the constant-based estimate is only a first-paint fallback before measurement
@@ -259,7 +270,13 @@ const estimateQuestionHeight = (
     h += estimateAnswerBlockHeight(question, exportMode);
   }
 
-  if (isFirstOfType) h += COMPONENT_HEIGHTS.SECTION;
+  // Real header height, not a flat constant: the 16px title WRAPS for the long
+  // Gujarati/Hindi wordings, and sections are separated by space-y-6. Under-counting
+  // here overflows the fixed-height page, which clips content out of the PDF.
+  if (isFirstOfType) {
+    h += sectionHeaderHeight(question.type, subjectName);
+    if (hasQuestionsOnPage) h += SECTION_GAP;
+  }
   if (hasQuestionsOnPage) h += COMPONENT_HEIGHTS.SPACING;
   return h;
 };
@@ -267,7 +284,7 @@ const estimateQuestionHeight = (
 // Per-question pagination (mirrors CustomPaper.renderPages): a question that
 // doesn't fit is pushed to the next page instead of being clipped, and a single
 // section can span multiple pages (its title is printed once via printedTypes).
-function buildPages(sections, exportMode = "paper", measuredHeights = null) {
+function buildPages(sections, exportMode = "paper", measuredHeights = null, subjectName = "") {
   let pages = [];
   let currentHeight = PAGE_HEIGHT - HEADER_HEIGHT - CONTENT_PADDING;
   let currentPage = [];
@@ -284,6 +301,7 @@ function buildPages(sections, exportMode = "paper", measuredHeights = null) {
         hasQuestionsOnPage,
         exportMode,
         measuredHeights,
+        subjectName,
       });
 
       const availableHeight = currentHeight - MARGIN - SAFETY_BUFFER;
@@ -297,6 +315,7 @@ function buildPages(sections, exportMode = "paper", measuredHeights = null) {
           hasQuestionsOnPage: false,
           exportMode,
           measuredHeights,
+          subjectName,
         });
         currentPage.push({ type: question.type, selectedQuestions: [question] });
         currentHeight = PAGE_HEIGHT - CONTENT_PADDING - newQuestionHeight;
@@ -536,7 +555,7 @@ const ViewPaperPage = () => {
 
   const printedTypes = new Set();
   const questionCounters = {};
-  const pages = buildPages(sections, exportMode, measuredHeights);
+  const pages = buildPages(sections, exportMode, measuredHeights, paper?.subject);
 
   // Total questions per type across the whole paper (a section can span pages,
   // so a page chunk's length is not the section total). Used for section marks.

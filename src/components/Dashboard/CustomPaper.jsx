@@ -96,6 +96,9 @@ const SMART_SECTION_GROUPS = QUESTION_TYPE_GROUPS.map((g) => ({
 })).filter((g) => g.keys.length > 0);
 
 /** Collect unique chapter IDs from all selected questions (for chapter_ids when saving paper). */
+/** Gap between sections on a page (the content area uses space-y-6 = 24px). */
+const SECTION_GAP = 24;
+
 const getChapterIdsFromSections = (sections) => {
   const ids = new Set();
   (sections || []).forEach((section) => {
@@ -648,6 +651,19 @@ const CustomPaper = () => {
   const paperLanguage = detectPaperLanguage(effectiveHeaderForChapter?.subject);
   const allowedTypeKeys = typeKeysForLanguage(paperLanguage);
   const isTypeAllowed = (type) => allowedTypeKeys.includes(normalizeTypeKeyLocal(type));
+
+  /**
+   * Height a section heading actually takes: a 16px title (which WRAPS for the long
+   * Gujarati/Hindi wordings) plus its mb-1/mb-4 margins. The paginator used a flat
+   * 36px, which under-counted every wrapped title until the page overflowed and the
+   * content area scrolled — and a scrolled page loses content in the PDF.
+   */
+  const sectionHeaderHeight = (type) => {
+    const title = getSectionTitle(type, effectiveHeaderForChapter?.subject) || "";
+    // ~610px of title width (page minus padding minus the marks label) at 16px.
+    const lines = Math.max(1, Math.ceil(String(title).length / 58));
+    return lines * 26 + 20;
+  };
   const rawSubjectTitleId =
     effectiveHeaderForChapter?.subjectTitle ??
     effectiveHeaderForChapter?.subject_title_id ??
@@ -1672,7 +1688,11 @@ const CustomPaper = () => {
         // Calculate question height including spacing
         let questionHeight = questionBodyHeight(question);
         if (isFirstQuestionOfType) {
-          questionHeight += COMPONENT_HEIGHTS.SECTION;
+          // Real header height, not a flat constant: the title is 16px and long
+          // Gujarati/Hindi titles wrap, and sections are separated by space-y-6.
+          // Under-counting here is what made a page overflow and scroll.
+          questionHeight += sectionHeaderHeight(question.type);
+          if (currentPage.length > 0) questionHeight += SECTION_GAP;
         }
         // Add spacing between questions (except for first question on page)
         const hasQuestionsOnPage = currentPage.some(
@@ -1700,7 +1720,7 @@ const CustomPaper = () => {
           // Recalculate question height for new page (it's now first of its type on this page)
           // No spacing needed for first question on new page.
           const newQuestionHeight =
-            questionBodyHeight(question) + COMPONENT_HEIGHTS.SECTION;
+            questionBodyHeight(question) + sectionHeaderHeight(question.type);
 
           // Add question to new page
           currentPage.push({
