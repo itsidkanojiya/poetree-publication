@@ -1,8 +1,10 @@
 /**
  * Section (question-type) titles printed as the paper's section headings, per language.
  *
- * Single source of truth — these used to be duplicated in every paper renderer, which
- * let them drift. Import `getSectionTitle` instead of redefining them.
+ * The title text now lives in the question-type registry (src/utils/questionTypes.js)
+ * so a type's key, titles, marks and language scope are defined in ONE place. This
+ * module keeps the public API (`getSectionTitle`, `detectPaperLanguage`) so every
+ * existing caller is unchanged.
  *
  * Language is resolved from the SUBJECT NAME:
  *   1. by name — "Sanskrit"/"संस्कृत", "Hindi"/"हिंदी", "Gujarati"/"ગુજરાતી".
@@ -14,67 +16,7 @@
  *
  * Any title missing for a language falls back to English.
  */
-
-// Canonical title keys. NOTE: the question type is `blank` but the title key is
-// `blanks` — normalizeTitleKey bridges that so callers can pass either.
-const normalizeTitleKey = (type) => {
-  if (!type) return type;
-  if (type === "blank") return "blanks";
-  if (type === "truefalse") return "true_false";
-  return type;
-};
-
-export const englishTitles = {
-  mcq: "Multiple Choice Questions (MCQs). Tick the correct options.",
-  blanks: "Fill in the blanks in each sentence with an appropriate word.",
-  true_false: "Write (T) for True and (F) for False.",
-  onetwo: "Answer the following questions in one or two sentences.",
-  short: "Short Answer Questions.",
-  long: "Long Answer Questions.",
-  passage: "Read the passage and answer the following questions.",
-  match: "Match the following.",
-};
-
-export const hindiTitles = {
-  mcq: "निम्नलिखित प्रश्नों के उत्तर दिए गए विकल्पों में से सही विकल्प चुनकर लिखिए ।",
-  blanks: "रिक्तस्थानों की पूर्ति कीजिए ।",
-  true_false:
-    "निम्नलिखित कथनों में सही कथनों के सामने (✓) और गलत कथनों के सामने (✗) का निशान लगाइए ।",
-  onetwo: "निम्नलिखित प्रश्नों के उत्तर एक - एक वाक्य में दीजिए ।",
-  short: "निम्नलिखित प्रश्नों के उत्तर दो - तीन वाक्यों में लिखिए ।",
-  long: "निम्नलिखित प्रश्नों के उत्तर चार - पाँच वाक्यों में लिखिए ।",
-  passage: "दिए गए काव्य को पढ़कर नीचे लिखे प्रश्नों के उत्तर लिखिए ।",
-  match: "निम्नलिखित का मिलान कीजिए ।",
-};
-
-export const gujaratiTitles = {
-  mcq: "નીચેના દરેક પ્રશ્નોના ઉત્તર માટે આપેલા વિકલ્પોમાંથી સાચો વિકલ્પ શોધીને લખો.",
-  blanks: "ખાલી જગ્યા પૂરો.",
-  true_false:
-    "નીચેના વિધાનોમાંથી ખરા વિધાનો સામે ü ની અને ખોટા વિધાનો સામે û ની નિશાની કરો.",
-  onetwo: "નીચેના પ્રશ્નોના ઉત્તર એક - એક વાક્યમાં લખો.",
-  short: "નીચેના પ્રશ્નોના ઉત્તર બે-ત્રણ વાક્યમાં લખો.",
-  long: "નીચેના પ્રશ્નોના ઉત્તર સંક્ષેપમાં લખો.",
-  passage: "નીચેનો ફકરો વાંચી પ્રશ્નોના જવાબ લખો.",
-  match: "જોડકા જોડો.",
-};
-
-// Sanskrit papers use English instructions. Only the keys below differ from English;
-// short / long / passage intentionally fall back to the English wording.
-export const sanskritTitles = {
-  mcq: "Choose the Correct Answer from the Options Given Below.",
-  blanks: "Fill in the Blanks with Appropriate Words.",
-  true_false: "Write ‘T’ for True and ‘F’ for False.",
-  onetwo: "Answer the following questions in Sanskrit.",
-  match: "Match the following.",
-};
-
-const TITLE_SETS = {
-  english: englishTitles,
-  hindi: hindiTitles,
-  gujarati: gujaratiTitles,
-  sanskrit: sanskritTitles,
-};
+import { getType, normalizeTypeKey } from "./questionTypes";
 
 /**
  * Resolve the paper language from the subject name.
@@ -102,27 +44,18 @@ export const detectPaperLanguage = (subjectName) => {
  * The section heading for a question type, in the paper's language.
  * Falls back to the English title (then to the raw type) when a language is missing one.
  *
- * @param {string} type question type ("mcq" | "blank" | "true_false" | ...)
+ * @param {string} type question type ("mcq" | "blank" | "synonyms" | ...)
  * @param {string} [subjectName] used to auto-detect the language
  * @param {string} [language] explicit language; skips detection when provided
  */
 export const getSectionTitle = (type, subjectName, language) => {
-  const key = normalizeTitleKey(type);
+  const entry = getType(type);
+  if (!entry) return normalizeTypeKey(type);
   const lang = language || detectPaperLanguage(subjectName);
-  const set = TITLE_SETS[lang] || englishTitles;
-  return set[key] || englishTitles[key] || type;
+  return entry.titles[lang] || entry.titles.english || entry.label;
 };
 
-/** Default marks per question type. */
-export const DEFAULT_MARKS_PER_TYPE = {
-  mcq: 1,
-  blank: 1,
-  true_false: 1,
-  onetwo: 1,
-  short: 2,
-  long: 5,
-  passage: 3,
-  match: 4,
-};
+// Re-exported for callers that already import these from here.
+export { DEFAULT_MARKS_PER_TYPE } from "./questionTypes";
 
 export default getSectionTitle;

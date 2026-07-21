@@ -10,7 +10,52 @@ import {
   FileQuestion,
   BookOpen,
   Link2,
+  Repeat,
+  ArrowLeftRight,
+  Languages,
+  PenLine,
 } from "lucide-react";
+import QUESTION_TYPES from "../../../utils/questionTypes";
+
+// Tab id (URL-friendly) per registry key, where it differs from the key.
+const TAB_ID_BY_KEY = { true_false: "true-false" };
+const KEY_BY_TAB_ID = { "true-false": "true_false" };
+
+const TAB_ICONS = {
+  mcq: CheckSquare,
+  blank: Hash,
+  true_false: Type,
+  onetwo: FileText,
+  short: AlignLeft,
+  long: FileQuestion,
+  passage: BookOpen,
+  match: Link2,
+  complete_lines: PenLine,
+  synonyms: Repeat,
+  antonyms: ArrowLeftRight,
+  translate: Languages,
+};
+
+const TAB_NAMES = {
+  mcq: "MCQ",
+  blank: "Fill in Blanks",
+  true_false: "True & False",
+  onetwo: "One Two",
+  short: "Short Answer",
+  long: "Long Answer",
+  passage: "Passage",
+  match: "Match",
+};
+
+// Tabs come from the registry, so a new question type shows up here automatically.
+const QUESTION_TYPE_TABS = QUESTION_TYPES.map((t) => ({
+  id: TAB_ID_BY_KEY[t.key] || t.key,
+  key: t.key,
+  name: TAB_NAMES[t.key] || t.label,
+  icon: TAB_ICONS[t.key] || FileText,
+  // null = every subject; otherwise only these paper languages.
+  languages: t.languages,
+}));
 
 const QuestionManagement = () => {
   const location = useLocation();
@@ -18,43 +63,17 @@ const QuestionManagement = () => {
     // Get type from URL or default to mcq
     const pathParts = location.pathname.split("/");
     const typeFromPath = pathParts[pathParts.length - 1];
-    const validTypes = [
-      "mcq",
-      "blank",
-      "true-false",
-      "onetwo",
-      "short",
-      "long",
-      "passage",
-      "match",
-    ];
+    const validTypes = QUESTION_TYPE_TABS.map((t) => t.id);
     return validTypes.includes(typeFromPath) ? typeFromPath : "mcq";
   });
 
-  const questionTypes = [
-    { id: "mcq", name: "MCQ", icon: CheckSquare },
-    { id: "blank", name: "Fill in Blanks", icon: Hash },
-    { id: "true-false", name: "True & False", icon: Type },
-    { id: "onetwo", name: "One Two", icon: FileText },
-    { id: "short", name: "Short Answer", icon: AlignLeft },
-    { id: "long", name: "Long Answer", icon: FileQuestion },
-    { id: "passage", name: "Passage", icon: BookOpen },
-    { id: "match", name: "Match", icon: Link2 },
-  ];
+  const questionTypes = QUESTION_TYPE_TABS;
 
-  // Map URL-friendly names to API type names
+  // Map URL-friendly names to API type names.
   const getApiType = (type) => {
-    const mapping = {
-      "true-false": "true&false",
-      mcq: "mcq",
-      blank: "blank",
-      onetwo: "onetwo",
-      short: "short",
-      long: "long",
-      passage: "passage",
-      match: "match",
-    };
-    return mapping[type] || type;
+    const key = KEY_BY_TAB_ID[type] || type;
+    // The admin API still expects the legacy "true&false" spelling here.
+    return key === "true_false" ? "true&false" : key;
   };
 
   return (

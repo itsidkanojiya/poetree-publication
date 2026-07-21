@@ -34,7 +34,19 @@ import MathText from "../Common/MathText";
 import { QuestionText, QuestionImageBlock } from "../Common/QuestionImageBlock";
 import { QuestionBody, OptionBody, MatchItemBody, renderRichHtml } from "../Common/QuestionBody";
 import { seededMatchOrder } from "../../utils/matchShuffle";
-import { getSectionTitle, DEFAULT_MARKS_PER_TYPE } from "../../utils/sectionTitles";
+import { getSectionTitle, detectPaperLanguage } from "../../utils/sectionTitles";
+import QUESTION_TYPES, {
+  ALL_TYPE_KEYS,
+  QUESTION_TYPE_GROUPS,
+  DEFAULT_SECTION_COUNTS,
+  DEFAULT_MARKS_PER_TYPE,
+  TYPE_CONFIG,
+  TYPE_SHORT_LABELS,
+  typeKeysForLanguage,
+  getType,
+  formatMarks,
+  normalizeTypeKey as normalizeTypeKeyLocal,
+} from "../../utils/questionTypes";
 import { estimateImageBlockHeight } from "../../utils/questionImage";
 import Loader from "../Common/loader/loader";
 import SmartPaperStepper from "./SmartPaperStepper";
@@ -63,58 +75,24 @@ const COMPONENT_HEIGHTS = {
   MATCH_ROW: 40,
 };
 
-const INITIAL_QUESTION_SECTIONS = [
-  { type: "mcq", selectedQuestions: [] },
-  { type: "blank", selectedQuestions: [] },
-  { type: "true_false", selectedQuestions: [] },
-  { type: "onetwo", selectedQuestions: [] },
-  { type: "short", selectedQuestions: [] },
-  { type: "long", selectedQuestions: [] },
-  { type: "passage", selectedQuestions: [] },
-  { type: "match", selectedQuestions: [] },
-];
+/* These all derive from the shared registry (src/utils/questionTypes.js) so adding a
+   question type is a one-file change instead of editing six parallel lists here. */
+
+const INITIAL_QUESTION_SECTIONS = ALL_TYPE_KEYS.map((type) => ({
+  type,
+  selectedQuestions: [],
+}));
 
 /** Canonical keys for POST /papers/smart-propose `section_question_counts` (non‑negative integers; sum ≥ 1). */
-const SMART_SECTION_KEYS = [
-  "mcq",
-  "blank",
-  "true_false",
-  "onetwo",
-  "short",
-  "long",
-  "passage",
-  "match",
-];
+const SMART_SECTION_KEYS = ALL_TYPE_KEYS;
 
-/** Default counts per type (small paper preset; total 25 questions). */
-const DEFAULT_SMART_SECTION_COUNTS = {
-  mcq: 8,
-  blank: 2,
-  true_false: 2,
-  onetwo: 2,
-  short: 4,
-  long: 6,
-  passage: 0,
-  match: 1,
-};
+/** Default counts per type. */
+const DEFAULT_SMART_SECTION_COUNTS = DEFAULT_SECTION_COUNTS;
 
-const SMART_SECTION_GROUPS = [
-  {
-    id: "objective",
-    title: "Objective and quick",
-    keys: ["mcq", "true_false", "blank"],
-  },
-  {
-    id: "written",
-    title: "Written answers",
-    keys: ["onetwo", "short", "long"],
-  },
-  {
-    id: "context",
-    title: "Context and matching",
-    keys: ["passage", "match"],
-  },
-];
+const SMART_SECTION_GROUPS = QUESTION_TYPE_GROUPS.map((g) => ({
+  ...g,
+  keys: QUESTION_TYPES.filter((t) => t.group === g.id).map((t) => t.key),
+})).filter((g) => g.keys.length > 0);
 
 /** Collect unique chapter IDs from all selected questions (for chapter_ids when saving paper). */
 const getChapterIdsFromSections = (sections) => {
@@ -128,72 +106,12 @@ const getChapterIdsFromSections = (sections) => {
   return Array.from(ids);
 };
 
-// Map question types to section letters (A, B, C, D, E, F, G, H)
-const SECTION_LETTERS = {
-  mcq: "A",
-  blank: "B",
-  true_false: "C",
-  onetwo: "D",
-  short: "D",
-  long: "E",
-  passage: "F",
-  match: "G",
-};
+// Section letters are assigned SEQUENTIALLY by appearance (A, B, C...) in the paper
+// renderer, so there is no fixed type->letter map. Labels/colours and the short labels
+// used by humanizeSmartWarning both come from the shared registry.
+const QUESTION_TYPE_CONFIG = TYPE_CONFIG;
 
-const QUESTION_TYPE_CONFIG = {
-  mcq: {
-    label: "Multiple Choice Questions",
-    color: "bg-blue-500",
-    badge: "bg-blue-100 text-blue-700",
-  },
-  short: {
-    label: "Short Answer Questions",
-    color: "bg-green-500",
-    badge: "bg-green-100 text-green-700",
-  },
-  long: {
-    label: "Long Answer Questions",
-    color: "bg-purple-500",
-    badge: "bg-purple-100 text-purple-700",
-  },
-  blank: {
-    label: "Fill in the Blanks",
-    color: "bg-orange-500",
-    badge: "bg-orange-100 text-orange-700",
-  },
-  onetwo: {
-    label: "One or Two Sentence Questions",
-    color: "bg-teal-500",
-    badge: "bg-teal-100 text-teal-700",
-  },
-  true_false: {
-    label: "True or False",
-    color: "bg-amber-500",
-    badge: "bg-amber-100 text-amber-700",
-  },
-  passage: {
-    label: "Passage",
-    color: "bg-indigo-500",
-    badge: "bg-indigo-100 text-indigo-700",
-  },
-  match: {
-    label: "Match the Following",
-    color: "bg-rose-500",
-    badge: "bg-rose-100 text-rose-700",
-  },
-};
-
-// Short labels used in the smart-paper summary line and per-type status.
-const SMART_SECTION_SHORT_LABELS = {
-  mcq: "MCQ",
-  blank: "Fill in the Blanks",
-  true_false: "True/False",
-  onetwo: "One–two sentence",
-  short: "Short answer",
-  long: "Long answer",
-  passage: "Passage",
-  match: "Match",
-};
+const SMART_SECTION_SHORT_LABELS = TYPE_SHORT_LABELS;
 
 // Turn machine warning codes from /papers/smart-propose into friendly sentences.
 const humanizeSmartWarning = (w) => {
@@ -700,6 +618,14 @@ const CustomPaper = () => {
   }, []);
 
   const effectiveHeaderForChapter = paperHeader || header;
+
+  // LANGUAGE GATE — the language-specific types (complete_lines / synonyms / antonyms /
+  // translate) may only be used on Gujarati, Hindi and Sanskrit papers; every other
+  // subject sees only the base 8. translate is Sanskrit-only. Applied to the type
+  // picker, the marks panel and the AI-paper counters.
+  const paperLanguage = detectPaperLanguage(effectiveHeaderForChapter?.subject);
+  const allowedTypeKeys = typeKeysForLanguage(paperLanguage);
+  const isTypeAllowed = (type) => allowedTypeKeys.includes(normalizeTypeKeyLocal(type));
   const rawSubjectTitleId =
     effectiveHeaderForChapter?.subjectTitle ??
     effectiveHeaderForChapter?.subject_title_id ??
@@ -1116,6 +1042,8 @@ const CustomPaper = () => {
           hard: Number(smartDifficulty.hard),
         },
         section_question_counts: SMART_SECTION_KEYS.reduce((acc, k) => {
+          // Types not allowed for this paper language must never be requested.
+          if (!isTypeAllowed(k)) { acc[k] = 0; return acc; }
           acc[k] = Math.max(0, Math.floor(Number(smartSectionCounts[k]) || 0));
           return acc;
         }, {}),
@@ -2423,7 +2351,9 @@ const CustomPaper = () => {
                   </button>
                 </div>
                 <div className="space-y-3">
-                  {SMART_SECTION_GROUPS.map((group) => (
+                  {SMART_SECTION_GROUPS.map((group) => ({ ...group, keys: group.keys.filter(isTypeAllowed) }))
+                    .filter((group) => group.keys.length > 0)
+                    .map((group) => (
                     <details
                       key={group.id}
                       className="group border border-gray-200 rounded-xl bg-white overflow-hidden open:shadow-sm"
@@ -3047,7 +2977,7 @@ const CustomPaper = () => {
                     <span className="w-2 h-2 rounded-full bg-gray-400" />
                     <span className="font-medium text-gray-700">All types (mixed)</span>
                   </button>
-                  {Object.entries(QUESTION_TYPE_CONFIG).map(([type, config]) => (
+                  {Object.entries(QUESTION_TYPE_CONFIG).filter(([type]) => isTypeAllowed(type)).map(([type, config]) => (
                     <button
                       key={type}
                       type="button"
@@ -3103,7 +3033,7 @@ const CustomPaper = () => {
                 <span className="text-base">Marks per Question Type</span>
               </label>
               <div className="grid grid-cols-2 gap-4">
-                {Object.entries(QUESTION_TYPE_CONFIG).map(([type, config]) => (
+                {Object.entries(QUESTION_TYPE_CONFIG).filter(([type]) => isTypeAllowed(type)).map(([type, config]) => (
                   <div
                     key={type}
                     className="bg-white rounded-xl p-4 border-2 border-amber-200 shadow-sm hover:shadow-md transition-all"
@@ -3591,9 +3521,31 @@ const CustomPaper = () => {
                             </div>
                           )}
 
-                          <div className="space-y-3">
+                          <div
+                            className={
+                              getType(section.type)?.layout === "row"
+                                ? "flex flex-wrap gap-x-10 gap-y-1"
+                                : "space-y-3"
+                            }
+                          >
                             {section.selectedQuestions.map(
-                              (question, qIndex) => (
+                              (question, qIndex) => {
+                                // Word types (synonyms / antonyms) print side-by-side in a
+                                // wrapping row: (1) સુંદર   (2) નદી   (3) મિત્ર
+                                if (getType(section.type)?.layout === "row") {
+                                  return (
+                                    <div
+                                      key={qIndex}
+                                      style={{ fontSize: "14px", lineHeight: "1.9" }}
+                                    >
+                                      <span style={{ fontWeight: "bold" }}>
+                                        ({question.questionNumber}){" "}
+                                      </span>
+                                      <QuestionBody question={question} inline="flow" />
+                                    </div>
+                                  );
+                                }
+                                return (
                                 <div key={qIndex} className="mb-4">
                                   <QuestionImageBlock question={question} slot="top" />
                                   <div
@@ -3953,7 +3905,8 @@ const CustomPaper = () => {
 
                                   <QuestionImageBlock question={question} slot="bottom" />
                                 </div>
-                              )
+                                );
+                              }
                             )}
                           </div>
                         </div>

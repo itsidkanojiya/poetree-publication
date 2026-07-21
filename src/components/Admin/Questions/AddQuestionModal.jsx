@@ -5,6 +5,8 @@ import Toast from "../../Common/Toast";
 import MathTextInput from "../../Common/MathTextInput";
 import QuestionImageEditor from "../../Common/QuestionImageEditor";
 import RichQuestionEditor from "../../Common/RichQuestionEditor";
+import { getType, isTypeAllowedForLanguage } from "../../../utils/questionTypes";
+import { detectPaperLanguage } from "../../../utils/sectionTitles";
 import { IMG_TOKEN } from "../../../utils/questionImage";
 
 const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
@@ -34,6 +36,17 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [toast, setToast] = useState({ show: false, message: "", type: "error" });
+
+  // LANGUAGE GATE — resolve the chosen subject's language and check this question type
+  // is permitted for it (e.g. synonyms only on Gujarati/Hindi/Sanskrit, translate only
+  // on Sanskrit). Types with no `languages` are allowed everywhere.
+  const selectedSubjectName = subjects.find(
+    (s) => String(s.subject_id) === String(formData.subject_id)
+  )?.subject_name;
+  const isTypeAllowedForSubject = isTypeAllowedForLanguage(
+    questionType,
+    detectPaperLanguage(selectedSubjectName)
+  );
 
   // Fabric image editor. `imageData` holds the composite result:
   // { layout, compositeBlob, compositeDataUrl, width, height, placement, align, sourceFiles }
@@ -402,6 +415,15 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
   const validate = () => {
     const newErrors = {};
     if (!formData.subject_id) newErrors.subject_id = "Subject is required";
+    // LANGUAGE GATE — the language-specific types (complete lines / synonyms /
+    // antonyms / translate) may only be attached to Gujarati, Hindi or Sanskrit
+    // subjects (translate: Sanskrit only).
+    if (formData.subject_id && !isTypeAllowedForSubject) {
+      const allowed = getType(questionType)?.languages || [];
+      newErrors.subject_id = `"${getType(questionType)?.label || questionType}" questions are only for ${allowed
+        .map((l) => l.charAt(0).toUpperCase() + l.slice(1))
+        .join(", ")} subjects.`;
+    }
     if (!formData.standard) newErrors.standard = "Standard is required";
     if (!formData.board_id) newErrors.board_id = "Board is required";
     if (!formData.subject_title_id) newErrors.subject_title_id = "Subject Title is required";
@@ -610,6 +632,18 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Language gate: warn as soon as a mismatched subject is picked, rather
+                than only failing on submit. */}
+            {formData.subject_id && !isTypeAllowedForSubject && (
+              <div className="rounded-xl border-2 border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                <strong>{getType(questionType)?.label || questionType}</strong> questions are
+                only for{" "}
+                {(getType(questionType)?.languages || [])
+                  .map((l) => l.charAt(0).toUpperCase() + l.slice(1))
+                  .join(", ")}{" "}
+                subjects. Choose a matching subject, or pick a different question type.
+              </div>
+            )}
             {/* Common Fields: Subject → Standard → Board → Subject Title (same flow as Worksheet/Answer Sheet) */}
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -792,8 +826,11 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
                   name="marks"
                   value={formData.marks}
                   onChange={handleChange}
+                  // Marks may be fractional (e.g. 0.5 per word for synonyms/antonyms).
+                  step="0.5"
+                  min="0"
                   className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition outline-none"
-                  placeholder="e.g., 1"
+                  placeholder="e.g., 1 or 0.5"
                 />
               </div>
 

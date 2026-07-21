@@ -12,6 +12,7 @@ import { QuestionText, QuestionImageBlock } from "../Common/QuestionImageBlock";
 import { QuestionBody, OptionBody, renderRichHtml } from "../Common/QuestionBody";
 import { seededMatchOrder } from "../../utils/matchShuffle";
 import { getSectionTitle as resolveSectionTitle } from "../../utils/sectionTitles";
+import { getType } from "../../utils/questionTypes";
 import { estimateImageBlockHeight } from "../../utils/questionImage";
 
 const QUESTION_TYPE_CONFIG = {
@@ -616,9 +617,34 @@ const ViewPaperPage = () => {
                       </div>
                     )}
 
-                    <div className="space-y-3">
+                    <div
+                      className={
+                        getType(sectionType)?.layout === "row"
+                          ? "flex flex-wrap gap-x-10 gap-y-1"
+                          : "space-y-3"
+                      }
+                    >
                       {section.selectedQuestions.map((question, qIndex) => {
                         const qNum = questionCounters[sectionType]++;
+                        // Word types (synonyms / antonyms) print side-by-side in a
+                        // wrapping row: (1) સુંદર   (2) નદી   (3) મિત્ર
+                        if (getType(sectionType)?.layout === "row") {
+                          return (
+                            <div
+                              key={qIndex}
+                              data-measure-qid={question.question_id}
+                              style={{ fontSize: "14px", lineHeight: "1.9" }}
+                            >
+                              <span style={{ fontWeight: "bold" }}>({qNum}) </span>
+                              <QuestionBody question={question} inline="flow" />
+                              {exportMode !== "paper" && (
+                                <span className="ml-2 text-emerald-800">
+                                  {renderAnswerContent(question)}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        }
                         return (
                           <div key={qIndex} className="mb-4" data-measure-qid={question.question_id}>
                             <QuestionImageBlock question={question} slot="top" />

@@ -1,4 +1,5 @@
 import { addNewPaper } from '../services/paperService';
+import { ALL_TYPE_KEYS, normalizeTypeKey } from '../utils/questionTypes';
 
 export const savePaper = async (
   user, 
@@ -70,69 +71,32 @@ export const savePaper = async (
       formData.append("chapter_ids", JSON.stringify(chapterIds));
     }
 
-    // Calculate and add marks for each question type
+    // Per-type marks. Driven by the shared registry so a new question type is never
+    // silently dropped (the old switch had no default: passage/match marks were lost).
+    const marksByType = {};
     if (questionSections && marksPerType) {
-      let marksMcq = 0;
-      let marksShort = 0;
-      let marksLong = 0;
-      let marksBlank = 0;
-      let marksOnetwo = 0;
-      let marksTruefalse = 0;
-      let marksPassage = 0;
-      let marksMatch = 0;
-
       questionSections.forEach((section) => {
+        const key = normalizeTypeKey(section.type);
         const count = section.selectedQuestions.length;
-        const marks = marksPerType[section.type] || 0;
-        const totalMarks = count * marks;
-
-        switch (section.type) {
-          case "mcq":
-            marksMcq = totalMarks;
-            break;
-          case "short":
-            marksShort = totalMarks;
-            break;
-          case "long":
-            marksLong = totalMarks;
-            break;
-          case "blank":
-            marksBlank = totalMarks;
-            break;
-          case "onetwo":
-            marksOnetwo = totalMarks;
-            break;
-          case "true_false":
-            marksTruefalse = totalMarks;
-            break;
-          case "passage":
-            marksPassage = totalMarks;
-            break;
-          case "match":
-            marksMatch = totalMarks;
-            break;
-        }
+        const marks = Number(marksPerType[section.type] ?? marksPerType[key]) || 0;
+        if (!key) return;
+        marksByType[key] = (marksByType[key] || 0) + count * marks;
       });
-
-      formData.append("marks_mcq", marksMcq);
-      formData.append("marks_short", marksShort);
-      formData.append("marks_long", marksLong);
-      formData.append("marks_blank", marksBlank);
-      formData.append("marks_onetwo", marksOnetwo);
-      formData.append("marks_truefalse", marksTruefalse);
-      formData.append("marks_passage", marksPassage);
-      formData.append("marks_match", marksMatch);
-    } else {
-      // Default to 0 if not provided
-      formData.append("marks_mcq", 0);
-      formData.append("marks_short", 0);
-      formData.append("marks_long", 0);
-      formData.append("marks_blank", 0);
-      formData.append("marks_onetwo", 0);
-      formData.append("marks_truefalse", 0);
-      formData.append("marks_passage", 0);
-      formData.append("marks_match", 0);
     }
+    ALL_TYPE_KEYS.forEach((key) => {
+      if (marksByType[key] == null) marksByType[key] = 0;
+    });
+    // New contract: every type in one field (decimals preserved).
+    formData.append("marks_by_type", JSON.stringify(marksByType));
+    // Legacy per-type fields, still sent for backward compatibility.
+    formData.append("marks_mcq", marksByType.mcq || 0);
+    formData.append("marks_short", marksByType.short || 0);
+    formData.append("marks_long", marksByType.long || 0);
+    formData.append("marks_blank", marksByType.blank || 0);
+    formData.append("marks_onetwo", marksByType.onetwo || 0);
+    formData.append("marks_truefalse", marksByType.true_false || 0);
+    formData.append("marks_passage", marksByType.passage || 0);
+    formData.append("marks_match", marksByType.match || 0);
 
     // Note: logo is now fetched from user table via user_id, no need to send it here
 
