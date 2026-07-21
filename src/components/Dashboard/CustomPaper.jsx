@@ -327,11 +327,19 @@ const CustomPaper = () => {
       (type) => byType.get(type) || { type, selectedQuestions: [] }
     );
   });
-  // v2 key: the standard marks per type changed (onetwo 1, short 2, passage 3,
-  // match 4), so the old cached values must not stick.
+  // v3 key: synonyms/antonyms moved from 0.5-per-word to 3 marks for the whole word
+  // list, so the v2 cache would keep printing "0.5 marks" for those sections.
+  // Also merged with the defaults, so a NEWLY added type gets its proper marks
+  // instead of falling through to 0.
   const [marksPerType, setMarksPerType] = useState(() => {
-    const storedMarks = localStorage.getItem("marksPerType_v2");
-    return storedMarks ? JSON.parse(storedMarks) : { ...DEFAULT_MARKS_PER_TYPE };
+    const storedMarks = localStorage.getItem("marksPerType_v3");
+    let parsed = null;
+    try {
+      parsed = storedMarks ? JSON.parse(storedMarks) : null;
+    } catch {
+      parsed = null;
+    }
+    return { ...DEFAULT_MARKS_PER_TYPE, ...(parsed || {}) };
   });
 
   // Save to localStorage whenever sections change
@@ -341,7 +349,7 @@ const CustomPaper = () => {
 
   // Save marks to localStorage whenever they change
   useEffect(() => {
-    localStorage.setItem("marksPerType_v2", JSON.stringify(marksPerType));
+    localStorage.setItem("marksPerType_v3", JSON.stringify(marksPerType));
   }, [marksPerType]);
 
   // Load paper data in edit mode
@@ -3524,11 +3532,16 @@ const CustomPaper = () => {
                                     fontSize: "13px",
                                     fontWeight: "bold",
                                     color: "#374151",
+                                    // Keep "3 marks" on one line — a long section title
+                                    // was wrapping it to "3" / "marks".
+                                    whiteSpace: "nowrap",
                                   }}
                                 >
-                                  {(sectionTypeTotals[sectionTypeNormalized] ??
-                                    section.selectedQuestions.length) *
-                                    (marksPerType[sectionTypeNormalized] || 0)}{" "}
+                                  {formatMarks(
+                                    (sectionTypeTotals[sectionTypeNormalized] ??
+                                      section.selectedQuestions.length) *
+                                      (marksPerType[sectionTypeNormalized] || 0)
+                                  )}{" "}
                                   marks
                                 </span>
                               </div>

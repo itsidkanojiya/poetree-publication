@@ -12,7 +12,7 @@ import { QuestionText, QuestionImageBlock } from "../Common/QuestionImageBlock";
 import { QuestionBody, OptionBody, renderRichHtml } from "../Common/QuestionBody";
 import { seededMatchOrder } from "../../utils/matchShuffle";
 import { getSectionTitle as resolveSectionTitle } from "../../utils/sectionTitles";
-import { getType, getWordList, getWordAnswers } from "../../utils/questionTypes";
+import { getType, getWordList, getWordAnswers, formatMarks } from "../../utils/questionTypes";
 import { estimateImageBlockHeight } from "../../utils/questionImage";
 
 const QUESTION_TYPE_CONFIG = {
@@ -609,9 +609,11 @@ const ViewPaperPage = () => {
                               fontSize: "13px",
                               fontWeight: "bold",
                               color: "#374151",
+                              // Keep "3 marks" on one line next to a long title.
+                              whiteSpace: "nowrap",
                             }}
                           >
-                            {sectionMarks} marks
+                            {formatMarks(sectionMarks)} marks
                           </span>
                         </div>
                       </div>

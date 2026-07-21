@@ -21,6 +21,28 @@ import { API_ORIGIN } from "../../../config/api";
 import MathText from "../../Common/MathText";
 import { QuestionBody, OptionBody } from "../../Common/QuestionBody";
 
+/**
+ * Readable answer for the list cell. Word-list types (synonyms/antonyms) store a JSON
+ * array, which used to dump raw as ["","",""]; show a comma list, or "N/A" when every
+ * entry is blank (answers are optional there).
+ */
+const formatAnswerCell = (answer) => {
+  let value = answer;
+  if (typeof value === "string" && value.trim().startsWith("[")) {
+    try {
+      value = JSON.parse(value);
+    } catch {
+      /* leave as string */
+    }
+  }
+  if (Array.isArray(value)) {
+    const filled = value.map((v) => String(v ?? "").trim()).filter(Boolean);
+    return filled.length ? filled.join(", ") : "N/A";
+  }
+  if (value && typeof value === "object") return JSON.stringify(value);
+  return value || "N/A";
+};
+
 const QuestionsList = ({ questionType }) => {
   const [questions, setQuestions] = useState([]);
   const [filteredQuestions, setFilteredQuestions] = useState([]);
@@ -609,11 +631,7 @@ const QuestionsList = ({ questionType }) => {
                       </div>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600 max-w-xs">
-                      <div className="line-clamp-2">
-                        {typeof question.answer === "object"
-                          ? JSON.stringify(question.answer)
-                          : question.answer || "N/A"}
-                      </div>
+                      <div className="line-clamp-2">{formatAnswerCell(question.answer)}</div>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">
                       {getSubjectName(question.subject) || "N/A"}

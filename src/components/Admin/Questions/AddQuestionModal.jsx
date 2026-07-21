@@ -399,9 +399,12 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
           "options",
           JSON.stringify(rows.map((r) => r.word.trim()))
         );
+        const answers = rows.map((r) => (r.answer || "").trim());
+        // Answers are optional — send nothing rather than ["","",""], which would
+        // otherwise show as literal empty-string JSON in the admin list.
         formDataToSend.append(
           "answer",
-          JSON.stringify(rows.map((r) => (r.answer || "").trim()))
+          answers.some(Boolean) ? JSON.stringify(answers) : ""
         );
       } else if (questionType === "mcq") {
         const optionsArray = mcqOptionList.map((o) => (o && o.trim()) || "").filter(Boolean);
