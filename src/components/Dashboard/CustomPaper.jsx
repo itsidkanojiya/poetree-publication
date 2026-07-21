@@ -44,6 +44,7 @@ import QUESTION_TYPES, {
   TYPE_SHORT_LABELS,
   typeKeysForLanguage,
   getType,
+  getWordList,
   formatMarks,
   normalizeTypeKey as normalizeTypeKeyLocal,
 } from "../../utils/questionTypes";
@@ -311,7 +312,20 @@ const CustomPaper = () => {
   const [error, setError] = useState(null);
   const [questionSections, setQuestionSections] = useState(() => {
     const storedData = localStorage.getItem("questionSections");
-    return storedData ? JSON.parse(storedData) : INITIAL_QUESTION_SECTIONS;
+    let parsed = null;
+    try {
+      parsed = storedData ? JSON.parse(storedData) : null;
+    } catch {
+      parsed = null;
+    }
+    if (!Array.isArray(parsed)) return INITIAL_QUESTION_SECTIONS;
+    // MERGE with the registry. The cache was written before newer question types
+    // existed, so without this a new type has no bucket and "Select" silently does
+    // nothing. Keeps any in-progress selections.
+    const byType = new Map(parsed.map((s) => [s.type, s]));
+    return ALL_TYPE_KEYS.map(
+      (type) => byType.get(type) || { type, selectedQuestions: [] }
+    );
   });
   // v2 key: the standard marks per type changed (onetwo 1, short 2, passage 3,
   // match 4), so the old cached values must not stick.
@@ -3528,23 +3542,31 @@ const CustomPaper = () => {
                                 : "space-y-3"
                             }
                           >
-                            {section.selectedQuestions.map(
+                            {/* Synonyms / antonyms: ONE question holds a list of words.
+                                Print the words numbered side-by-side, continuing the
+                                numbering across questions in the section. */}
+                            {getType(section.type)?.layout === "row" &&
+                              (() => {
+                                let n = 0;
+                                return section.selectedQuestions.flatMap((q, qIdx) =>
+                                  getWordList(q).map((word, wIdx) => {
+                                    n += 1;
+                                    return (
+                                      <div
+                                        key={`${qIdx}-${wIdx}`}
+                                        style={{ fontSize: "14px", lineHeight: "1.9" }}
+                                      >
+                                        <span style={{ fontWeight: "bold" }}>({n}) </span>
+                                        <MathText text={word} />
+                                      </div>
+                                    );
+                                  })
+                                );
+                              })()}
+
+                            {getType(section.type)?.layout !== "row" &&
+                              section.selectedQuestions.map(
                               (question, qIndex) => {
-                                // Word types (synonyms / antonyms) print side-by-side in a
-                                // wrapping row: (1) સુંદર   (2) નદી   (3) મિત્ર
-                                if (getType(section.type)?.layout === "row") {
-                                  return (
-                                    <div
-                                      key={qIndex}
-                                      style={{ fontSize: "14px", lineHeight: "1.9" }}
-                                    >
-                                      <span style={{ fontWeight: "bold" }}>
-                                        ({question.questionNumber}){" "}
-                                      </span>
-                                      <QuestionBody question={question} inline="flow" />
-                                    </div>
-                                  );
-                                }
                                 return (
                                 <div key={qIndex} className="mb-4">
                                   <QuestionImageBlock question={question} slot="top" />

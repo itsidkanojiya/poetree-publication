@@ -12,7 +12,7 @@ import { QuestionText, QuestionImageBlock } from "../Common/QuestionImageBlock";
 import { QuestionBody, OptionBody, renderRichHtml } from "../Common/QuestionBody";
 import { seededMatchOrder } from "../../utils/matchShuffle";
 import { getSectionTitle as resolveSectionTitle } from "../../utils/sectionTitles";
-import { getType } from "../../utils/questionTypes";
+import { getType, getWordList, getWordAnswers } from "../../utils/questionTypes";
 import { estimateImageBlockHeight } from "../../utils/questionImage";
 
 const QUESTION_TYPE_CONFIG = {
@@ -624,27 +624,38 @@ const ViewPaperPage = () => {
                           : "space-y-3"
                       }
                     >
-                      {section.selectedQuestions.map((question, qIndex) => {
+                      {/* Synonyms / antonyms: ONE question holds a list of words. Print
+                          them numbered side-by-side, numbering continuing across the
+                          section's questions. In answer-key mode show word → answer. */}
+                      {getType(sectionType)?.layout === "row" &&
+                        (() => {
+                          let n = 0;
+                          return section.selectedQuestions.flatMap((q, qIdx) => {
+                            const answers = getWordAnswers(q);
+                            return getWordList(q).map((word, wIdx) => {
+                              n += 1;
+                              return (
+                                <div
+                                  key={`${qIdx}-${wIdx}`}
+                                  data-measure-qid={wIdx === 0 ? q.question_id : undefined}
+                                  style={{ fontSize: "14px", lineHeight: "1.9" }}
+                                >
+                                  <span style={{ fontWeight: "bold" }}>({n}) </span>
+                                  <MathText text={word} />
+                                  {exportMode !== "paper" && answers[wIdx] && (
+                                    <span className="ml-1 text-emerald-800 font-semibold">
+                                      — <MathText text={answers[wIdx]} />
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            });
+                          });
+                        })()}
+
+                      {getType(sectionType)?.layout !== "row" &&
+                        section.selectedQuestions.map((question, qIndex) => {
                         const qNum = questionCounters[sectionType]++;
-                        // Word types (synonyms / antonyms) print side-by-side in a
-                        // wrapping row: (1) સુંદર   (2) નદી   (3) મિત્ર
-                        if (getType(sectionType)?.layout === "row") {
-                          return (
-                            <div
-                              key={qIndex}
-                              data-measure-qid={question.question_id}
-                              style={{ fontSize: "14px", lineHeight: "1.9" }}
-                            >
-                              <span style={{ fontWeight: "bold" }}>({qNum}) </span>
-                              <QuestionBody question={question} inline="flow" />
-                              {exportMode !== "paper" && (
-                                <span className="ml-2 text-emerald-800">
-                                  {renderAnswerContent(question)}
-                                </span>
-                              )}
-                            </div>
-                          );
-                        }
                         return (
                           <div key={qIndex} className="mb-4" data-measure-qid={question.question_id}>
                             <QuestionImageBlock question={question} slot="top" />

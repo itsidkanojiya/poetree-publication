@@ -48,6 +48,10 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
     detectPaperLanguage(selectedSubjectName)
   );
 
+  // Synonyms / antonyms: ONE question carries a list of words, so the plain
+  // question/answer boxes are replaced by the word list.
+  const isWordListType = getType(questionType)?.layout === "row";
+
   // Fabric image editor. `imageData` holds the composite result:
   // { layout, compositeBlob, compositeDataUrl, width, height, placement, align, sourceFiles }
   const [showImageEditor, setShowImageEditor] = useState(false);
@@ -93,6 +97,12 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
 
   // For MCQ: option list (frontend only); formData.options/answer still sent as JSON array + 1-based index
   const [mcqOptionList, setMcqOptionList] = useState(["", "", "", ""]);
+  // Synonyms / antonyms: one question carries a list of words (any number).
+  const [wordList, setWordList] = useState([
+    { word: "", answer: "" },
+    { word: "", answer: "" },
+    { word: "", answer: "" },
+  ]);
 
   useEffect(() => {
     fetchInitialData();
@@ -100,6 +110,14 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
       loadQuestionData();
     } else if (questionType === "mcq") {
       setMcqOptionList(["", "", "", ""]);
+    }
+    // Prefill the type's standard marks on a NEW question (e.g. synonyms = 3), so
+    // the admin doesn't have to remember them. Editing keeps the saved value.
+    if (!question) {
+      const defaultMarks = getType(questionType)?.defaultMarks;
+      if (defaultMarks != null) {
+        setFormData((prev) => ({ ...prev, marks: String(defaultMarks) }));
+      }
     }
   }, [question, questionType]);
 
@@ -245,6 +263,33 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
         setMcqOptionList(["", "", "", ""]);
       }
     }
+
+    // Word-list types: rebuild the rows from the parallel options/answer arrays.
+    if (getType(questionType)?.layout === "row") {
+      const parse = (v) => {
+        if (Array.isArray(v)) return v;
+        if (typeof v === "string" && v.trim().startsWith("[")) {
+          try {
+            const a = JSON.parse(v);
+            return Array.isArray(a) ? a : [];
+          } catch {
+            return [];
+          }
+        }
+        return [];
+      };
+      const words = parse(question.options);
+      const answers = parse(question.answer);
+      setWordList(
+        words.length > 0
+          ? words.map((w, i) => ({ word: String(w ?? ""), answer: String(answers[i] ?? "") }))
+          : [
+              { word: "", answer: "" },
+              { word: "", answer: "" },
+              { word: "", answer: "" },
+            ]
+      );
+    }
   };
 
   const handleChange = (e) => {
@@ -278,7 +323,18 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
       formDataToSend.append("type", apiType);
       if (formData.board_id) formDataToSend.append("board_id", formData.board_id);
       if (formData.standard) formDataToSend.append("standard", formData.standard);
-      formDataToSend.append("question", formData.question);
+      // Word-list types have no question box — the words ARE the question. Send them
+      // joined as the plain-text mirror so the DB row is readable and the server-side
+      // quiz PDF (which can only print text) still has something sensible.
+      formDataToSend.append(
+        "question",
+        isWordListType
+          ? wordList
+              .filter((r) => (r.word || "").trim())
+              .map((r) => r.word.trim())
+              .join(", ")
+          : formData.question
+      );
       if (formData.solution) formDataToSend.append("solution", formData.solution);
       if (formData.subject_id) formDataToSend.append("subject_id", formData.subject_id);
       if (formData.subject_title_id) formDataToSend.append("subject_title_id", formData.subject_title_id);
@@ -334,7 +390,20 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
       }
 
       // Handle type-specific fields
-      if (questionType === "mcq") {
+      if (isWordListType) {
+        // Synonyms / antonyms: ONE question carries the whole word list. Words go in
+        // `options`, their answers in `answer` (parallel arrays), so a question can
+        // hold any number of words and is worth its marks as a whole.
+        const rows = wordList.filter((r) => (r.word || "").trim());
+        formDataToSend.append(
+          "options",
+          JSON.stringify(rows.map((r) => r.word.trim()))
+        );
+        formDataToSend.append(
+          "answer",
+          JSON.stringify(rows.map((r) => (r.answer || "").trim()))
+        );
+      } else if (questionType === "mcq") {
         const optionsArray = mcqOptionList.map((o) => (o && o.trim()) || "").filter(Boolean);
         formDataToSend.append("options", JSON.stringify(optionsArray));
         formDataToSend.append("answer", formData.answer);
@@ -431,7 +500,12 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
     if (!formData.difficulty || !["easy", "medium", "hard"].includes(formData.difficulty)) {
       newErrors.difficulty = "Difficulty is required";
     }
-    if (richMode) {
+    if (isWordListType) {
+      // The words ARE the question here, so validate those instead of the question box.
+      if (!wordList.some((r) => (r.word || "").trim())) {
+        newErrors.words = "Add at least one word.";
+      }
+    } else if (richMode) {
       // Rich mode: the plain text is derived server-side, so validate the HTML body.
       // It counts as non-empty if it has text OR an image/table.
       const html = questionHtml || "";
@@ -564,6 +638,23 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
     updated[pqIndex] = { ...pq, options: opts.length ? opts : [""], answer };
     setPassageQuestions(updated);
   };
+
+  /* ---- Synonyms / Antonyms: ONE question holds a list of words ----
+     Each row is { word, answer }. The words are stored in `options` and the answers
+     in `answer` (parallel JSON arrays), so a single question can carry 3, 4, 5, 6…
+     words and is worth the question's marks as a whole. */
+  const updateWordRow = (index, field, value) => {
+    setWordList((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], [field]: value };
+      return next;
+    });
+  };
+
+  const addWordRow = () => setWordList((prev) => [...prev, { word: "", answer: "" }]);
+
+  const removeWordRow = (index) =>
+    setWordList((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== index)));
 
   const updateMcqOption = (index, value) => {
     setMcqOptionList((prev) => {
@@ -916,6 +1007,60 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
                 <p className="mt-1 text-sm text-red-600">{errors.question}</p>
               )}
             </div>
+
+            {/* Synonyms / Antonyms: ONE question holds the whole word list. */}
+            {isWordListType && (
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Words <span className="text-red-500">*</span>
+                </label>
+                <p className="mb-3 text-sm text-gray-500">
+                  Add as many words as you like — they print together as one question
+                  ({getType(questionType)?.defaultMarks ?? 3} marks by default), side by
+                  side on the paper. The answer column is optional and only shows in the
+                  answer key.
+                </p>
+                {wordList.map((row, index) => (
+                  <div key={index} className="flex gap-2 mb-2 items-start">
+                    <span className="w-7 pt-3 text-sm font-semibold text-gray-500 shrink-0">
+                      {index + 1}.
+                    </span>
+                    <MathTextInput
+                      className="flex-1"
+                      value={row.word}
+                      onChange={(val) => updateWordRow(index, "word", val)}
+                      placeholder={`Word ${index + 1}`}
+                    />
+                    <MathTextInput
+                      className="flex-1"
+                      value={row.answer}
+                      onChange={(val) => updateWordRow(index, "answer", val)}
+                      placeholder="Answer (optional)"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeWordRow(index)}
+                      disabled={wordList.length <= 1}
+                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition mt-1"
+                      title="Remove word"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={addWordRow}
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition text-sm font-medium"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add word
+                </button>
+                {errors.words && (
+                  <p className="mt-2 text-sm text-red-600">{errors.words}</p>
+                )}
+              </div>
+            )}
 
             {/* Type-specific fields */}
             {questionType === "mcq" && (
@@ -1327,7 +1472,8 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
               </div>
             )}
 
-            {!["mcq", "passage", "match", "true&false"].includes(questionType) && (
+            {!["mcq", "passage", "match", "true&false"].includes(questionType) &&
+              !isWordListType && (
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   Answer (Optional)

@@ -202,11 +202,10 @@ export const QUESTION_TYPES = [
     // Words print side-by-side in a wrapping row: (1) સુંદર  (2) નદી  (3) મિત્ર
     layout: "row",
     group: "language",
-    // 0.5 per WORD, so the section total is 0.5 x word count
-    // (4 words => 2 marks, 6 words => 3 marks). This is why marks are DECIMAL —
-    // as INTEGER, 0.5 truncated to 0.
-    defaultMarks: 0.5,
-    defaultCount: 4,
+    // ONE question holds the whole word list (words live in `options`), so the
+    // question is worth 3 marks regardless of whether it has 3, 4, 5 or 6 words.
+    defaultMarks: 3,
+    defaultCount: 1,
     color: "bg-lime-500",
     badge: "bg-lime-100 text-lime-700",
     languages: LANG_SUBJECTS,
@@ -224,9 +223,9 @@ export const QUESTION_TYPES = [
     short: "Antonyms",
     layout: "row",
     group: "language",
-    // 0.5 per WORD, same as synonyms (4 words => 2 marks).
-    defaultMarks: 0.5,
-    defaultCount: 4,
+    // ONE question holds the whole word list (see synonyms).
+    defaultMarks: 3,
+    defaultCount: 1,
     color: "bg-pink-500",
     badge: "bg-pink-100 text-pink-700",
     languages: LANG_SUBJECTS,
@@ -326,6 +325,49 @@ export const TYPE_SHORT_LABELS = QUESTION_TYPES.reduce((acc, t) => {
   acc[t.key] = t.short;
   return acc;
 }, {});
+
+/**
+ * The word list for a row-layout question (synonyms / antonyms).
+ *
+ * ONE question holds several words, stored in `options` (with the matching answers in
+ * `answer`). Falls back to the question text so a question saved before this model —
+ * i.e. one word per question — still renders.
+ */
+export const getWordList = (question) => {
+  const parse = (raw) => {
+    if (Array.isArray(raw)) return raw;
+    if (typeof raw === "string" && raw.trim().startsWith("[")) {
+      try {
+        const a = JSON.parse(raw);
+        return Array.isArray(a) ? a : [];
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  };
+  const words = parse(question?.options)
+    .map((w) => String(w ?? "").trim())
+    .filter(Boolean);
+  if (words.length) return words;
+  const q = String(question?.question ?? "").trim();
+  return q ? [q] : [];
+};
+
+/** Answers matching getWordList(question), index-aligned. */
+export const getWordAnswers = (question) => {
+  const raw = question?.answer;
+  if (Array.isArray(raw)) return raw.map((a) => String(a ?? ""));
+  if (typeof raw === "string" && raw.trim().startsWith("[")) {
+    try {
+      const a = JSON.parse(raw);
+      return Array.isArray(a) ? a.map((x) => String(x ?? "")) : [];
+    } catch {
+      return [];
+    }
+  }
+  return raw != null && raw !== "" ? [String(raw)] : [];
+};
 
 /** Marks helper — marks can be fractional (e.g. 0.5), so trim trailing zeros. */
 export const formatMarks = (value) => {
