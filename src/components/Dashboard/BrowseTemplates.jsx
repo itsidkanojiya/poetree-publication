@@ -6,6 +6,7 @@ import apiClient from "../../services/apiClient";
 import Loader from "../Common/loader/loader";
 import { getAllStandards } from "../../services/adminService";
 import { useUserTeaching } from "../../context/UserTeachingContext";
+import { formatMarks } from "../../utils/questionTypes";
 
 const BrowseTemplates = () => {
   const navigate = useNavigate();
@@ -231,7 +232,7 @@ const BrowseTemplates = () => {
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-600">Total Marks:</span>
-                    <span className="font-semibold text-gray-800">{template.total_marks || 0}</span>
+                    <span className="font-semibold text-gray-800">{formatMarks(template.total_marks || 0)}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-600">Questions:</span>

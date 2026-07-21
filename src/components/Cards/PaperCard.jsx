@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { API_ORIGIN } from "../../config/api";
 import { usePaper } from "../../context/PaperContext";
 import { getQuizPaperPdf, getQuizAnswerKey, getQuizAnswerSolution, getQuizOmrSheet } from "../../services/quizService";
+import { formatMarks } from "../../utils/questionTypes";
 
 const PaperCard = ({
   id,
@@ -225,7 +226,8 @@ const PaperCard = ({
                   Total Marks:
                 </span>
                 <span className="text-lg font-bold text-emerald-600">
-                  {total_marks}
+                  {/* marks are DECIMAL in the DB, so they arrive as "36.00" */}
+                  {formatMarks(total_marks)}
                 </span>
               </div>
             </div>

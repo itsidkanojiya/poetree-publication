@@ -11,6 +11,7 @@ import apiClient from "../../services/apiClient";
 import { QuestionImageBlock } from "../Common/QuestionImageBlock";
 import { estimateImageBlockHeight } from "../../utils/questionImage";
 import { seededMatchOrder } from "../../utils/matchShuffle";
+import { formatMarks } from "../../utils/questionTypes";
 
 const CustomizePaper = () => {
   const { id } = useParams();
@@ -784,7 +785,7 @@ const CustomizePaper = () => {
             <div>
               <span className="text-sm text-gray-600">Total Marks:</span>
               <p className="font-semibold text-gray-800">
-                {paper.total_marks || 0}
+                {formatMarks(paper.total_marks || 0)}
               </p>
             </div>
           </div>
@@ -800,7 +801,7 @@ const CustomizePaper = () => {
             <div className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-lg">
               <span className="text-sm font-semibold">Total: </span>
               <span className="text-lg font-bold">
-                {paper.total_marks || 0}
+                {formatMarks(paper.total_marks || 0)}
               </span>
               <span className="text-sm font-semibold"> marks</span>
             </div>

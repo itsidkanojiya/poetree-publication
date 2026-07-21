@@ -5,6 +5,7 @@ import Toast from "../../Common/Toast";
 import Loader from "../../Common/loader/loader";
 import apiClient from "../../../services/apiClient";
 import { getAllStandards } from "../../../services/adminService";
+import { formatMarks } from "../../../utils/questionTypes";
 
 const TemplateList = () => {
   const [templates, setTemplates] = useState([]);
@@ -248,7 +249,7 @@ const TemplateList = () => {
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-600">Total Marks:</span>
-                    <span className="font-semibold text-gray-800">{template.total_marks || 0}</span>
+                    <span className="font-semibold text-gray-800">{formatMarks(template.total_marks || 0)}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-600">Questions:</span>

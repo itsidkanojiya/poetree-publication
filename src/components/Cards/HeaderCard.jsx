@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { formatMarks } from "../../utils/questionTypes";
 
 const HeaderCard = ({
   header,
@@ -207,7 +208,9 @@ const HeaderCard = ({
                 })()}
               </div>
               <div>
-                <strong>Marks:</strong> {header.totalMarks ?? header.marks ?? "80"}
+                {/* marks are DECIMAL in the DB, so a saved paper returns "36.00" */}
+                <strong>Marks:</strong>{" "}
+                {formatMarks(header.totalMarks ?? header.marks ?? 80)}
               </div>
             </div>
           </div>

@@ -10,6 +10,7 @@ import { Plus, Trash2, Search, FileText, Eye, Download, CheckSquare } from "luci
 import Toast from "../../Common/Toast";
 import Loader from "../../Common/loader/loader";
 import AddReadymadePaperModal from "./AddReadymadePaperModal";
+import { formatMarks } from "../../../utils/questionTypes";
 
 const ReadymadePaperManagement = () => {
   const [papers, setPapers] = useState([]);
@@ -308,7 +309,7 @@ const ReadymadePaperManagement = () => {
                     <span>Std: {paper.standard_name ?? paper.standard}</span>
                   )}
                   {paper.board && <span>Board: {paper.board}</span>}
-                  {paper.total_marks != null && <span>Marks: {paper.total_marks}</span>}
+                  {paper.total_marks != null && <span>Marks: {formatMarks(paper.total_marks)}</span>}
                 </div>
 
                 {/* Actions */}
