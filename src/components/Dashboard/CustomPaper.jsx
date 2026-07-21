@@ -45,7 +45,7 @@ import QUESTION_TYPES, {
   typeKeysForLanguage,
   getType,
   getWordList,
-  formatMarks,
+  formatMarksLabel,
   normalizeTypeKey as normalizeTypeKeyLocal,
 } from "../../utils/questionTypes";
 import { estimateImageBlockHeight } from "../../utils/questionImage";
@@ -3533,16 +3533,19 @@ const CustomPaper = () => {
                                     fontWeight: "bold",
                                     color: "#374151",
                                     // Keep "3 marks" on one line — a long section title
-                                    // was wrapping it to "3" / "marks".
+                                    // was wrapping it to "3" / "marks" — and keep it
+                                    // aligned with the first line of that title.
                                     whiteSpace: "nowrap",
+                                    flexShrink: 0,
+                                    marginLeft: "12px",
+                                    lineHeight: "1.5",
                                   }}
                                 >
-                                  {formatMarks(
+                                  {formatMarksLabel(
                                     (sectionTypeTotals[sectionTypeNormalized] ??
                                       section.selectedQuestions.length) *
                                       (marksPerType[sectionTypeNormalized] || 0)
-                                  )}{" "}
-                                  marks
+                                  )}
                                 </span>
                               </div>
                             </div>

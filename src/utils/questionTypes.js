@@ -81,8 +81,10 @@ export const QUESTION_TYPES = [
       english: "Write (T) for True and (F) for False.",
       hindi:
         "निम्नलिखित कथनों में सही कथनों के सामने (✓) और गलत कथनों के सामने (✗) का निशान लगाइए ।",
+      // The source doc used Wingdings, where ü/û ARE the tick and cross. In a normal
+      // font they print literally as "ü"/"û", so use the real symbols.
       gujarati:
-        "નીચેના વિધાનોમાંથી ખરા વિધાનો સામે ü ની અને ખોટા વિધાનો સામે û ની નિશાની કરો.",
+        "નીચેના વિધાનોમાંથી ખરા વિધાનો સામે ✓ ની અને ખોટા વિધાનો સામે ✗ ની નિશાની કરો.",
       sanskrit: "Write ‘T’ for True and ‘F’ for False.",
     },
   },
@@ -374,6 +376,12 @@ export const formatMarks = (value) => {
   const n = Number(value);
   if (!Number.isFinite(n)) return "0";
   return String(Math.round(n * 100) / 100);
+};
+
+/** "1 mark" / "3 marks" / "1.5 marks" — singular only for exactly 1. */
+export const formatMarksLabel = (value) => {
+  const n = Math.round((Number(value) || 0) * 100) / 100;
+  return `${formatMarks(n)} ${n === 1 ? "mark" : "marks"}`;
 };
 
 export default QUESTION_TYPES;
