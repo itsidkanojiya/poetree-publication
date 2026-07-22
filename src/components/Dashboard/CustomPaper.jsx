@@ -14,6 +14,7 @@ import {
   ChevronDown,
   Award,
   AlertTriangle,
+  RotateCcw,
 } from "lucide-react";
 import Button from "../Common/Buttons/Button";
 import { savePaper } from "../../utils/savePaper";
@@ -45,6 +46,7 @@ import QUESTION_TYPES, {
   typeKeysForLanguage,
   getType,
   getWordList,
+  formatMarks,
   formatMarksLabel,
   normalizeTypeKey as normalizeTypeKeyLocal,
 } from "../../utils/questionTypes";
@@ -330,19 +332,23 @@ const CustomPaper = () => {
       (type) => byType.get(type) || { type, selectedQuestions: [] }
     );
   });
-  // v3 key: synonyms/antonyms moved from 0.5-per-word to 3 marks for the whole word
-  // list, so the v2 cache would keep printing "0.5 marks" for those sections.
-  // Also merged with the defaults, so a NEWLY added type gets its proper marks
-  // instead of falling through to 0.
-  const [marksPerType, setMarksPerType] = useState(() => {
-    const storedMarks = localStorage.getItem("marksPerType_v3");
-    let parsed = null;
+  /**
+   * "Configure Marks" is an OVERRIDE, not the source of truth.
+   *
+   * By default a question is worth the marks saved on it, and the panel simply shows
+   * that value. Only when the teacher actually edits a type does it override every
+   * question of that type for this paper; Reset removes the override and the saved
+   * marks apply again. Only overridden types are stored here — absence means
+   * "use the saved marks".
+   */
+  const [marksOverrides, setMarksOverrides] = useState(() => {
     try {
-      parsed = storedMarks ? JSON.parse(storedMarks) : null;
+      const stored = localStorage.getItem("marksOverrides_v1");
+      const parsed = stored ? JSON.parse(stored) : null;
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
     } catch {
-      parsed = null;
+      return {};
     }
-    return { ...DEFAULT_MARKS_PER_TYPE, ...(parsed || {}) };
   });
 
   // Save to localStorage whenever sections change
@@ -352,8 +358,8 @@ const CustomPaper = () => {
 
   // Save marks to localStorage whenever they change
   useEffect(() => {
-    localStorage.setItem("marksPerType_v3", JSON.stringify(marksPerType));
-  }, [marksPerType]);
+    localStorage.setItem("marksOverrides_v1", JSON.stringify(marksOverrides));
+  }, [marksOverrides]);
 
   // Load paper data in edit mode
   useEffect(() => {
@@ -498,7 +504,7 @@ const CustomPaper = () => {
       
       // Calculate marks per question type based on paper marks
       if (marksData) {
-        const calculatedMarks = { ...marksPerType };
+        const calculatedMarks = { ...effectiveMarksPerType };
         
         Object.keys(groupedQuestions).forEach((type) => {
           const questionCount = groupedQuestions[type].length;
@@ -532,7 +538,9 @@ const CustomPaper = () => {
           }
         });
         
-        setMarksPerType(calculatedMarks);
+        // Editing an existing paper: keep the marks it was saved with as overrides so
+        // the paper reproduces exactly. Reset drops them back to the question marks.
+        setMarksOverrides(calculatedMarks);
       }
     } catch (error) {
       console.error("Error loading questions:", error);
@@ -1233,15 +1241,8 @@ const CustomPaper = () => {
     }
   };
 
-  const handleMarksChange = (type, value) => {
-    const numValue = parseFloat(value) || 0;
-    if (numValue >= 0) {
-      setMarksPerType((prev) => ({
-        ...prev,
-        [type]: numValue,
-      }));
-    }
-  };
+  // Marks are now driven by each question's own value, with "Configure Marks" acting
+  // as an optional per-type override — see setMarksOverride / resetMarksOverride.
 
   /**
    * Marks for a single question: the value saved ON the question wins, falling back to
@@ -1250,10 +1251,66 @@ const CustomPaper = () => {
    * 1-mark word still printed as 3 because the type default was 3.
    */
   const questionMarks = (question, sectionType) => {
+    const key = normalizeTypeKeyLocal(sectionType);
+    // An explicit "Configure Marks" override wins for every question of the type.
+    const override = Number(marksOverrides[key]);
+    if (Number.isFinite(override) && override >= 0) return override;
+    // Otherwise the marks saved on the question.
     const own = Number(question?.marks);
     if (Number.isFinite(own) && own > 0) return own;
-    return Number(marksPerType[normalizeTypeKeyLocal(sectionType)]) || 0;
+    return Number(DEFAULT_MARKS_PER_TYPE[key]) || 0;
   };
+
+  /**
+   * The marks saved on the selected questions of a type — what the panel shows when
+   * there's no override. Returns null when the questions disagree ("Mixed").
+   */
+  const savedMarksForType = (sectionType) => {
+    const key = normalizeTypeKeyLocal(sectionType);
+    const values = questionSections
+      .filter((s) => normalizeTypeKeyLocal(s.type) === key)
+      .flatMap((s) => s.selectedQuestions || [])
+      .map((q) => Number(q?.marks))
+      .filter((v) => Number.isFinite(v) && v > 0);
+    if (values.length === 0) return Number(DEFAULT_MARKS_PER_TYPE[key]) || 0;
+    return values.every((v) => v === values[0]) ? values[0] : null;
+  };
+
+  /** Value shown in the Configure Marks input (override, else saved, else ""). */
+  const marksInputValue = (sectionType) => {
+    const key = normalizeTypeKeyLocal(sectionType);
+    if (marksOverrides[key] != null) return marksOverrides[key];
+    const saved = savedMarksForType(key);
+    return saved == null ? "" : saved;
+  };
+
+  const isMarksOverridden = (sectionType) =>
+    marksOverrides[normalizeTypeKeyLocal(sectionType)] != null;
+
+  const setMarksOverride = (sectionType, value) => {
+    const key = normalizeTypeKeyLocal(sectionType);
+    setMarksOverrides((prev) => ({ ...prev, [key]: value }));
+  };
+
+  /** Remove the override for a type → back to the saved marks. */
+  const resetMarksOverride = (sectionType) => {
+    const key = normalizeTypeKeyLocal(sectionType);
+    setMarksOverrides((prev) => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  };
+
+  /** Effective per-type marks (override, else the saved/uniform value). */
+  const effectiveMarksPerType = ALL_TYPE_KEYS.reduce((acc, key) => {
+    const override = Number(marksOverrides[key]);
+    acc[key] =
+      Number.isFinite(override) && override >= 0
+        ? override
+        : savedMarksForType(key) ?? (Number(DEFAULT_MARKS_PER_TYPE[key]) || 0);
+    return acc;
+  }, {});
 
   /** Total marks of every question of a type across the WHOLE paper. */
   const sectionMarksFor = (sectionType) =>
@@ -1329,18 +1386,10 @@ const CustomPaper = () => {
 
   const handleReset = () => {
     setQuestionSections(INITIAL_QUESTION_SECTIONS);
-    setMarksPerType({
-      mcq: 1,
-      blank: 1,
-      true_false: 1,
-      onetwo: 2,
-      short: 3,
-      long: 5,
-      passage: 2,
-      match: 2,
-    });
+    // Drop any per-type overrides — marks go back to each question's saved value.
+    setMarksOverrides({});
     localStorage.removeItem("questionSections");
-    localStorage.removeItem("marksPerType");
+    localStorage.removeItem("marksOverrides_v1");
     if (smartWizardActive) {
       setSmartWizardStep("header");
       setSmartMeta(null);
@@ -1387,7 +1436,7 @@ const CustomPaper = () => {
           logoFile, 
           "custom", 
           headerToSave,
-          marksPerType,
+          effectiveMarksPerType,
           questionSections,
           headerToSave?.documentTitle || null,
           chapterIds
@@ -1458,7 +1507,7 @@ const CustomPaper = () => {
       // Clear questions now that PDF is downloaded
       setQuestionSections(INITIAL_QUESTION_SECTIONS);
       localStorage.removeItem("questionSections");
-      localStorage.removeItem("marksPerType");
+      localStorage.removeItem("marksOverrides_v1");
       
       // Show success message and redirect to history
       setToast({
@@ -1552,7 +1601,7 @@ const CustomPaper = () => {
 
         questionSections.forEach((section) => {
           const count = section.selectedQuestions.length;
-          const marks = marksPerType[section.type] || 0;
+          const marks = effectiveMarksPerType[section.type] || 0;
           const totalMarks = count * marks;
 
           switch (section.type) {
@@ -1631,7 +1680,7 @@ const CustomPaper = () => {
           logoFile, 
           "custom", 
           headerToSave,
-          marksPerType,
+          effectiveMarksPerType,
           questionSections,
           headerToSave?.documentTitle || null,
           chapterIds
@@ -1647,7 +1696,7 @@ const CustomPaper = () => {
         setTimeout(() => {
           setQuestionSections(INITIAL_QUESTION_SECTIONS);
           localStorage.removeItem("questionSections");
-          localStorage.removeItem("marksPerType");
+          localStorage.removeItem("marksOverrides_v1");
           navigate("/dashboard/history", { state: { refresh: true } });
         }, 1500);
       } catch (error) {
@@ -1663,7 +1712,7 @@ const CustomPaper = () => {
   const handleDiscardAndGo = () => {
     setQuestionSections(INITIAL_QUESTION_SECTIONS);
     localStorage.removeItem("questionSections");
-    localStorage.removeItem("marksPerType");
+    localStorage.removeItem("marksOverrides_v1");
     setShowBackConfirm(false);
     navigate("/dashboard");
   };
@@ -1914,7 +1963,7 @@ const CustomPaper = () => {
   // Total marks use the SAME per-type config the paper prints with (marksPerType),
   // NOT each question's stored marks — so this exactly matches the generated paper.
   const smartEstimatedMarks = SMART_SECTION_KEYS.reduce(
-    (s, k) => s + smartAchievableCount(k) * (Number(marksPerType[k]) || 0),
+    (s, k) => s + smartAchievableCount(k) * (Number(effectiveMarksPerType[k]) || 0),
     0
   );
   // What the "Total marks (auto)" box shows.
@@ -2474,10 +2523,10 @@ const CustomPaper = () => {
                               className="w-full px-3 py-2 border-2 border-gray-200 rounded-xl text-sm"
                             />
                             <div className="mt-1 text-[11px] text-gray-500">
-                              {(Number(marksPerType[key]) || 0) > 0 && (
+                              {(Number(effectiveMarksPerType[key]) || 0) > 0 && (
                                 <>
-                                  {marksPerType[key]} mark
-                                  {Number(marksPerType[key]) !== 1 ? "s" : ""} each
+                                  {formatMarks(effectiveMarksPerType[key])} mark
+                                  {Number(effectiveMarksPerType[key]) !== 1 ? "s" : ""} each
                                   {smartMarksByType?.[key] && " · "}
                                 </>
                               )}
@@ -3118,10 +3167,26 @@ const CustomPaper = () => {
           {/* Marks Configuration - Modern Design (Collapsible) */}
           {isMarksPanelExpanded && (
             <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl shadow-lg border-2 border-amber-200 p-6 mb-6 animate-in slide-in-from-top-2 duration-300">
-              <label className="block text-sm font-bold text-gray-800 mb-4 flex items-center gap-2">
-                <span className="w-1 h-5 bg-gradient-to-b from-amber-500 to-orange-600 rounded-full"></span>
-                <span className="text-base">Marks per Question Type</span>
-              </label>
+              <div className="mb-1 flex items-center justify-between gap-3">
+                <label className="text-sm font-bold text-gray-800 flex items-center gap-2">
+                  <span className="w-1 h-5 bg-gradient-to-b from-amber-500 to-orange-600 rounded-full"></span>
+                  <span className="text-base">Marks per Question Type</span>
+                </label>
+                {Object.keys(marksOverrides).length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setMarksOverrides({})}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-amber-800 bg-white border-2 border-amber-300 rounded-lg hover:bg-amber-100 transition"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    Reset all
+                  </button>
+                )}
+              </div>
+              <p className="text-xs text-gray-600 mb-4">
+                Shows the marks saved on each question. Change a value to override it for
+                this paper, then Reset to go back to the saved marks.
+              </p>
               <div className="grid grid-cols-2 gap-4">
                 {Object.entries(QUESTION_TYPE_CONFIG).filter(([type]) => isTypeAllowed(type)).map(([type, config]) => (
                   <div
@@ -3146,27 +3211,48 @@ const CustomPaper = () => {
                         type="number"
                         min="0"
                         step="0.5"
-                        value={marksPerType[type] || 0}
-                        onChange={(e) =>
-                          handleMarksChange(type, e.target.value)
-                        }
-                        className="w-full px-3 py-2 border-2 border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all text-gray-800 font-bold text-sm bg-white"
-                        placeholder="Marks"
+                        // Shows the marks saved on the questions; typing here OVERRIDES
+                        // every question of this type until Reset.
+                        value={marksInputValue(type)}
+                        onChange={(e) => setMarksOverride(type, e.target.value)}
+                        className={`w-full px-3 py-2 border-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all text-gray-800 font-bold text-sm bg-white ${
+                          isMarksOverridden(type) ? "border-amber-500" : "border-amber-300"
+                        }`}
+                        placeholder={savedMarksForType(type) == null ? "Mixed" : "Marks"}
                       />
                       <span className="text-xs font-semibold text-gray-600 whitespace-nowrap">
                         marks
                       </span>
+                      {isMarksOverridden(type) && (
+                        <button
+                          type="button"
+                          onClick={() => resetMarksOverride(type)}
+                          title="Reset to the marks saved on the questions"
+                          className="p-1.5 rounded-lg text-amber-700 hover:bg-amber-100 transition shrink-0"
+                        >
+                          <RotateCcw className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
-                    {questionSections.find((s) => s.type === type)
-                      ?.selectedQuestions.length > 0 && (
-                      <div className="mt-2 text-xs font-semibold text-amber-700">
-                        Subtotal:{" "}
-                        {(questionSections.find((s) => s.type === type)
-                          ?.selectedQuestions.length || 0) *
-                          (marksPerType[type] || 0)}{" "}
-                        marks
-                      </div>
-                    )}
+                    <div className="mt-2 flex items-center justify-between gap-2">
+                      {questionSections.find((s) => s.type === type)
+                        ?.selectedQuestions.length > 0 && (
+                        <span className="text-xs font-semibold text-amber-700">
+                          Subtotal: {formatMarks(sectionMarksFor(type))} marks
+                        </span>
+                      )}
+                      {isMarksOverridden(type) ? (
+                        <span className="text-[10px] font-bold uppercase tracking-wide text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">
+                          Overridden
+                        </span>
+                      ) : (
+                        savedMarksForType(type) == null && (
+                          <span className="text-[10px] font-semibold text-gray-500">
+                            using each question&apos;s marks
+                          </span>
+                        )
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
