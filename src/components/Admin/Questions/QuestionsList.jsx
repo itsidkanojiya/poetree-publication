@@ -404,6 +404,22 @@ const QuestionsList = ({ questionType }) => {
     setShowAddModal(true);
   };
 
+  const hasActiveFilters = Boolean(
+    filterBoardId ||
+      filterSubjectId ||
+      filterStandard ||
+      filterSubjectTitleId ||
+      filterChapterId
+  );
+
+  const clearAllFilters = () => {
+    setFilterBoardId("");
+    setFilterSubjectId("");
+    setFilterStandard("");
+    setFilterSubjectTitleId("");
+    setFilterChapterId("");
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -422,11 +438,69 @@ const QuestionsList = ({ questionType }) => {
         />
       )}
 
-      {/* Toolbar: Filters + Search + Buttons */}
-      <div className="mb-6 flex flex-col gap-3">
-        <div className="flex flex-col lg:flex-row lg:items-center gap-3">
-          {/* Filters inline in toolbar */}
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
+      {/* Toolbar. Search + actions on top, filters on their own row below: the five
+          filters and three buttons used to sit on ONE row as shrink-0, which squeezed
+          the search box down to just its icon and clipped the button labels. */}
+      <div className="mb-6 space-y-3">
+        {/* Search + actions */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="relative flex-1 min-w-0">
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search questions or answers…"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-11 pr-10 py-3 border-2 border-gray-200 rounded-xl bg-white text-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition outline-none"
+            />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm("")}
+                title="Clear search"
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={buildAndDownloadExcel}
+              disabled={filteredQuestions.length === 0}
+              title="Bulk Download"
+              className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-xl hover:from-indigo-600 hover:to-purple-700 transition shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Download className="w-5 h-5 shrink-0" />
+              <span className="hidden lg:inline whitespace-nowrap">Bulk Download</span>
+            </button>
+            <button
+              onClick={() => setShowBulkUploadModal(true)}
+              title="Bulk Upload"
+              className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl hover:from-green-600 hover:to-emerald-700 transition shadow-lg"
+            >
+              <Upload className="w-5 h-5 shrink-0" />
+              <span className="hidden lg:inline whitespace-nowrap">Bulk Upload</span>
+            </button>
+            <button
+              onClick={() => {
+                setSelectedQuestion(null);
+                setShowAddModal(true);
+              }}
+              className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl hover:from-blue-600 hover:to-indigo-700 transition shadow-lg"
+            >
+              <Plus className="w-5 h-5 shrink-0" />
+              <span className="whitespace-nowrap">Add Question</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Filters row */}
+        <div className="rounded-xl border-2 border-gray-100 bg-gray-50/60 px-3 py-2.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[11px] font-bold uppercase tracking-wide text-gray-500 mr-0.5">
+              Filters
+            </span>
             {/* Cascading filters: Board → Subject → Standard → Title → Chapter.
                 Changing one clears the ones below it so the selection stays valid. */}
             <select
@@ -506,47 +580,27 @@ const QuestionsList = ({ questionType }) => {
                 </option>
               ))}
             </select>
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="relative">
-              <Search className="absolute left-3 top-3.5 w-5 h-5 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search questions..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition outline-none"
-              />
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
-          <button
-            onClick={buildAndDownloadExcel}
-            disabled={filteredQuestions.length === 0}
-            className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg hover:from-indigo-600 hover:to-purple-700 transition shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Download className="w-5 h-5" />
-            <span>Bulk Download</span>
-          </button>
-          <button
-            onClick={() => setShowBulkUploadModal(true)}
-            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg hover:from-green-600 hover:to-emerald-700 transition shadow-lg"
-          >
-            <Upload className="w-5 h-5" />
-            <span>Bulk Upload</span>
-          </button>
-          <button
-            onClick={() => {
-              setSelectedQuestion(null);
-              setShowAddModal(true);
-            }}
-            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-lg hover:from-blue-600 hover:to-indigo-700 transition shadow-lg"
-          >
-            <Plus className="w-5 h-5" />
-            <span>Add Question</span>
-          </button>
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={clearAllFilters}
+                className="ml-auto flex items-center gap-1.5 px-3 py-2 text-sm font-semibold text-gray-600 bg-white border-2 border-gray-200 rounded-lg hover:bg-gray-100 hover:text-gray-800 transition"
+              >
+                <X className="w-4 h-4" />
+                Clear filters
+              </button>
+            )}
           </div>
         </div>
+
+        {/* Result count — makes it obvious when a filter is hiding rows. */}
+        <p className="px-1 text-xs text-gray-500">
+          Showing <span className="font-semibold text-gray-700">{filteredQuestions.length}</span>
+          {filteredQuestions.length !== questions.length && (
+            <> of <span className="font-semibold text-gray-700">{questions.length}</span></>
+          )}{" "}
+          question{filteredQuestions.length === 1 ? "" : "s"}
+        </p>
       </div>
 
       {/* Selection action bar */}
