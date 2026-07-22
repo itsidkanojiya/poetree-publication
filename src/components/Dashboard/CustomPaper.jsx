@@ -648,9 +648,13 @@ const CustomPaper = () => {
   // translate) may only be used on Gujarati, Hindi and Sanskrit papers; every other
   // subject sees only the base 8. translate is Sanskrit-only. Applied to the type
   // picker, the marks panel and the AI-paper counters.
-  const paperLanguage = detectPaperLanguage(effectiveHeaderForChapter?.subject);
+  const paperSubjectName = effectiveHeaderForChapter?.subject;
+  const paperLanguage = detectPaperLanguage(paperSubjectName);
   const allowedTypeKeys = typeKeysForLanguage(paperLanguage);
   const isTypeAllowed = (type) => allowedTypeKeys.includes(normalizeTypeKeyLocal(type));
+  // On a Gujarati/Hindi/Sanskrit paper the type picker shows the heading that will
+  // actually print, instead of the generic English label.
+  const isLanguagePaper = ["gujarati", "hindi", "sanskrit"].includes(paperLanguage);
 
   /**
    * Height a section heading actually takes: a 16px title (which WRAPS for the long
@@ -3022,11 +3026,15 @@ const CustomPaper = () => {
                 disabled={approvedSubjectIds.length === 0}
                 className="w-full px-4 py-3.5 flex items-center justify-between gap-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 text-left bg-white hover:border-blue-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
               >
-                <span className="font-semibold text-gray-800 truncate">
+                <span className="font-semibold text-gray-800 min-w-0 truncate">
                   {currentType ? (
-                    <span className={`inline-flex items-center gap-2 ${QUESTION_TYPE_CONFIG[currentType]?.badge} px-3 py-1 rounded-lg`}>
-                      <span className={`w-2 h-2 rounded-full ${QUESTION_TYPE_CONFIG[currentType]?.color}`} />
-                      {QUESTION_TYPE_CONFIG[currentType]?.label}
+                    <span className={`inline-flex items-center gap-2 max-w-full ${QUESTION_TYPE_CONFIG[currentType]?.badge} px-3 py-1 rounded-lg`}>
+                      <span className={`w-2 h-2 rounded-full flex-shrink-0 ${QUESTION_TYPE_CONFIG[currentType]?.color}`} />
+                      <span className="truncate">
+                        {isLanguagePaper
+                          ? getSectionTitle(currentType, paperSubjectName)
+                          : QUESTION_TYPE_CONFIG[currentType]?.label}
+                      </span>
                     </span>
                   ) : (
                     <span className="text-gray-500">Choose a question type or view all (mixed)</span>
@@ -3060,8 +3068,17 @@ const CustomPaper = () => {
                       }}
                       className={`w-full px-4 py-3 flex items-center gap-3 text-left hover:bg-gray-50 transition-colors ${currentType === type ? "bg-blue-50 border-l-4 border-blue-500" : ""}`}
                     >
-                      <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${config.color}`} />
-                      <span className="font-medium text-gray-800">{config.label}</span>
+                      <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 mt-1.5 self-start ${config.color}`} />
+                      <span className="min-w-0">
+                        {/* On a Gujarati/Hindi/Sanskrit paper show the heading that will
+                            actually print, so the teacher picks by what they'll see. */}
+                        <span className="block font-medium text-gray-800">
+                          {isLanguagePaper ? getSectionTitle(type, paperSubjectName) : config.label}
+                        </span>
+                        {isLanguagePaper && (
+                          <span className="block text-xs text-gray-500 mt-0.5">{config.label}</span>
+                        )}
+                      </span>
                     </button>
                   ))}
                 </div>
