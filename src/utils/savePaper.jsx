@@ -73,14 +73,20 @@ export const savePaper = async (
 
     // Per-type marks. Driven by the shared registry so a new question type is never
     // silently dropped (the old switch had no default: passage/match marks were lost).
+    // Each question's OWN marks win, falling back to the per-type marks when a
+    // question has none — matching what the paper preview prints. (It used to be
+    // count x per-type marks, so a 1-mark question saved as the type default.)
     const marksByType = {};
-    if (questionSections && marksPerType) {
+    if (questionSections) {
       questionSections.forEach((section) => {
         const key = normalizeTypeKey(section.type);
-        const count = section.selectedQuestions.length;
-        const marks = Number(marksPerType[section.type] ?? marksPerType[key]) || 0;
         if (!key) return;
-        marksByType[key] = (marksByType[key] || 0) + count * marks;
+        const fallback = Number(marksPerType?.[section.type] ?? marksPerType?.[key]) || 0;
+        const total = (section.selectedQuestions || []).reduce((sum, q) => {
+          const own = Number(q?.marks);
+          return sum + (Number.isFinite(own) && own > 0 ? own : fallback);
+        }, 0);
+        marksByType[key] = (marksByType[key] || 0) + total;
       });
     }
     ALL_TYPE_KEYS.forEach((key) => {

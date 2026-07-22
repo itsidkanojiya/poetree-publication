@@ -1239,11 +1239,42 @@ const CustomPaper = () => {
     }
   };
 
+  /**
+   * Marks for a single question: the value saved ON the question wins, falling back to
+   * the per-type marks from "Configure Marks" when a question has none. The paper used
+   * to be count x per-type marks, which ignored what the admin actually entered — a
+   * 1-mark word still printed as 3 because the type default was 3.
+   */
+  const questionMarks = (question, sectionType) => {
+    const own = Number(question?.marks);
+    if (Number.isFinite(own) && own > 0) return own;
+    return Number(marksPerType[normalizeTypeKeyLocal(sectionType)]) || 0;
+  };
+
+  /** Total marks of every question of a type across the WHOLE paper. */
+  const sectionMarksFor = (sectionType) =>
+    questionSections
+      .filter((s) => normalizeTypeKeyLocal(s.type) === normalizeTypeKeyLocal(sectionType))
+      .reduce(
+        (sum, s) =>
+          sum +
+          (s.selectedQuestions || []).reduce(
+            (t, q) => t + questionMarks(q, sectionType),
+            0
+          ),
+        0
+      );
+
   const getTotalMarks = () => {
-    return questionSections.reduce((total, section) => {
-      const marks = marksPerType[section.type] || 0;
-      return total + section.selectedQuestions.length * marks;
-    }, 0);
+    return questionSections.reduce(
+      (total, section) =>
+        total +
+        (section.selectedQuestions || []).reduce(
+          (t, q) => t + questionMarks(q, section.type),
+          0
+        ),
+      0
+    );
   };
 
   const handleTypeSelection = (type) => {
@@ -3561,11 +3592,7 @@ const CustomPaper = () => {
                                     lineHeight: "1.5",
                                   }}
                                 >
-                                  {formatMarksLabel(
-                                    (sectionTypeTotals[sectionTypeNormalized] ??
-                                      section.selectedQuestions.length) *
-                                      (marksPerType[sectionTypeNormalized] || 0)
-                                  )}
+                                  {formatMarksLabel(sectionMarksFor(sectionTypeNormalized))}
                                 </span>
                               </div>
                             </div>

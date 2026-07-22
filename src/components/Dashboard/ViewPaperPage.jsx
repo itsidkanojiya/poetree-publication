@@ -604,9 +604,26 @@ const ViewPaperPage = () => {
                   questionCounters[sectionType] = 1;
                 }
 
-                const sectionMarks =
-                  (sectionTypeTotals[sectionType] ?? section.selectedQuestions.length) *
-                  (marksPerType[sectionType] || 0);
+                // Each question's OWN marks win, falling back to the per-type value.
+                // (Was count x per-type marks, so a 1-mark question printed as the
+                // type default.) Summed across the whole paper, not just this page,
+                // since a section can span pages.
+                const sectionMarks = sections
+                  .filter((s) => normalizeQuestionType(s.type) === sectionType)
+                  .reduce(
+                    (sum, s) =>
+                      sum +
+                      (s.selectedQuestions || []).reduce((t, q) => {
+                        const own = Number(q?.marks);
+                        return (
+                          t +
+                          (Number.isFinite(own) && own > 0
+                            ? own
+                            : Number(marksPerType[sectionType]) || 0)
+                        );
+                      }, 0),
+                    0
+                  );
 
                 return (
                   <div key={sectionIndex}>
