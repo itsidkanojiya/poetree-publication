@@ -184,8 +184,8 @@ export const QUESTION_TYPES = [
     short: "Complete lines",
     layout: "plain",
     group: "language",
-    // 1 mark each x 2 questions => the section prints "2 marks".
-    defaultMarks: 1,
+    // 2 marks EACH (x2 questions by default => a 4-mark section).
+    defaultMarks: 2,
     defaultCount: 2,
     color: "bg-cyan-500",
     badge: "bg-cyan-100 text-cyan-700",
@@ -204,10 +204,11 @@ export const QUESTION_TYPES = [
     // Words print side-by-side in a wrapping row: (1) સુંદર  (2) નદી  (3) મિત્ર
     layout: "row",
     group: "language",
-    // ONE question holds the whole word list (words live in `options`), so the
-    // question is worth 3 marks regardless of whether it has 3, 4, 5 or 6 words.
-    defaultMarks: 3,
-    defaultCount: 1,
+    // 1 mark EACH. A question may be a single word, or hold a word list in
+    // `options` — either way the section total is the sum of the question marks
+    // (3 words at 1 mark => a 3-mark section).
+    defaultMarks: 1,
+    defaultCount: 3,
     color: "bg-lime-500",
     badge: "bg-lime-100 text-lime-700",
     languages: LANG_SUBJECTS,
@@ -225,9 +226,9 @@ export const QUESTION_TYPES = [
     short: "Antonyms",
     layout: "row",
     group: "language",
-    // ONE question holds the whole word list (see synonyms).
-    defaultMarks: 3,
-    defaultCount: 1,
+    // 1 mark EACH (see synonyms).
+    defaultMarks: 1,
+    defaultCount: 3,
     color: "bg-pink-500",
     badge: "bg-pink-100 text-pink-700",
     languages: LANG_SUBJECTS,
