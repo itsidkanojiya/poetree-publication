@@ -10,10 +10,23 @@ import { Download } from "lucide-react";
  * Optional: worksheetId + onDownload for personalized PDF download (school logo/name).
  * Optional: loading + errorMessage for personalized fetch state.
  */
+/**
+ * An https page cannot embed an http iframe — the browser blocks it as mixed content
+ * and the frame just stays blank (while "Open in new tab" still works, because a
+ * top-level navigation is not mixed content). The API builds absolute URLs from
+ * req.protocol, so it can hand back http:// when it sits behind a TLS-terminating
+ * proxy. Upgrade the scheme so the preview works regardless.
+ */
+const toSafeUrl = (url) => {
+  if (!url || typeof window === "undefined") return url;
+  if (window.location.protocol !== "https:") return url;
+  return String(url).replace(/^http:\/\//i, "https://");
+};
+
 export default function PDFModal({
   isOpen,
   onClose,
-  pdfUrl,
+  pdfUrl: rawPdfUrl,
   title,
   loading = false,
   errorMessage = null,
@@ -21,6 +34,7 @@ export default function PDFModal({
   onDownload = null,
 }) {
   const [downloading, setDownloading] = useState(false);
+  const pdfUrl = toSafeUrl(rawPdfUrl);
 
   const handleDownload = async () => {
     if (worksheetId == null || typeof onDownload !== "function") return;
