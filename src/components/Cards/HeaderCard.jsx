@@ -1,6 +1,31 @@
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { formatMarks } from "../../utils/questionTypes";
+import { getAllStandards } from "../../services/adminService";
+
+/**
+ * Papers store `standard` as the standard_id, which is NOT the grade number
+ * (id 26 = "6", id 27 = "7", id 9 = "5", id 30 = "10"). Printing the id raw showed
+ * "Class: 26" for a Std 6 paper, so the name has to be looked up — no arithmetic
+ * shortcut works. Fetched once and shared by every HeaderCard on the page.
+ */
+let standardsCache = null;
+let standardsPromise = null;
+const loadStandards = () => {
+  if (standardsCache) return Promise.resolve(standardsCache);
+  if (!standardsPromise) {
+    standardsPromise = getAllStandards()
+      .then((list) => {
+        standardsCache = Array.isArray(list) ? list : [];
+        return standardsCache;
+      })
+      .catch(() => {
+        standardsPromise = null; // allow a retry
+        return [];
+      });
+  }
+  return standardsPromise;
+};
 
 const HeaderCard = ({
   header,
@@ -12,6 +37,16 @@ const HeaderCard = ({
 }) => {
   const navigate = useNavigate();
   const [userProfile, setUserProfile] = useState(null);
+  const [standards, setStandards] = useState(standardsCache || []);
+
+  useEffect(() => {
+    if (standardsCache) return;
+    let cancelled = false;
+    loadStandards().then((list) => {
+      if (!cancelled) setStandards(list);
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   // Load user profile data for school info
   useEffect(() => {
@@ -60,6 +95,22 @@ const HeaderCard = ({
   };
 
   const appliedStyle = !disableStyles ? styles[safeHeader.styleType] : "";
+
+  /**
+   * The grade to print. `class` (when set) already holds the grade text; otherwise
+   * `standard` is a standard_ID that must be looked up — the id is NOT the grade
+   * (26 -> "6", 9 -> "5", 30 -> "10"), so printing it raw showed "Class: 26".
+   */
+  const classDisplay = (() => {
+    if (header?.class) {
+      const match = String(header.class).match(/\d+/);
+      return match ? match[0] : String(header.class);
+    }
+    const std = header?.standard;
+    if (std == null || std === "") return "";
+    const found = standards.find((s) => String(s.standard_id) === String(std));
+    return found ? String(found.name) : ""; // blank beats a wrong number
+  })();
 
   // Render logo (either image or initials)
   const renderLogo = () => {
@@ -181,18 +232,7 @@ const HeaderCard = ({
             <div className="flex justify-between items-start text-sm">
               <div>
                 <strong>Class:</strong>{" "}
-                {(() => {
-                  // Prefer the explicit class; else derive from the real standard
-                  // (the teaching context's Std) instead of a hardcoded "1".
-                  const classValue =
-                    header.class ||
-                    (header.standard != null && header.standard !== ""
-                      ? `Standard ${header.standard}`
-                      : "");
-                  // Extract just the number from "Standard X" or return the number if it's just a number
-                  const match = String(classValue).match(/\d+/);
-                  return match ? match[0] : classValue;
-                })()}
+                {classDisplay}
               </div>
               <div>
                 <strong>Date:</strong>{" "}
@@ -248,9 +288,9 @@ const HeaderCard = ({
               )}
 
               {/* Grade/Class - Medium bold, centered */}
-              {safeHeader.class && (
+              {classDisplay && (
                 <p className="text-sm font-bold text-gray-900 text-center">
-                  Grade : {safeHeader.class}
+                  Grade : {classDisplay}
                 </p>
               )}
             </div>
@@ -269,7 +309,7 @@ const HeaderCard = ({
               </h1>
             </div>
             <div className="text-right text-sm">
-              <div>Class: {header.class}</div>
+              <div>Class: {classDisplay}</div>
               <div>Roll No: {header.rollNo}</div>
             </div>
           </div>
