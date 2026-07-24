@@ -475,20 +475,16 @@ const CustomPaper = () => {
         .map((id) => byId.get(Number(id)))
         .filter((q) => q !== undefined); // Remove any undefined (questions not found)
       
-      // Group questions by type and populate questionSections
-      const groupedQuestions = {
-        mcq: [],
-        blank: [],
-        short: [],
-        long: [],
-        onetwo: [],
-        true_false: [],
-        passage: [],
-        match: [],
-      };
-      
+      // Group questions by type (from the registry, so every type is covered —
+      // a hardcoded 8-type list here dropped synonyms/antonyms/etc. when editing
+      // a saved paper).
+      const groupedQuestions = ALL_TYPE_KEYS.reduce((acc, key) => {
+        acc[key] = [];
+        return acc;
+      }, {});
+
       fetchedQuestions.forEach((question) => {
-        const normalizedType = normalizeQuestionType(question.type);
+        const normalizedType = normalizeTypeKeyLocal(question.type);
         if (groupedQuestions[normalizedType]) {
           groupedQuestions[normalizedType].push(question);
         }
@@ -1149,21 +1145,19 @@ const CustomPaper = () => {
         })
       );
 
-      const groupedQuestions = {
-        mcq: [],
-        blank: [],
-        short: [],
-        long: [],
-        onetwo: [],
-        true_false: [],
-        passage: [],
-        match: [],
-      };
+      // Built from the type registry, NOT a hardcoded list: this object used to name
+      // only the original 8 types, so proposed synonyms/antonyms/complete-lines
+      // questions hit the `if (groupedQuestions[nt])` guard below, were silently
+      // dropped, and never reached the paper even though the API returned them.
+      const groupedQuestions = ALL_TYPE_KEYS.reduce((acc, key) => {
+        acc[key] = [];
+        return acc;
+      }, {});
 
       order.forEach((id) => {
         const q = byId[id];
         if (!q) return;
-        const nt = normalizeQuestionType(q.type);
+        const nt = normalizeTypeKeyLocal(q.type);
         if (groupedQuestions[nt]) {
           groupedQuestions[nt].push(q);
         }
