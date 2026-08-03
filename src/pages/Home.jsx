@@ -1,613 +1,750 @@
-import React from "react";
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
-import { motion, useScroll, useTransform, useReducedMotion } from "framer-motion";
+import { motion } from "framer-motion";
 import { Navbar } from "../components/Navbar";
 import Footer from "../components/Footer";
 import { BROCHURE_PDF_URL } from "../config/api";
 import AnimatedCounter from "../components/Common/AnimatedCounter";
-import { fadeInUp, staggerContainer, staggerItem, viewportOnce } from "../utils/animationVariants";
+import { staggerContainer, staggerItem, viewportOnce } from "../utils/animationVariants";
 import {
-  FileText,
-  BookOpen,
   FilePlus,
   ClipboardCheck,
   GraduationCap,
   UserCircle,
   ArrowRight,
   CheckCircle2,
-  Sparkles,
   FileDown,
   Play,
-  Film,
-  Target,
-  Flag,
-  ShieldCheck,
-  Award,
+  Bot,
+  Layers,
+  SlidersHorizontal,
+  MousePointerClick,
   School,
-  BookMarked,
-  ChevronDown,
+  PenTool,
+  ClipboardList,
+  BarChart3,
+  Video,
+  Wand2,
+  NotebookPen,
+  Star,
+  Quote,
+  Mail,
+  Send,
+  Cpu,
+  Rocket,
+  Bookmark,
+  Printer,
+  BookOpen,
 } from "lucide-react";
 
+/**
+ * Poetree Publications — public landing page.
+ *
+ * Redesigned as a modern ed-tech landing: two-column hero, quick-search strip,
+ * colourful category cards, a stats band, "who it's for", a tools row,
+ * testimonials + brochure, and a newsletter CTA.
+ *
+ * Every CTA points at a route that actually exists. Gated product areas route to
+ * /auth/register (or /auth/login); "Videos" points at the public /animations page.
+ */
+
+// --- Content -------------------------------------------------------------
+
+// Hero feature bullets (labels match the hero illustration).
+const HERO_FEATURES = [
+  { icon: Cpu, label: "AI Question Paper Generator", color: "text-violet-600" },
+  { icon: Rocket, label: "AI-Powered Performance", color: "text-indigo-600" },
+  { icon: Bookmark, label: "School-Board Syllabus Aligned", color: "text-emerald-600" },
+  { icon: Printer, label: "Print-Ready Resources", color: "text-rose-600" },
+  { icon: ClipboardCheck, label: "Instant & Smart Assessments", color: "text-amber-600" },
+  { icon: BookOpen, label: "Multi-Subject Support", color: "text-teal-600" },
+];
+
+// The six big category cards. `to` is always a real route.
+const CATEGORIES = [
+  {
+    icon: Bot,
+    title: "AI Question Paper Generator",
+    description: "Create customized question papers in minutes with multiple question types.",
+    cta: "Try Now",
+    to: "/auth/register",
+    accent: "blue",
+    art: "/cards/ai-paper.svg",
+  },
+  {
+    icon: FilePlus,
+    title: "Worksheets",
+    description: "Download printable worksheets by subject, board and standard.",
+    cta: "Explore",
+    to: "/auth/register",
+    accent: "emerald",
+    art: "/cards/worksheets.svg",
+  },
+  {
+    icon: ClipboardCheck,
+    title: "Answer Sheets",
+    description: "Answer sheets and step-by-step solutions aligned to every paper.",
+    cta: "Browse",
+    to: "/auth/register",
+    accent: "amber",
+    art: "/cards/answer-sheets.svg",
+  },
+  {
+    icon: Video,
+    title: "Educational Videos",
+    description: "Engaging animations & concept videos — free to watch, no login.",
+    cta: "Watch Now",
+    to: "/animations",
+    accent: "violet",
+    art: "/cards/videos.svg",
+  },
+  {
+    icon: ClipboardList,
+    title: "Tests & Assessments",
+    description: "Build quizzes and live tests, then track results in one place.",
+    cta: "Start Test",
+    to: "/auth/register",
+    accent: "rose",
+    art: "/cards/tests.svg",
+  },
+  {
+    icon: School,
+    title: "Teacher & School Solutions",
+    description: "Smart digital tools to manage teaching, learning & assessment.",
+    cta: "Know More",
+    to: "/auth/register",
+    accent: "sky",
+    art: "/cards/school.svg",
+  },
+];
+
+// Tailwind classes per accent (kept as full class strings so JIT doesn't purge them).
+const ACCENTS = {
+  blue: { tint: "bg-blue-50", ring: "border-blue-100", icon: "bg-blue-100 text-blue-600", link: "text-blue-600", grad: "from-blue-500 to-blue-600" },
+  emerald: { tint: "bg-emerald-50", ring: "border-emerald-100", icon: "bg-emerald-100 text-emerald-600", link: "text-emerald-600", grad: "from-emerald-500 to-emerald-600" },
+  amber: { tint: "bg-amber-50", ring: "border-amber-100", icon: "bg-amber-100 text-amber-600", link: "text-amber-600", grad: "from-amber-500 to-amber-600" },
+  violet: { tint: "bg-violet-50", ring: "border-violet-100", icon: "bg-violet-100 text-violet-600", link: "text-violet-600", grad: "from-violet-500 to-fuchsia-600" },
+  rose: { tint: "bg-rose-50", ring: "border-rose-100", icon: "bg-rose-100 text-rose-600", link: "text-rose-600", grad: "from-rose-500 to-pink-600" },
+  sky: { tint: "bg-sky-50", ring: "border-sky-100", icon: "bg-sky-100 text-sky-600", link: "text-sky-600", grad: "from-sky-500 to-indigo-600" },
+};
+
+// "How it works" — the 4-step paper generation flow.
+const PAPER_STEPS = [
+  {
+    icon: Layers,
+    title: "Choose your context",
+    description: "Pick the subject, board and standard. Everything you see is aligned to that class.",
+  },
+  {
+    icon: Bot,
+    title: "Add questions",
+    description: "Select from the ready question bank, or let the AI generator build a full set for you.",
+  },
+  {
+    icon: SlidersHorizontal,
+    title: "Configure marks & sections",
+    description: "Set per-question marks, arrange sections, add your school header — full control.",
+  },
+  {
+    icon: FileDown,
+    title: "Preview & download",
+    description: "See a live preview of the exact paper, then export a clean, print-ready PDF.",
+  },
+];
+
+// Two ways to create a paper.
+const CREATE_MODES = [
+  {
+    icon: MousePointerClick,
+    tag: "Manual Builder",
+    title: "Build it yourself, exactly your way",
+    grad: "from-blue-500 to-indigo-600",
+    points: [
+      "Pick questions from the bank by subject & chapter",
+      "Mix MCQs, short, long, fill-in-the-blanks & more",
+      "Reorder sections and set marks per question",
+      "Add your school header and download the PDF",
+    ],
+  },
+  {
+    icon: Wand2,
+    tag: "AI Generator",
+    title: "Let AI draft a full paper in seconds",
+    grad: "from-violet-500 to-fuchsia-600",
+    points: [
+      "Choose chapters and how much weight each gets",
+      "Set the easy / medium / hard difficulty split",
+      "Pick how many questions of each type you need",
+      "Review, tweak anything, and export instantly",
+    ],
+  },
+];
+
+const STATS = [
+  { value: 500, suffix: "+", label: "Happy Teachers" },
+  { value: 50, suffix: "+", label: "Schools" },
+  { value: 10000, suffix: "+", label: "Papers Created" },
+  { value: 50, suffix: "+", label: "Subjects" },
+  { value: 2000, suffix: "+", label: "Worksheets" },
+];
+
+const AUDIENCES = [
+  {
+    icon: UserCircle,
+    title: "For Teachers",
+    description: "Save time, create better assessments and engage your students.",
+    grad: "from-blue-500 to-indigo-500",
+    to: "/auth/register",
+  },
+  {
+    icon: School,
+    title: "For Schools",
+    description: "Digital solutions to manage teaching, content & learning at scale.",
+    grad: "from-emerald-500 to-teal-500",
+    to: "/auth/register",
+  },
+  {
+    icon: GraduationCap,
+    title: "For Students",
+    description: "Learn with interactive videos, practice worksheets and tests.",
+    grad: "from-violet-500 to-fuchsia-500",
+    to: "/animations",
+  },
+];
+
+const TOOLS = [
+  { icon: Wand2, label: "Question Paper Generator", to: "/auth/register" },
+  { icon: NotebookPen, label: "Worksheet Builder", to: "/auth/register" },
+  { icon: ClipboardCheck, label: "Answer Sheet Generator", to: "/auth/register" },
+  { icon: PenTool, label: "Online Test Creator", to: "/auth/register" },
+  { icon: Video, label: "Animation Library", to: "/animations" },
+  { icon: BarChart3, label: "Result & Report Analysis", to: "/auth/register" },
+];
+
+const TESTIMONIALS = [
+  {
+    quote: "Poetree Publications has reduced my preparation time by 70%. All question papers and worksheets are excellent!",
+    name: "Neha Sharma",
+    role: "Teacher, Ahmedabad",
+  },
+  {
+    quote: "Worksheets are well-designed and help my students practice better. Highly recommended for all teachers.",
+    name: "Ramesh Patel",
+    role: "Principal, Rajkot",
+  },
+  {
+    quote: "The educational videos are amazing! My students understand concepts so much better now.",
+    name: "Priya Mehta",
+    role: "Teacher, Vadodara",
+  },
+];
+
+// --- Component -----------------------------------------------------------
+
 const Home = () => {
-  const features = [
-    {
-      icon: FileText,
-      title: "Question Papers",
-      description: "Create and customize exam papers with multiple question types. Build from scratch or use your saved papers.",
-      color: "from-blue-500 to-blue-600",
-      bgLight: "bg-blue-50",
-      iconBg: "bg-blue-100",
-    },
-    // Prebuilt Questions (templates) feature commented out — not needed for now
-    // {
-    //   icon: BookOpen,
-    //   title: "Prebuilt Questions",
-    //   description: "Start with ready-made templates. Pick a template, customize questions, and generate papers in minutes.",
-    //   color: "from-indigo-500 to-indigo-600",
-    //   bgLight: "bg-indigo-50",
-    //   iconBg: "bg-indigo-100",
-    // },
-    {
-      icon: FilePlus,
-      title: "Practice Worksheets",
-      description: "Access worksheets by subject and standard. Perfect for daily practice and revision.",
-      color: "from-emerald-500 to-emerald-600",
-      bgLight: "bg-emerald-50",
-      iconBg: "bg-emerald-100",
-    },
-    {
-      icon: ClipboardCheck,
-      title: "Answer Sheets",
-      description: "Download answer sheets and solutions. Aligned with your subject, board, and standard.",
-      color: "from-amber-500 to-amber-600",
-      bgLight: "bg-amber-50",
-      iconBg: "bg-amber-100",
-    },
-  ];
+  const [email, setEmail] = useState("");
+  const [subscribed, setSubscribed] = useState(false);
 
-  const forTeachers = [
-    "Create question papers with MCQs, short & long answers, fill-in-blanks",
-    // Prebuilt templates mention commented out — feature not needed for now
-    // "Use prebuilt templates or build from scratch",
-    "Filter by subject, subject title, board & standard",
-    "Manage worksheets and answer sheets in one place",
-  ];
-
-  const forStudents = [
-    "Access question papers and worksheets by your class & subject",
-    "Practice with worksheets and view answer sheets",
-    "Clear filtering by subject, board and standard",
-    "Everything in one dashboard—no clutter",
-  ];
-
-  const visionMission = {
-    vision: "To be the most trusted name in educational content—empowering every teacher and student with quality question papers, worksheets, and learning resources aligned to their curriculum.",
-    mission: "To simplify paper creation and practice for schools by delivering board-aligned, standard-wise content and tools that save time and improve learning outcomes.",
+  const handleSubscribe = (e) => {
+    e.preventDefault();
+    if (email.trim()) setSubscribed(true);
   };
 
-  const trustBadges = [
-    { icon: Award, label: "Quality content", sub: "Reviewed & curriculum-aligned" },
-    { icon: BookMarked, label: "Board-aligned", sub: "CBSE, State boards & more" },
-    { icon: School, label: "For schools", sub: "Trusted by teachers & institutions" },
-    { icon: ShieldCheck, label: "Reliable & secure", sub: "Your data and content, safe" },
-  ];
-
-  const prefersReducedMotion = useReducedMotion();
-  const { scrollY } = useScroll();
-  const heroBgY = useTransform(scrollY, [0, 400], [0, prefersReducedMotion ? 0 : 80]);
-  const heroOpacity = useTransform(scrollY, [0, 200], [1, prefersReducedMotion ? 1 : 0.3]);
+  const brochureProps = {
+    href: BROCHURE_PDF_URL || "#",
+    target: BROCHURE_PDF_URL ? "_blank" : undefined,
+    rel: BROCHURE_PDF_URL ? "noopener noreferrer" : undefined,
+    onClick: !BROCHURE_PDF_URL ? (e) => e.preventDefault() : undefined,
+  };
 
   return (
     <>
       <Navbar />
 
-      {/* Hero */}
-      <section className="relative min-h-[85vh] flex items-center justify-center overflow-hidden bg-gradient-to-br from-slate-900 via-blue-900 to-indigo-900">
-        {/* Floating gradient blobs - very subtle; no motion when reduced motion preferred */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden>
-          <motion.div
-            className="absolute w-[400px] h-[400px] rounded-full bg-blue-500/10 blur-3xl -top-40 -right-40"
-            animate={prefersReducedMotion ? undefined : { x: [0, 20, 0], y: [0, -15, 0] }}
-            transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
-          />
-          <motion.div
-            className="absolute w-[300px] h-[300px] rounded-full bg-indigo-500/10 blur-3xl bottom-20 -left-20"
-            animate={prefersReducedMotion ? undefined : { x: [0, -15, 0], y: [0, 20, 0] }}
-            transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
-          />
-          <motion.div
-            className="absolute w-[250px] h-[250px] rounded-full bg-slate-400/5 blur-2xl top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
-            animate={prefersReducedMotion ? undefined : { scale: [1, 1.15, 1] }}
-            transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-          />
+      {/* ============================= HERO ============================= */}
+      {/* Real HTML text on the left (crisp & responsive) + the illustration
+          cropped from the reference image on the right. */}
+      <section className="relative overflow-hidden bg-gradient-to-br from-indigo-50 via-white to-blue-50">
+        {/* soft decorative blobs */}
+        <div className="absolute inset-0 pointer-events-none" aria-hidden>
+          <div className="absolute -top-24 -right-16 w-96 h-96 rounded-full bg-blue-200/40 blur-3xl" />
+          <div className="absolute top-40 -left-24 w-80 h-80 rounded-full bg-violet-200/40 blur-3xl" />
         </div>
-        {/* Parallax background image */}
-        <motion.div
-          className="absolute inset-0 bg-[url('/s1.jpg')] bg-cover bg-center opacity-20"
-          style={{ y: heroBgY }}
+
+        {/* decorative paper plane */}
+        <motion.img
+          src="/paper-plane.svg"
+          alt=""
+          aria-hidden
+          className="hidden lg:block absolute top-24 left-[46%] w-16 pointer-events-none"
+          initial={{ opacity: 0, y: 10, x: -10 }}
+          animate={{ opacity: 1, y: 0, x: 0 }}
+          transition={{ duration: 0.8, delay: 0.4, ease: "easeOut" }}
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-slate-900/90 via-transparent to-slate-900/50" />
-        <motion.div
-          className="relative z-10 max-w-5xl mx-auto px-6 py-20 text-center"
-          style={{ opacity: heroOpacity }}
-        >
+
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 lg:py-20">
+          <div className="grid lg:grid-cols-2 gap-10 lg:gap-8 items-center">
+            {/* Left: copy */}
+            <motion.div
+              initial={{ opacity: 0, y: 24 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] }}
+            >
+              <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold tracking-tight text-slate-900 leading-[1.1]">
+                Empowering Education.
+                <br />
+                <span className="bg-gradient-to-r from-blue-600 to-violet-600 bg-clip-text text-transparent">
+                  Inspiring Futures.
+                </span>
+              </h1>
+              <p className="mt-5 text-lg text-slate-600 max-w-xl">
+                Everything teachers need to teach better and students need to learn smarter.
+              </p>
+
+              {/* feature bullets */}
+              <div className="mt-8 grid grid-cols-2 gap-x-6 gap-y-4">
+                {HERO_FEATURES.map(({ icon: Icon, label, color }) => (
+                  <div key={label} className="flex items-center gap-3 text-slate-700">
+                    <span className="flex-shrink-0 w-9 h-9 rounded-lg bg-white shadow-sm border border-slate-100 flex items-center justify-center">
+                      <Icon className={`w-5 h-5 ${color}`} />
+                    </span>
+                    <span className="text-sm font-semibold leading-tight">{label}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* CTAs */}
+              <div className="mt-9 flex flex-wrap gap-4">
+                <Link
+                  to="/auth/register"
+                  className="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-lg shadow-blue-600/25 transition"
+                >
+                  Explore Tools
+                  <ArrowRight className="w-5 h-5" />
+                </Link>
+                <Link
+                  to="/animations"
+                  className="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl bg-white hover:bg-slate-50 text-slate-800 font-semibold border border-slate-200 shadow-sm transition"
+                >
+                  <Play className="w-5 h-5 text-blue-600" fill="currentColor" />
+                  Watch Demo
+                </Link>
+              </div>
+            </motion.div>
+
+            {/* Right: illustration cropped from the reference image */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.6, delay: 0.15, ease: "easeOut" }}
+              className="relative"
+            >
+              <img
+                src="/hero-cut.webp"
+                alt="A teacher and student learning together with an AI assistant — Poetree Publications"
+                className="w-full h-auto max-w-lg mx-auto lg:max-w-none"
+                fetchpriority="high"
+              />
+            </motion.div>
+          </div>
+        </div>
+      </section>
+
+      {/* ======================= CATEGORY CARDS ======================= */}
+      <section className="py-20 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto">
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 text-white/90 text-sm font-medium mb-8"
-          >
-            <Sparkles className="w-4 h-4" />
-            For Teachers & Schools
-          </motion.div>
-          <motion.h1
-            initial={{ opacity: 0, y: 28 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.1, ease: [0.25, 0.46, 0.45, 0.94] }}
-            className="text-4xl md:text-5xl lg:text-6xl font-bold text-white tracking-tight"
-          >
-            Create Papers.
-            <br />
-            <span className="bg-gradient-to-r from-blue-300 to-indigo-300 bg-clip-text text-transparent">
-              Teach Smarter.
-            </span>
-          </motion.h1>
-          <motion.p
-            initial={{ opacity: 0, y: 24 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.25, ease: "easeOut" }}
-            className="mt-6 text-lg md:text-xl text-slate-300 max-w-2xl mx-auto"
-          >
-            Question papers, worksheets, and answer sheets—all in one place. Choose your subject, board & standard and get started.
-          </motion.p>
-          <motion.div
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
             initial="initial"
-            animate="animate"
+            whileInView="animate"
+            viewport={viewportOnce}
             variants={staggerContainer}
-            className="mt-10 flex flex-wrap justify-center gap-4"
           >
-            {[
-              { to: "/auth/register", primary: true, label: "Get Started", icon: ArrowRight },
-              { to: "/auth/login", primary: false, label: "Sign In", icon: null },
-              { brochure: true },
-            ].map((item, i) => (
-              <motion.div key={i} variants={staggerItem}>
-                {item.brochure ? (
-                  <a
-                    href={BROCHURE_PDF_URL || "#"}
-                    target={BROCHURE_PDF_URL ? "_blank" : undefined}
-                    rel={BROCHURE_PDF_URL ? "noopener noreferrer" : undefined}
-                    onClick={!BROCHURE_PDF_URL ? (e) => e.preventDefault() : undefined}
-                    className={`inline-flex items-center gap-2 px-8 py-4 rounded-xl font-semibold border transition ${
-                      BROCHURE_PDF_URL
-                        ? "bg-white/10 hover:bg-white/20 text-white border-white/20"
-                        : "bg-white/5 text-white/60 border-white/10 cursor-not-allowed"
-                    }`}
-                    title={BROCHURE_PDF_URL ? "Open brochure PDF" : "Brochure link will be added soon"}
-                  >
-                    <FileDown className="w-5 h-5" />
-                    Download Brochure
-                  </a>
-                ) : item.primary ? (
+            {CATEGORIES.map(({ icon: Icon, title, description, cta, to, accent, art }) => {
+              const a = ACCENTS[accent];
+              return (
+                <motion.div key={title} variants={staggerItem} whileHover={{ y: -6 }}>
                   <Link
-                    to={item.to}
-                    className="inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-blue-500 hover:bg-blue-600 text-white font-semibold shadow-lg shadow-blue-500/30 transition duration-300 hover:shadow-xl hover:shadow-blue-500/40"
+                    to={to}
+                    className={`group relative block h-full overflow-hidden rounded-2xl ${a.tint} border ${a.ring} p-7 pb-24 transition-shadow hover:shadow-xl`}
                   >
-                    {item.label}
-                    <ArrowRight className="w-5 h-5" />
+                    <div className={`w-14 h-14 rounded-2xl ${a.icon} flex items-center justify-center mb-5`}>
+                      <Icon className="w-7 h-7" />
+                    </div>
+                    <h3 className="text-lg font-bold text-slate-800 max-w-[70%]">{title}</h3>
+                    <p className="mt-2 text-sm text-slate-600 leading-relaxed max-w-[75%]">{description}</p>
+                    <span className={`mt-5 inline-flex items-center gap-1.5 text-sm font-semibold ${a.link}`}>
+                      {cta}
+                      <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                    </span>
+                    {/* card illustration — drops in /cards/*.png, otherwise nothing shows */}
+                    {art && (
+                      <SmartImage
+                        src={art}
+                        alt=""
+                        imgClassName="pointer-events-none absolute bottom-3 right-3 w-28 h-28 object-contain drop-shadow-md transition-transform duration-300 group-hover:scale-105"
+                      />
+                    )}
                   </Link>
-                ) : (
-                  <Link
-                    to={item.to}
-                    className="inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold border border-white/20 transition"
-                  >
-                    {item.label}
-                  </Link>
-                )}
+                </motion.div>
+              );
+            })}
+          </motion.div>
+        </div>
+      </section>
+
+      {/* ==================== HOW PAPER GENERATION WORKS ==================== */}
+      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-slate-50 border-y border-slate-100">
+        <div className="max-w-7xl mx-auto">
+          <SectionHeading
+            eyebrow="How it works"
+            title="Create a question paper in 4 simple steps"
+            subtitle="From an empty page to a print-ready paper in minutes — no design skills needed."
+          />
+          <motion.div
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"
+            initial="initial"
+            whileInView="animate"
+            viewport={viewportOnce}
+            variants={staggerContainer}
+          >
+            {PAPER_STEPS.map(({ icon: Icon, title, description }, i) => (
+              <motion.div
+                key={title}
+                variants={staggerItem}
+                className="relative rounded-2xl bg-white border border-slate-100 shadow-sm hover:shadow-lg transition-shadow p-7"
+              >
+                <span className="absolute top-5 right-6 text-5xl font-black text-slate-100 select-none">
+                  {i + 1}
+                </span>
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white shadow-lg">
+                  <Icon className="w-7 h-7" />
+                </div>
+                <h3 className="mt-5 text-lg font-bold text-slate-800">{title}</h3>
+                <p className="mt-2 text-sm text-slate-600 leading-relaxed">{description}</p>
               </motion.div>
             ))}
           </motion.div>
-        </motion.div>
-        {/* Scroll indicator */}
-        <motion.div
-          className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 hidden sm:block"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1, duration: 0.5 }}
-        >
-          <motion.div
-            animate={{ y: [0, 6, 0] }}
-            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-            className="flex flex-col items-center gap-1 text-white/70"
-          >
-            <span className="text-xs font-medium uppercase tracking-wider">Scroll</span>
-            <ChevronDown className="w-5 h-5" />
-          </motion.div>
-        </motion.div>
-      </section>
-
-      {/* Features - What Poetree offers */}
-      <section className="py-20 px-6 bg-slate-50">
-        <div className="max-w-6xl mx-auto">
-          <motion.div
-            className="text-center mb-16"
-            initial={{ opacity: 0, y: 24 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={viewportOnce}
-            transition={{ duration: 0.5, ease: "easeOut" }}
-          >
-            <h2 className="text-3xl md:text-4xl font-bold text-slate-800">
-              Everything you need in one place
-            </h2>
-            <p className="mt-4 text-slate-600 text-lg max-w-2xl mx-auto">
-              Poetree helps teachers create and manage exam content—and gives students easy access to papers, worksheets, and answers.
-            </p>
-          </motion.div>
-          <motion.div
-            className="grid grid-cols-1 md:grid-cols-2 gap-8"
-            initial="initial"
-            whileInView="animate"
-            viewport={viewportOnce}
-            variants={staggerContainer}
-          >
-            {features.map((item) => {
-              const Icon = item.icon;
-              return (
-                <motion.div
-                  key={item.title}
-                  variants={staggerItem}
-                  whileHover={{ scale: 1.03, transition: { duration: 0.3, ease: "easeOut" } }}
-                  className={`${item.bgLight} rounded-2xl p-8 border border-slate-100 transition-all duration-300 ease-out hover:shadow-xl hover:border-slate-200 hover:shadow-slate-200/50`}
-                >
-                  <motion.div
-                    className={`${item.iconBg} w-14 h-14 rounded-xl flex items-center justify-center mb-6 text-slate-700`}
-                    whileHover={{ scale: 1.08, y: -2, transition: { duration: 0.25 } }}
-                  >
-                    <Icon className="w-7 h-7" />
-                  </motion.div>
-                  <h3 className="text-xl font-bold text-slate-800">{item.title}</h3>
-                  <p className="mt-3 text-slate-600">{item.description}</p>
-                </motion.div>
-              );
-            })}
-          </motion.div>
-          <motion.div
-            className="mt-12 text-center"
-            initial={{ opacity: 0, y: 16 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={viewportOnce}
-            transition={{ duration: 0.4, delay: 0.2 }}
-          >
+          <div className="mt-12 text-center">
             <Link
               to="/auth/register"
-              className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 font-semibold transition-colors"
+              className="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-lg shadow-blue-600/25 transition"
             >
-              Create your account and start
-              <ArrowRight className="w-4 h-4" />
+              Start creating your paper
+              <ArrowRight className="w-5 h-5" />
             </Link>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* Stats - animated counters (lightweight strip) */}
-      <section className="py-12 px-6 bg-white border-y border-slate-100">
-        <div className="max-w-6xl mx-auto">
-          <motion.div
-            className="grid grid-cols-3 gap-8 text-center"
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={viewportOnce}
-            transition={{ duration: 0.5 }}
-          >
-            <div>
-              <div className="text-3xl md:text-4xl font-bold text-slate-800">
-                <AnimatedCounter value={500} suffix="+" duration={1800} />
-              </div>
-              <p className="mt-1 text-sm font-medium text-slate-500">Teachers</p>
-            </div>
-            <div>
-              <div className="text-3xl md:text-4xl font-bold text-slate-800">
-                <AnimatedCounter value={10000} suffix="+" duration={2000} />
-              </div>
-              <p className="mt-1 text-sm font-medium text-slate-500">Papers created</p>
-            </div>
-            <div>
-              <div className="text-3xl md:text-4xl font-bold text-slate-800">
-                <AnimatedCounter value={50} suffix="+" duration={1600} />
-              </div>
-              <p className="mt-1 text-sm font-medium text-slate-500">Subjects</p>
-            </div>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* Vision & Mission */}
-      <section className="py-20 px-6 bg-white">
-        <div className="max-w-6xl mx-auto">
-          <motion.div
-            className="text-center mb-14"
-            initial={{ opacity: 0, y: 24 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={viewportOnce}
-            transition={{ duration: 0.5 }}
-          >
-            <h2 className="text-3xl md:text-4xl font-bold text-slate-800">
-              Our Vision & Mission
-            </h2>
-            <p className="mt-4 text-slate-600 text-lg max-w-2xl mx-auto">
-              Why we exist and what we strive for at Poetree Publication.
-            </p>
-          </motion.div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-50px" }}
-              transition={{ duration: 0.4 }}
-              className="rounded-2xl bg-gradient-to-br from-slate-50 to-blue-50/50 p-8 border border-slate-100 shadow-sm hover:shadow-lg transition-shadow"
-            >
-              <div className="w-14 h-14 rounded-xl bg-blue-500 flex items-center justify-center mb-6">
-                <Target className="w-7 h-7 text-white" />
-              </div>
-              <h3 className="text-xl font-bold text-slate-800 mb-3">Our Vision</h3>
-              <p className="text-slate-600 leading-relaxed">
-                {visionMission.vision}
-              </p>
-            </motion.div>
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-50px" }}
-              transition={{ duration: 0.4, delay: 0.1 }}
-              className="rounded-2xl bg-gradient-to-br from-slate-50 to-indigo-50/50 p-8 border border-slate-100 shadow-sm hover:shadow-lg transition-shadow"
-            >
-              <div className="w-14 h-14 rounded-xl bg-indigo-500 flex items-center justify-center mb-6">
-                <Flag className="w-7 h-7 text-white" />
-              </div>
-              <h3 className="text-xl font-bold text-slate-800 mb-3">Our Mission</h3>
-              <p className="text-slate-600 leading-relaxed">
-                {visionMission.mission}
-              </p>
-            </motion.div>
           </div>
         </div>
       </section>
 
-      {/* Trust / Publication graphics - why trust Poetree */}
-      <section className="py-16 px-6 bg-slate-50 border-y border-slate-200/60">
-        <div className="max-w-6xl mx-auto">
-          <motion.p
-            className="text-center text-sm font-semibold uppercase tracking-wider text-slate-500 mb-10"
-            initial={{ opacity: 0, y: 16 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={viewportOnce}
-            transition={{ duration: 0.4 }}
-          >
-            Why trust Poetree Publication
-          </motion.p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8">
-            {trustBadges.map((item, i) => {
-              const Icon = item.icon;
-              return (
-                <motion.div
-                  key={item.label}
-                  initial={{ opacity: 0, y: 12 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, margin: "-40px" }}
-                  transition={{ duration: 0.35, delay: i * 0.06 }}
-                  whileHover={{ y: -4, transition: { duration: 0.25 } }}
-                  className="flex flex-col items-center text-center p-6 rounded-2xl bg-white border border-slate-100 shadow-sm hover:shadow-md hover:border-slate-200 transition-shadow duration-300"
-                >
-                  <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center mb-4 text-white shadow-lg shadow-blue-500/25">
-                    <Icon className="w-7 h-7" />
-                  </div>
-                  <span className="font-bold text-slate-800">{item.label}</span>
-                  <span className="text-sm text-slate-500 mt-1">{item.sub}</span>
-                </motion.div>
-              );
-            })}
-          </div>
+      {/* ==================== TWO WAYS TO CREATE ==================== */}
+      <section className="py-20 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto">
+          <SectionHeading
+            eyebrow="Two ways to create"
+            title="Do it manually, or let AI do the heavy lifting"
+            subtitle="Full manual control when you want it, one-click AI drafting when you're short on time."
+          />
           <motion.div
-            className="mt-12 flex flex-wrap items-center justify-center gap-x-10 gap-y-4"
-            initial={{ opacity: 0, y: 16 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={viewportOnce}
-            transition={{ duration: 0.4, delay: 0.15 }}
-          >
-            <div className="flex items-center gap-3 px-5 py-3 rounded-xl bg-white border border-slate-100 shadow-sm">
-              <div className="w-10 h-10 rounded-lg bg-slate-800 flex items-center justify-center text-white font-bold text-sm">
-                PP
-              </div>
-              <div className="text-left">
-                <span className="block font-semibold text-slate-800">Poetree Publication</span>
-                <span className="text-xs text-slate-500">Educational content you can trust</span>
-              </div>
-            </div>
-            <div className="text-slate-400 text-sm font-medium">
-              Question papers • Worksheets • Answer sheets • Animations
-            </div>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* Animations - Watch without login */}
-      <section className="py-20 px-6 bg-gradient-to-br from-violet-50 via-white to-fuchsia-50/50 overflow-hidden">
-        <div className="max-w-6xl mx-auto">
-          <motion.div
-            initial={{ opacity: 0, y: 24 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-80px" }}
-            transition={{ duration: 0.5, ease: "easeOut" }}
-            className="text-center mb-14"
-          >
-            <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-violet-100 text-violet-700 text-sm font-semibold mb-6">
-              <Film className="w-4 h-4" />
-              Free to watch
-            </span>
-            <h2 className="text-3xl md:text-4xl font-bold text-slate-800 tracking-tight">
-              Learning animations & videos
-            </h2>
-            <p className="mt-4 text-slate-600 text-lg max-w-2xl mx-auto leading-relaxed">
-              Watch subject-wise educational videos and animations. No login required—open and play anytime.
-            </p>
-          </motion.div>
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-60px" }}
-            transition={{ duration: 0.5, delay: 0.15, ease: "easeOut" }}
-            className="relative"
-          >
-            <Link
-              to="/animations"
-              className="group flex flex-col sm:flex-row items-center justify-center gap-6 sm:gap-8 p-8 sm:p-10 rounded-3xl bg-white border-2 border-violet-100 shadow-xl shadow-violet-500/10 hover:shadow-2xl hover:shadow-violet-500/20 hover:border-violet-200 transition-all duration-300 text-left"
-            >
-              <div className="flex-shrink-0 w-20 h-20 rounded-2xl bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform duration-300">
-                <Play className="w-10 h-10 text-white ml-1" fill="currentColor" />
-              </div>
-              <div className="flex-1 text-center sm:text-left">
-                <h3 className="text-xl sm:text-2xl font-bold text-slate-800 group-hover:text-violet-700 transition-colors">
-                  Watch animations
-                </h3>
-                <p className="mt-2 text-slate-600">
-                  Browse by subject, board & standard. Click any video to play in full screen.
-                </p>
-              </div>
-              <span className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-violet-500 text-white font-semibold group-hover:bg-violet-600 transition-colors">
-                Watch now
-                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-              </span>
-            </Link>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* For Teachers & Students */}
-      <section className="py-20 px-6 bg-white">
-        <div className="max-w-6xl mx-auto">
-          <motion.div
-            className="text-center mb-16"
-            initial={{ opacity: 0, y: 24 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={viewportOnce}
-            transition={{ duration: 0.5 }}
-          >
-            <h2 className="text-3xl md:text-4xl font-bold text-slate-800">
-              Built for teachers and students
-            </h2>
-            <p className="mt-4 text-slate-600 text-lg max-w-2xl mx-auto">
-              Poetree supports both educators and learners with the right tools in one dashboard.
-            </p>
-          </motion.div>
-          <motion.div
-            className="grid grid-cols-1 md:grid-cols-2 gap-10"
+            className="grid grid-cols-1 md:grid-cols-2 gap-6"
             initial="initial"
             whileInView="animate"
             viewport={viewportOnce}
             variants={staggerContainer}
           >
-            {/* For Teachers */}
-            <motion.div
-              variants={staggerItem}
-              className="rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 p-8 border border-blue-100"
-            >
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-12 h-12 rounded-xl bg-blue-500 flex items-center justify-center">
-                  <UserCircle className="w-6 h-6 text-white" />
+            {CREATE_MODES.map(({ icon: Icon, tag, title, grad, points }) => (
+              <motion.div
+                key={tag}
+                variants={staggerItem}
+                className="rounded-2xl bg-white border border-slate-100 shadow-sm hover:shadow-xl transition-shadow p-8"
+              >
+                <div className="flex items-center gap-4">
+                  <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${grad} flex items-center justify-center text-white shadow-lg`}>
+                    <Icon className="w-7 h-7" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-400">{tag}</span>
+                    <h3 className="text-xl font-bold text-slate-800">{title}</h3>
+                  </div>
                 </div>
-                <h3 className="text-xl font-bold text-slate-800">For Teachers</h3>
-              </div>
-              <ul className="space-y-4">
-                {forTeachers.map((text, i) => (
-                  <li key={i} className="flex items-start gap-3 text-slate-700">
-                    <CheckCircle2 className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
-                    <span>{text}</span>
-                  </li>
-                ))}
-              </ul>
-            </motion.div>
-            {/* For Students */}
-            <motion.div
-              variants={staggerItem}
-              className="rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 p-8 border border-emerald-100"
-            >
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-12 h-12 rounded-xl bg-emerald-500 flex items-center justify-center">
-                  <GraduationCap className="w-6 h-6 text-white" />
-                </div>
-                <h3 className="text-xl font-bold text-slate-800">For Students</h3>
-              </div>
-              <ul className="space-y-4">
-                {forStudents.map((text, i) => (
-                  <li key={i} className="flex items-start gap-3 text-slate-700">
-                    <CheckCircle2 className="w-5 h-5 text-emerald-500 flex-shrink-0 mt-0.5" />
-                    <span>{text}</span>
-                  </li>
-                ))}
-              </ul>
-            </motion.div>
+                <ul className="mt-6 space-y-3">
+                  {points.map((p) => (
+                    <li key={p} className="flex items-start gap-3 text-slate-700">
+                      <CheckCircle2 className="w-5 h-5 text-emerald-500 flex-shrink-0 mt-0.5" />
+                      <span className="text-sm">{p}</span>
+                    </li>
+                  ))}
+                </ul>
+                <Link
+                  to="/auth/register"
+                  className="mt-7 inline-flex items-center gap-1.5 text-blue-600 font-semibold hover:text-blue-700"
+                >
+                  Get started
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
+              </motion.div>
+            ))}
           </motion.div>
         </div>
       </section>
 
-      {/* CTA */}
-      <section className="py-20 px-6 bg-gradient-to-br from-slate-800 to-indigo-900">
-        <motion.div
-          className="max-w-3xl mx-auto text-center"
-          initial={{ opacity: 0, y: 24 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={viewportOnce}
-          transition={{ duration: 0.5 }}
-        >
-          <h2 className="text-3xl md:text-4xl font-bold text-white">
-            Ready to create better papers?
-          </h2>
-          <p className="mt-4 text-slate-300 text-lg">
-            Join Poetree Publication. Choose your subject, board & standard and start in minutes.
-          </p>
-          <div className="mt-10 flex flex-wrap justify-center gap-4">
+      {/* =========================== STATS =========================== */}
+      <section className="px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto">
+          <div className="rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 px-6 py-12 shadow-xl">
             <motion.div
-              animate={{ scale: [1, 1.02, 1] }}
-              transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
-              whileHover={{ scale: 1.03, transition: { duration: 0.2 } }}
-              whileTap={{ scale: 0.98 }}
+              className="grid grid-cols-2 md:grid-cols-5 gap-8 text-center"
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={viewportOnce}
+              transition={{ duration: 0.5 }}
             >
-              <Link
-                to="/auth/register"
-                className="inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-blue-500 text-white font-semibold shadow-lg shadow-blue-500/30 transition-all duration-300 hover:bg-blue-600 hover:shadow-xl hover:shadow-blue-500/40"
-              >
-                Get Started
-                <ArrowRight className="w-5 h-5" />
-              </Link>
+              {STATS.map((s) => (
+                <div key={s.label}>
+                  <div className="text-3xl md:text-4xl font-extrabold text-white">
+                    <AnimatedCounter value={s.value} suffix={s.suffix} duration={1800} />
+                  </div>
+                  <p className="mt-1 text-sm font-medium text-slate-400">{s.label}</p>
+                </div>
+              ))}
             </motion.div>
-            <Link
-              to="/auth/login"
-              className="inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold border border-white/20 transition"
-            >
-              Sign In
-            </Link>
-            <a
-              href={BROCHURE_PDF_URL || "#"}
-              target={BROCHURE_PDF_URL ? "_blank" : undefined}
-              rel={BROCHURE_PDF_URL ? "noopener noreferrer" : undefined}
-              onClick={!BROCHURE_PDF_URL ? (e) => e.preventDefault() : undefined}
-              className={`inline-flex items-center gap-2 px-8 py-4 rounded-xl font-semibold border transition ${
-                BROCHURE_PDF_URL
-                  ? "bg-white/10 hover:bg-white/20 text-white border-white/20"
-                  : "bg-white/5 text-white/60 border-white/10 cursor-not-allowed"
-              }`}
-              title={BROCHURE_PDF_URL ? "Open brochure PDF" : "Brochure link will be added soon"}
-            >
-              <FileDown className="w-5 h-5" />
-              Download Brochure
-            </a>
+            <p className="mt-8 text-center text-slate-400 text-sm">
+              Trusted by teachers &amp; schools across India
+            </p>
           </div>
-        </motion.div>
+        </div>
+      </section>
+
+      {/* ====================== WHO IS POETREE FOR ====================== */}
+      <section className="py-20 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto">
+          <SectionHeading
+            eyebrow="Who is Poetree for?"
+            title="Made for everyone in the classroom"
+            subtitle="One platform that supports teachers, schools and students alike."
+          />
+          <motion.div
+            className="grid grid-cols-1 md:grid-cols-3 gap-6"
+            initial="initial"
+            whileInView="animate"
+            viewport={viewportOnce}
+            variants={staggerContainer}
+          >
+            {AUDIENCES.map(({ icon: Icon, title, description, grad, to }) => (
+              <motion.div
+                key={title}
+                variants={staggerItem}
+                whileHover={{ y: -6 }}
+                className="rounded-2xl bg-white border border-slate-100 shadow-sm hover:shadow-xl transition-shadow p-8 text-center"
+              >
+                <div className={`w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br ${grad} flex items-center justify-center text-white shadow-lg`}>
+                  <Icon className="w-8 h-8" />
+                </div>
+                <h3 className="mt-5 text-xl font-bold text-slate-800">{title}</h3>
+                <p className="mt-2 text-slate-600">{description}</p>
+                <Link to={to} className="mt-5 inline-flex items-center gap-1.5 text-blue-600 font-semibold hover:text-blue-700">
+                  Learn More
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
+              </motion.div>
+            ))}
+          </motion.div>
+        </div>
+      </section>
+
+      {/* ======================== POPULAR TOOLS ======================== */}
+      <section className="py-16 px-4 sm:px-6 lg:px-8 bg-slate-50 border-y border-slate-100">
+        <div className="max-w-7xl mx-auto">
+          <SectionHeading
+            eyebrow="Popular Tools for You"
+            title="Everything you need to create & assess"
+          />
+          <motion.div
+            className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4"
+            initial="initial"
+            whileInView="animate"
+            viewport={viewportOnce}
+            variants={staggerContainer}
+          >
+            {TOOLS.map(({ icon: Icon, label, to }) => (
+              <motion.div key={label} variants={staggerItem} whileHover={{ y: -4 }}>
+                <Link
+                  to={to}
+                  className="flex flex-col items-center text-center gap-3 h-full rounded-2xl bg-white border border-slate-100 p-5 shadow-sm hover:shadow-md hover:border-blue-100 transition"
+                >
+                  <span className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                    <Icon className="w-6 h-6" />
+                  </span>
+                  <span className="text-sm font-semibold text-slate-700 leading-snug">{label}</span>
+                </Link>
+              </motion.div>
+            ))}
+          </motion.div>
+        </div>
+      </section>
+
+      {/* ======================== TESTIMONIALS ======================== */}
+      <section className="py-20 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto">
+          <SectionHeading
+            eyebrow="What Teachers Say About Us"
+            title="Loved by educators everywhere"
+          />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* three testimonials in a nested grid */}
+            <motion.div
+              className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6"
+              initial="initial"
+              whileInView="animate"
+              viewport={viewportOnce}
+              variants={staggerContainer}
+            >
+              {TESTIMONIALS.map((t) => (
+                <motion.div
+                  key={t.name}
+                  variants={staggerItem}
+                  className="rounded-2xl bg-white border border-slate-100 shadow-sm p-6 flex flex-col"
+                >
+                  <Quote className="w-8 h-8 text-blue-200" />
+                  <div className="flex gap-0.5 mt-3">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <Star key={i} className="w-4 h-4 text-amber-400" fill="currentColor" />
+                    ))}
+                  </div>
+                  <p className="mt-3 text-slate-700 leading-relaxed flex-1">“{t.quote}”</p>
+                  <div className="mt-5 flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-full bg-gradient-to-br from-blue-500 to-violet-500 flex items-center justify-center text-white font-bold">
+                      {t.name.charAt(0)}
+                    </div>
+                    <div>
+                      <p className="font-bold text-slate-800 text-sm">{t.name}</p>
+                      <p className="text-xs text-slate-500">{t.role}</p>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </motion.div>
+
+            {/* brochure / "take it anywhere" card */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={viewportOnce}
+              transition={{ duration: 0.5 }}
+              className="rounded-2xl bg-gradient-to-br from-slate-900 to-indigo-900 p-8 text-white flex flex-col justify-center"
+            >
+              <h3 className="text-2xl font-bold">Take learning anywhere</h3>
+              <p className="mt-3 text-slate-300">
+                Get the full catalogue of papers, worksheets and resources. Download our brochure to see everything Poetree offers.
+              </p>
+              <div className="mt-6 flex flex-col gap-3">
+                <a
+                  {...brochureProps}
+                  className={`inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold transition ${
+                    BROCHURE_PDF_URL
+                      ? "bg-white text-slate-900 hover:bg-slate-100"
+                      : "bg-white/10 text-white/60 border border-white/10 cursor-not-allowed"
+                  }`}
+                  title={BROCHURE_PDF_URL ? "Open brochure PDF" : "Brochure link coming soon"}
+                >
+                  <FileDown className="w-5 h-5" />
+                  Download Brochure
+                </a>
+                <Link
+                  to="/auth/register"
+                  className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold border border-white/20 transition"
+                >
+                  Create free account
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
+              </div>
+            </motion.div>
+          </div>
+        </div>
+      </section>
+
+      {/* ========================= NEWSLETTER ========================= */}
+      <section className="px-4 sm:px-6 lg:px-8 pb-20">
+        <div className="max-w-5xl mx-auto">
+          <div className="rounded-3xl bg-gradient-to-r from-blue-600 to-violet-600 px-6 py-12 sm:px-12 text-center shadow-xl">
+            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-white/15 text-white mb-5">
+              <Mail className="w-7 h-7" />
+            </div>
+            <h2 className="text-2xl md:text-3xl font-bold text-white">
+              Stay updated with the latest resources
+            </h2>
+            <p className="mt-3 text-white/80 max-w-xl mx-auto">
+              Subscribe to our newsletter and never miss a new paper, worksheet or update.
+            </p>
+            {subscribed ? (
+              <div className="mt-8 inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-white text-emerald-700 font-semibold">
+                <CheckCircle2 className="w-5 h-5" />
+                Thanks for subscribing!
+              </div>
+            ) : (
+              <form onSubmit={handleSubscribe} className="mt-8 flex flex-col sm:flex-row gap-3 max-w-lg mx-auto">
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Enter your email address"
+                  className="flex-1 px-5 py-3 rounded-xl bg-white outline-none text-slate-700 placeholder:text-slate-400"
+                />
+                <button
+                  type="submit"
+                  className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold transition"
+                >
+                  <Send className="w-4 h-4" />
+                  Subscribe
+                </button>
+              </form>
+            )}
+          </div>
+        </div>
       </section>
 
       <Footer />
     </>
   );
 };
+
+/**
+ * Renders an <img>, but if the file is missing/broken it swaps to `fallback`
+ * (or renders nothing). Lets us design for illustrations that may not be added
+ * to /public yet — the layout never shows a broken-image icon.
+ */
+const SmartImage = ({ src, alt, imgClassName = "", fallback = null }) => {
+  const [failed, setFailed] = useState(false);
+  if (failed) return fallback;
+  return (
+    <img
+      src={src}
+      alt={alt}
+      loading="lazy"
+      className={imgClassName}
+      onError={() => setFailed(true)}
+    />
+  );
+};
+
+// Shared section heading with a coloured eyebrow.
+const SectionHeading = ({ eyebrow, title, subtitle }) => (
+  <motion.div
+    className="text-center mb-12"
+    initial={{ opacity: 0, y: 20 }}
+    whileInView={{ opacity: 1, y: 0 }}
+    viewport={viewportOnce}
+    transition={{ duration: 0.5 }}
+  >
+    {eyebrow && (
+      <span className="inline-block text-sm font-bold uppercase tracking-wider text-blue-600 mb-3">
+        {eyebrow}
+      </span>
+    )}
+    <h2 className="text-3xl md:text-4xl font-bold text-slate-900">{title}</h2>
+    {subtitle && <p className="mt-4 text-slate-600 text-lg max-w-2xl mx-auto">{subtitle}</p>}
+  </motion.div>
+);
 
 export default Home;

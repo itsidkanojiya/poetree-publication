@@ -1,0 +1,18 @@
+<svg viewBox="0 0 240 240" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- clipboard -->
+  <rect x="60" y="46" width="120" height="150" rx="16" fill="#e11d48"/>
+  <rect x="72" y="58" width="96" height="126" rx="8" fill="#fff1f2"/>
+  <rect x="102" y="38" width="36" height="20" rx="6" fill="#be123c"/>
+  <!-- checklist rows -->
+  <circle cx="92" cy="86" r="8" fill="#fb7185"/>
+  <path d="M89 86 l2.5 3 5 -6" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <rect x="108" y="82" width="46" height="7" rx="3.5" fill="#fecdd3"/>
+  <circle cx="92" cy="112" r="8" fill="#fb7185"/>
+  <path d="M89 112 l2.5 3 5 -6" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <rect x="108" y="108" width="46" height="7" rx="3.5" fill="#fecdd3"/>
+  <circle cx="92" cy="138" r="8" fill="#fda4af"/>
+  <rect x="108" y="134" width="46" height="7" rx="3.5" fill="#fecdd3"/>
+  <!-- A+ grade badge -->
+  <circle cx="150" cy="166" r="24" fill="#f43f5e"/>
+  <text x="150" y="174" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#fff" text-anchor="middle">A+</text>
+</svg>

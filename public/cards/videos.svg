@@ -1,0 +1,15 @@
+<svg viewBox="0 0 240 240" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- monitor body -->
+  <rect x="44" y="56" width="152" height="104" rx="16" fill="#7c3aed"/>
+  <!-- screen -->
+  <rect x="58" y="70" width="124" height="76" rx="8" fill="#f5f3ff"/>
+  <!-- play button -->
+  <circle cx="120" cy="108" r="26" fill="#8b5cf6"/>
+  <path d="M113 96 l20 12 -20 12 z" fill="#fff"/>
+  <!-- stand -->
+  <rect x="108" y="160" width="24" height="18" fill="#6d28d9"/>
+  <rect x="84" y="176" width="72" height="12" rx="6" fill="#7c3aed"/>
+  <!-- sparkles -->
+  <path d="M186 44 l3 8 8 3 -8 3 -3 8 -3 -8 -8 -3 8 -3 z" fill="#c4b5fd"/>
+  <circle cx="54" cy="40" r="5" fill="#ddd6fe"/>
+</svg>

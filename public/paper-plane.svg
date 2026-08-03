@@ -1,0 +1,12 @@
+<svg viewBox="0 0 140 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- dashed curved trail -->
+  <path d="M6 108 C 30 104, 44 96, 58 82" stroke="#93a4f4" stroke-width="2.4"
+        stroke-linecap="round" stroke-dasharray="1 8" fill="none" opacity="0.8"/>
+  <!-- paper plane -->
+  <g stroke="#6b7ef0" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round" fill="#eef1ff">
+    <path d="M60 78 L128 20 L96 104 L74 82 Z"/>
+    <path d="M60 78 L128 20 L74 82 Z" fill="#dfe4ff"/>
+    <path d="M74 82 L128 20" />
+    <path d="M74 82 L84 74" fill="none"/>
+  </g>
+</svg>

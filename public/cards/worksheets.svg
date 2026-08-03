@@ -1,0 +1,25 @@
+<svg viewBox="0 0 240 240" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- clipboard back -->
+  <rect x="58" y="46" width="112" height="148" rx="16" fill="#059669"/>
+  <!-- paper -->
+  <rect x="70" y="58" width="88" height="124" rx="8" fill="#ecfdf5"/>
+  <!-- clip -->
+  <rect x="98" y="38" width="32" height="20" rx="6" fill="#047857"/>
+  <!-- checkmark rows -->
+  <rect x="84" y="82" width="14" height="14" rx="4" fill="#34d399"/>
+  <path d="M87 89 l3 4 6 -8" stroke="#065f46" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <rect x="106" y="85" width="40" height="7" rx="3.5" fill="#a7f3d0"/>
+  <rect x="84" y="108" width="14" height="14" rx="4" fill="#34d399"/>
+  <path d="M87 115 l3 4 6 -8" stroke="#065f46" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <rect x="106" y="111" width="40" height="7" rx="3.5" fill="#a7f3d0"/>
+  <rect x="84" y="134" width="14" height="14" rx="4" fill="#34d399"/>
+  <path d="M87 141 l3 4 6 -8" stroke="#065f46" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <rect x="106" y="137" width="40" height="7" rx="3.5" fill="#a7f3d0"/>
+  <!-- pencil -->
+  <g transform="rotate(40 168 150)">
+    <rect x="158" y="96" width="16" height="86" rx="4" fill="#f59e0b"/>
+    <rect x="158" y="96" width="16" height="14" fill="#fbbf24"/>
+    <path d="M158 182 l8 16 8 -16 z" fill="#fde68a"/>
+    <path d="M162 190 l4 8 4 -8 z" fill="#1f2937"/>
+  </g>
+</svg>
