@@ -164,6 +164,15 @@ const renderAnswerContent = (question) => {
       <div>
         <strong>Answers:</strong>
         {opts.map((sub, i) => {
+          // Rich answer (short / fill-in-the-blank) may hold an image + text.
+          if (sub && sub.answer_html && String(sub.answer_html).trim()) {
+            return (
+              <div key={i} style={{ display: "flex", gap: "4px" }}>
+                <span style={{ fontWeight: 600 }}>({String.fromCharCode(97 + i)}) </span>
+                <div className="rich-body" style={{ flex: 1 }}>{renderRichHtml(sub.answer_html)}</div>
+              </div>
+            );
+          }
           let val = ansObj[`q${i + 1}`];
           if (sub && sub.type === "mcq" && Array.isArray(sub.options)) {
             const si = parseInt(val, 10);
@@ -222,7 +231,17 @@ function estimateAnswerBlockHeight(question, mode) {
     const ansObj = parseAnswerObject(question.answer) || {};
     const subs = toOptionsArray(question.options);
     h += LINE; // "Answers:" label
-    subs.forEach((_, i) => { h += linesFor(ansObj[`q${i + 1}`]) * LINE; });
+    subs.forEach((sub, i) => {
+      if (sub && sub.answer_html && String(sub.answer_html).trim()) {
+        // Rich answer: reserve room for its text lines plus each embedded image.
+        const html = String(sub.answer_html);
+        const plainLen = html.replace(/<img\b[^>]*>/gi, "").replace(/<[^>]+>/g, "").length;
+        const imgCount = (html.match(/<img\b/gi) || []).length;
+        h += Math.max(1, Math.ceil((plainLen + 8) / CHARS_PER_LINE)) * LINE + imgCount * 150;
+      } else {
+        h += linesFor(ansObj[`q${i + 1}`]) * LINE;
+      }
+    });
   } else if (type === "match") {
     let data = question.options;
     if (typeof data === "string") { try { data = JSON.parse(data); } catch { data = null; } }

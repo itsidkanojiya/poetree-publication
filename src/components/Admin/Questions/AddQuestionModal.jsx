@@ -9,6 +9,16 @@ import { getType, isTypeAllowedForLanguage } from "../../../utils/questionTypes"
 import { detectPaperLanguage } from "../../../utils/sectionTitles";
 import { IMG_TOKEN } from "../../../utils/questionImage";
 
+/** Rough plain-text mirror of an HTML fragment (the backend regenerates the
+ *  authoritative one; this is just for the answer-object plain fallback). */
+const htmlToPlainText = (html) =>
+  String(html || "")
+    .replace(/<img\b[^>]*>/gi, " [image] ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
 const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
   const [formData, setFormData] = useState({
     type: questionType,
@@ -224,7 +234,7 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
             };
           }
           if (pq && pq.type === "blank") {
-            return { type: "blank", question: (pq.question != null ? pq.question : ""), question_html: html, answer: (pq.answer != null ? pq.answer : "") };
+            return { type: "blank", question: (pq.question != null ? pq.question : ""), question_html: html, answer: (pq.answer != null ? pq.answer : ""), answer_html: (pq.answer_html || "") };
           }
           if (pq && (pq.type === "truefalse" || pq.type === "true&false")) {
             const ans = pq.answer === "true" || pq.answer === "false" ? pq.answer : "true";
@@ -235,6 +245,7 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
             question: (pq && pq.question) != null ? pq.question : "",
             question_html: html,
             answer: (pq && pq.answer) != null ? pq.answer : "",
+            answer_html: (pq && pq.answer_html) || "",
           };
         });
         setPassageQuestions(normalized.length ? normalized : [{ type: "short", question: "", answer: "" }]);
@@ -415,7 +426,13 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
           // In rich mode the sub-question prompt lives in question_html; the backend
           // sanitizes it and regenerates the plain `question` mirror.
           const html = richMode && pq.question_html && pq.question_html.trim() ? pq.question_html : undefined;
-          const withHtml = (obj) => (html ? { ...obj, question_html: html } : obj);
+          // Rich answer (short / blank): may hold an uploaded image + text.
+          const aHtml = richMode && pq.answer_html && pq.answer_html.trim() ? pq.answer_html : undefined;
+          const withHtml = (obj) => {
+            let o = html ? { ...obj, question_html: html } : obj;
+            if (aHtml && (obj.type === "short" || obj.type === "blank")) o = { ...o, answer_html: aHtml };
+            return o;
+          };
           if (pq.type === "mcq") {
             const opts = (pq.options || []).map((o) => (o && o.trim()) || "").filter(Boolean);
             return withHtml({ type: "mcq", question: pq.question || "", options: opts, answer: pq.answer != null ? String(pq.answer) : "1" });
@@ -433,6 +450,10 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
           let val = q.answer != null ? q.answer : "";
           if (q.type === "mcq") val = q.answer != null ? String(q.answer) : "1";
           if (q.type === "truefalse") val = q.answer === "true" || q.answer === "false" ? q.answer : "true";
+          // Rich answer: keep a plain-text mirror in the answer object for non-HTML consumers.
+          if ((q.type === "short" || q.type === "blank") && richMode && q.answer_html && q.answer_html.trim()) {
+            val = htmlToPlainText(q.answer_html);
+          }
           acc[`q${idx + 1}`] = val;
           return acc;
         }, {});
@@ -508,20 +529,15 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
       if (!wordList.some((r) => (r.word || "").trim())) {
         newErrors.words = "Add at least one word.";
       }
-    } else if (richMode) {
-      // Rich mode: the plain text is derived server-side, so validate the HTML body.
-      // It counts as non-empty if it has text OR an image/table.
-      const html = questionHtml || "";
-      const hasText = html.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0;
-      const hasBlock = /<(img|table)\b/i.test(html);
-      if (!hasText && !hasBlock) newErrors.question = "Question is required";
-    } else {
-      if (!formData.question.trim()) newErrors.question = "Question is required";
-      // Inline placement renders the image at the {{img}} token. Without the token the
-      // image would silently disappear from the paper, so require it.
+    } else if (!richMode) {
+      // Question text itself is OPTIONAL for every type. The only remaining rule:
+      // inline placement renders the image at the {{img}} token, so if the admin chose
+      // inline placement AND typed some question text, that text must contain the token
+      // (otherwise the image would silently disappear from the paper).
       if (
         imageData &&
         imageData.placement === "inline" &&
+        formData.question.trim() &&
         !(formData.question || "").includes(IMG_TOKEN)
       ) {
         newErrors.question = `Add the ${IMG_TOKEN} marker in the question text to show the image inline (or change placement).`;
@@ -956,7 +972,7 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
             <div className={isWordListType ? "hidden" : ""}>
               <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                 <label className="block text-sm font-semibold text-gray-700">
-                  Question <span className="text-red-500">*</span>
+                  Question <span className="text-gray-400 font-normal">(optional)</span>
                 </label>
                 {/* Simple = plain text + $math$ + the drag/drop image editor.
                     Rich   = Word-like editor (formatting, tables, inline images, math). */}
@@ -1269,11 +1285,23 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
                         </div>
                       </>
                     ) : pq.type === "blank" ? (
-                      <MathTextInput
-                        value={pq.answer != null ? pq.answer : ""}
-                        onChange={(val) => updatePassageQuestion(index, "answer", val)}
-                        placeholder="Correct word(s) for the blank"
-                      />
+                      richMode ? (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Answer (optional — supports images)</label>
+                          <RichQuestionEditor
+                            value={pq.answer_html || ""}
+                            onChange={(html) => updatePassageQuestion(index, "answer_html", html)}
+                            questionType={questionType}
+                            placeholder="Correct word(s) for the blank — you can also insert an image"
+                          />
+                        </div>
+                      ) : (
+                        <MathTextInput
+                          value={pq.answer != null ? pq.answer : ""}
+                          onChange={(val) => updatePassageQuestion(index, "answer", val)}
+                          placeholder="Correct word(s) for the blank"
+                        />
+                      )
                     ) : pq.type === "truefalse" ? (
                       <div className="mt-2">
                         <label className="block text-sm font-medium text-gray-700 mb-2">Correct answer</label>
@@ -1297,6 +1325,16 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
                             <span className="font-medium text-gray-800">False</span>
                           </label>
                         </div>
+                      </div>
+                    ) : richMode ? (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Answer (optional — supports images)</label>
+                        <RichQuestionEditor
+                          value={pq.answer_html || ""}
+                          onChange={(html) => updatePassageQuestion(index, "answer_html", html)}
+                          questionType={questionType}
+                          placeholder="Type the answer and/or insert an image"
+                        />
                       </div>
                     ) : (
                       <MathTextInput
