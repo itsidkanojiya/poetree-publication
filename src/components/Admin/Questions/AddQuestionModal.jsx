@@ -70,7 +70,7 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
   // Rich ("Word-like") editor. When on, question_html/options_html are sent and the
   // backend regenerates the plain-text mirror from them.
   const [richMode, setRichMode] = useState(() => {
-    if (question?.question_html) return true;
+    if (question?.question_html || question?.answer_html || question?.solution_html) return true;
     // Also turn on rich mode if any passage sub-question was authored with HTML.
     try {
       const opts = Array.isArray(question?.options)
@@ -78,12 +78,14 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
         : question?.options
         ? JSON.parse(question.options)
         : [];
-      return Array.isArray(opts) && opts.some((o) => o && o.question_html);
+      return Array.isArray(opts) && opts.some((o) => o && (o.question_html || o.answer_html));
     } catch {
       return false;
     }
   });
   const [questionHtml, setQuestionHtml] = useState(question?.question_html || "");
+  const [answerHtml, setAnswerHtml] = useState(question?.answer_html || "");
+  const [solutionHtml, setSolutionHtml] = useState(question?.solution_html || "");
   const [optionHtmlList, setOptionHtmlList] = useState(
     Array.isArray(question?.options_html) ? question.options_html : []
   );
@@ -358,6 +360,18 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
       // `question`/`options` from it, so the PDF and exports keep working.
       if (richMode) {
         formDataToSend.append("question_html", questionHtml || "");
+        // Rich solution (all types) and rich answer (free-text types only).
+        if (solutionHtml && solutionHtml.trim()) {
+          formDataToSend.append("solution_html", solutionHtml);
+        }
+        if (
+          answerHtml &&
+          answerHtml.trim() &&
+          !["mcq", "passage", "match", "true&false"].includes(questionType) &&
+          !isWordListType
+        ) {
+          formDataToSend.append("answer_html", answerHtml);
+        }
         if (questionType === "mcq") {
           const optsHtml = mcqOptionList.map((_, i) => optionHtmlList[i] || "");
           if (optsHtml.some((h) => h && h.trim())) {
@@ -1517,18 +1531,27 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
               !isWordListType && (
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Answer (Optional)
+                  Answer (Optional){richMode ? " — supports images" : ""}
                 </label>
-                <MathTextInput
-                  multiline
-                  rows={questionType === "long" ? 4 : 2}
-                  value={formData.answer}
-                  onChange={(val) =>
-                    handleChange({ target: { name: "answer", value: val } })
-                  }
-                  placeholder="Enter the answer"
-                  error={!!errors.answer}
-                />
+                {richMode ? (
+                  <RichQuestionEditor
+                    value={answerHtml}
+                    onChange={setAnswerHtml}
+                    questionType={questionType}
+                    placeholder="Type the answer. Use the toolbar for tables, images and formulas."
+                  />
+                ) : (
+                  <MathTextInput
+                    multiline
+                    rows={questionType === "long" ? 4 : 2}
+                    value={formData.answer}
+                    onChange={(val) =>
+                      handleChange({ target: { name: "answer", value: val } })
+                    }
+                    placeholder="Enter the answer"
+                    error={!!errors.answer}
+                  />
+                )}
                 {errors.answer && (
                   <p className="mt-1 text-sm text-red-600">{errors.answer}</p>
                 )}
@@ -1538,17 +1561,26 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
             {/* Solution */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Solution (Optional)
+                Solution (Optional){richMode ? " — supports images" : ""}
               </label>
-              <MathTextInput
-                multiline
-                rows={3}
-                value={formData.solution}
-                onChange={(val) =>
-                  handleChange({ target: { name: "solution", value: val } })
-                }
-                placeholder="Enter solution or explanation"
-              />
+              {richMode ? (
+                <RichQuestionEditor
+                  value={solutionHtml}
+                  onChange={setSolutionHtml}
+                  questionType={questionType}
+                  placeholder="Type the solution / explanation. Use the toolbar for tables, images and formulas."
+                />
+              ) : (
+                <MathTextInput
+                  multiline
+                  rows={3}
+                  value={formData.solution}
+                  onChange={(val) =>
+                    handleChange({ target: { name: "solution", value: val } })
+                  }
+                  placeholder="Enter solution or explanation"
+                />
+              )}
             </div>
 
             {/* Images (fabric editor) */}

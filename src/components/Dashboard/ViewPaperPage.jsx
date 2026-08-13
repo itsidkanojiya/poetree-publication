@@ -204,11 +204,21 @@ const renderAnswerContent = (question) => {
     return <span><strong>Answer: </strong>{pairs.join(",   ")}</span>;
   }
   // short / long / onetwo / blank / default
+  if (question.answer_html && String(question.answer_html).trim()) {
+    return (
+      <div><strong>Answer: </strong><div className="rich-body">{renderRichHtml(question.answer_html)}</div></div>
+    );
+  }
   return <span><strong>Answer: </strong><MathText text={String(question.answer ?? "")} /></span>;
 };
 
 /** JSX for a question's solution/explanation, or null when empty. */
 const renderSolutionContent = (question) => {
+  if (question.solution_html && String(question.solution_html).trim()) {
+    return (
+      <div><strong>Solution: </strong><div className="rich-body">{renderRichHtml(question.solution_html)}</div></div>
+    );
+  }
   const sol = question.solution;
   if (!sol || !String(sol).trim()) return null;
   return <span><strong>Solution: </strong><MathText text={String(sol)} /></span>;
@@ -252,13 +262,25 @@ function estimateAnswerBlockHeight(question, mode) {
     const idx = parseInt(question.answer, 10);
     const text = Number.isFinite(idx) && idx >= 1 ? opts[idx - 1] : question.answer;
     h += linesFor(text) * LINE;
+  } else if (question.answer_html && String(question.answer_html).trim()) {
+    const html = String(question.answer_html);
+    const plainLen = html.replace(/<img\b[^>]*>/gi, "").replace(/<[^>]+>/g, "").length;
+    const imgCount = (html.match(/<img\b/gi) || []).length;
+    h += Math.max(1, Math.ceil((plainLen + 8) / CHARS_PER_LINE)) * LINE + imgCount * 150;
   } else {
     h += linesFor(question.answer) * LINE;
   }
 
   if (mode === "solutions") {
-    const sol = String(question.solution || "");
-    if (sol.trim()) h += 26 + linesFor(`Solution: ${sol}`) * LINE;
+    if (question.solution_html && String(question.solution_html).trim()) {
+      const html = String(question.solution_html);
+      const plainLen = html.replace(/<img\b[^>]*>/gi, "").replace(/<[^>]+>/g, "").length;
+      const imgCount = (html.match(/<img\b/gi) || []).length;
+      h += 26 + Math.max(1, Math.ceil((plainLen + 8) / CHARS_PER_LINE)) * LINE + imgCount * 150;
+    } else {
+      const sol = String(question.solution || "");
+      if (sol.trim()) h += 26 + linesFor(`Solution: ${sol}`) * LINE;
+    }
   }
   return h + 10;
 }
