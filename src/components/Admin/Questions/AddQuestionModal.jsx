@@ -19,6 +19,21 @@ const htmlToPlainText = (html) =>
     .replace(/\s+/g, " ")
     .trim();
 
+/** Wrap existing PLAIN text as minimal HTML so the rich editor can display it.
+ *  Needed when editing a question whose content was saved as plain text (older
+ *  data, or fields the rich editors didn't exist for yet) while the modal opens
+ *  in Rich mode — otherwise the editor is bound to an empty *_html and the
+ *  content looks like it vanished. */
+const plainToHtml = (text) => {
+  const s = String(text ?? "");
+  if (!s.trim()) return "";
+  const esc = s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+  return `<p>${esc.replace(/\r?\n/g, "<br>")}</p>`;
+};
+
 const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
   const [formData, setFormData] = useState({
     type: questionType,
@@ -83,9 +98,21 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
       return false;
     }
   });
-  const [questionHtml, setQuestionHtml] = useState(question?.question_html || "");
-  const [answerHtml, setAnswerHtml] = useState(question?.answer_html || "");
-  const [solutionHtml, setSolutionHtml] = useState(question?.solution_html || "");
+  // Seed rich editors from existing plain text when the modal opens in Rich mode
+  // but a field was only ever saved as plain (older questions / newly-added fields),
+  // so the content shows instead of appearing blank.
+  const [questionHtml, setQuestionHtml] = useState(
+    question?.question_html || (richMode ? plainToHtml(question?.question) : "")
+  );
+  const [answerHtml, setAnswerHtml] = useState(
+    question?.answer_html ||
+      (richMode && !["mcq", "passage", "match", "true&false"].includes(questionType)
+        ? plainToHtml(question?.answer)
+        : "")
+  );
+  const [solutionHtml, setSolutionHtml] = useState(
+    question?.solution_html || (richMode ? plainToHtml(question?.solution) : "")
+  );
   const [optionHtmlList, setOptionHtmlList] = useState(
     Array.isArray(question?.options_html) ? question.options_html : []
   );
@@ -224,7 +251,9 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
       try {
         const parsed = Array.isArray(question.options) ? question.options : JSON.parse(question.options);
         const normalized = (Array.isArray(parsed) ? parsed : []).map((pq) => {
-          const html = (pq && pq.question_html) || "";
+          // Seed the sub-question prompt editor from plain text when opening in Rich
+          // mode without stored HTML, so old/plain sub-questions don't look empty.
+          const html = (pq && pq.question_html) || (richMode ? plainToHtml(pq && pq.question) : "");
           if (pq && pq.type === "mcq") {
             const opts = Array.isArray(pq.options) ? pq.options : [];
             return {
@@ -236,7 +265,7 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
             };
           }
           if (pq && pq.type === "blank") {
-            return { type: "blank", question: (pq.question != null ? pq.question : ""), question_html: html, answer: (pq.answer != null ? pq.answer : ""), answer_html: (pq.answer_html || "") };
+            return { type: "blank", question: (pq.question != null ? pq.question : ""), question_html: html, answer: (pq.answer != null ? pq.answer : ""), answer_html: (pq.answer_html || (richMode ? plainToHtml(pq.answer) : "")) };
           }
           if (pq && (pq.type === "truefalse" || pq.type === "true&false")) {
             const ans = pq.answer === "true" || pq.answer === "false" ? pq.answer : "true";
@@ -247,7 +276,7 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
             question: (pq && pq.question) != null ? pq.question : "",
             question_html: html,
             answer: (pq && pq.answer) != null ? pq.answer : "",
-            answer_html: (pq && pq.answer_html) || "",
+            answer_html: (pq && pq.answer_html) || (richMode ? plainToHtml(pq && pq.answer) : ""),
           };
         });
         setPassageQuestions(normalized.length ? normalized : [{ type: "short", question: "", answer: "" }]);
