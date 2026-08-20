@@ -1,4 +1,4 @@
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, useEffect } from "react";
 import { useEditor, EditorContent, ReactNodeViewRenderer, NodeViewWrapper } from "@tiptap/react";
 import { Node, mergeAttributes } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
@@ -291,6 +291,20 @@ const RichQuestionEditor = ({ value, onChange, questionType = "mcq", placeholder
       },
     },
   });
+
+  // TipTap's useEditor reads `content` only once at creation, so when the parent
+  // populates `value` AFTER mount (edit modal loading data, or seeding plain->HTML)
+  // the editor would otherwise stay blank until it remounts (e.g. a Simple<->Rich
+  // toggle). Sync external value changes in. The equality guard means typing — which
+  // sets value to exactly editor.getHTML() — never triggers setContent, so the caret
+  // is never disturbed while editing.
+  useEffect(() => {
+    if (!editor) return;
+    const incoming = value || "";
+    if (incoming !== editor.getHTML()) {
+      editor.commands.setContent(incoming, false);
+    }
+  }, [value, editor]);
 
   if (!editor) return null;
 
