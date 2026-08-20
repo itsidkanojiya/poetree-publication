@@ -24,6 +24,12 @@ const htmlToPlainText = (html) =>
  *  data, or fields the rich editors didn't exist for yet) while the modal opens
  *  in Rich mode — otherwise the editor is bound to an empty *_html and the
  *  content looks like it vanished. */
+/** Stable unique id for a passage sub-question, used as the React list key.
+ *  Index keys make React reuse the wrong stateful editor when sub-questions are
+ *  added/removed/retyped, so content appears to shift or vanish. */
+let _pqUidCounter = 0;
+const makePqUid = () => `pq_${Date.now().toString(36)}_${++_pqUidCounter}`;
+
 const plainToHtml = (text) => {
   const s = String(text ?? "");
   if (!s.trim()) return "";
@@ -131,7 +137,7 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
 
   // For Passage and Match types
   // Passage: each item is { type: "short", question, answer } or { type: "mcq", question, options: string[], answer: "1" }
-  const [passageQuestions, setPassageQuestions] = useState([{ type: "short", question: "", answer: "" }]);
+  const [passageQuestions, setPassageQuestions] = useState([{ type: "short", question: "", answer: "", uid: makePqUid() }]);
   const [matchPairs, setMatchPairs] = useState({ left: [""], right: [""] });
 
   // For MCQ: option list (frontend only); formData.options/answer still sent as JSON array + 1-based index
@@ -254,6 +260,7 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
           // Seed the sub-question prompt editor from plain text when opening in Rich
           // mode without stored HTML, so old/plain sub-questions don't look empty.
           const html = (pq && pq.question_html) || (richMode ? plainToHtml(pq && pq.question) : "");
+          const uid = makePqUid();
           if (pq && pq.type === "mcq") {
             const opts = Array.isArray(pq.options) ? pq.options : [];
             return {
@@ -262,14 +269,15 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
               question_html: html,
               options: opts.length ? opts : ["", "", "", ""],
               answer: pq.answer != null ? String(pq.answer) : "1",
+              uid,
             };
           }
           if (pq && pq.type === "blank") {
-            return { type: "blank", question: (pq.question != null ? pq.question : ""), question_html: html, answer: (pq.answer != null ? pq.answer : ""), answer_html: (pq.answer_html || (richMode ? plainToHtml(pq.answer) : "")) };
+            return { type: "blank", question: (pq.question != null ? pq.question : ""), question_html: html, answer: (pq.answer != null ? pq.answer : ""), answer_html: (pq.answer_html || (richMode ? plainToHtml(pq.answer) : "")), uid };
           }
           if (pq && (pq.type === "truefalse" || pq.type === "true&false")) {
             const ans = pq.answer === "true" || pq.answer === "false" ? pq.answer : "true";
-            return { type: "truefalse", question: (pq.question != null ? pq.question : ""), question_html: html, answer: ans };
+            return { type: "truefalse", question: (pq.question != null ? pq.question : ""), question_html: html, answer: ans, uid };
           }
           return {
             type: "short",
@@ -277,9 +285,10 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
             question_html: html,
             answer: (pq && pq.answer) != null ? pq.answer : "",
             answer_html: (pq && pq.answer_html) || (richMode ? plainToHtml(pq && pq.answer) : ""),
+            uid,
           };
         });
-        setPassageQuestions(normalized.length ? normalized : [{ type: "short", question: "", answer: "" }]);
+        setPassageQuestions(normalized.length ? normalized : [{ type: "short", question: "", answer: "", uid: makePqUid() }]);
       } catch (e) {
         console.error("Error parsing passage questions:", e);
       }
@@ -626,14 +635,15 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
   };
 
   const addPassageQuestion = (subType = "short") => {
+    const uid = makePqUid();
     if (subType === "mcq") {
-      setPassageQuestions([...passageQuestions, { type: "mcq", question: "", options: ["", "", "", ""], answer: "1" }]);
+      setPassageQuestions([...passageQuestions, { type: "mcq", question: "", options: ["", "", "", ""], answer: "1", uid }]);
     } else if (subType === "blank") {
-      setPassageQuestions([...passageQuestions, { type: "blank", question: "", answer: "" }]);
+      setPassageQuestions([...passageQuestions, { type: "blank", question: "", answer: "", uid }]);
     } else if (subType === "truefalse") {
-      setPassageQuestions([...passageQuestions, { type: "truefalse", question: "", answer: "true" }]);
+      setPassageQuestions([...passageQuestions, { type: "truefalse", question: "", answer: "true", uid }]);
     } else {
-      setPassageQuestions([...passageQuestions, { type: "short", question: "", answer: "" }]);
+      setPassageQuestions([...passageQuestions, { type: "short", question: "", answer: "", uid }]);
     }
   };
 
@@ -652,6 +662,8 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
     const updated = [...passageQuestions];
     const prev = updated[index];
     const html = (prev && prev.question_html) || ""; // keep the rich prompt across type changes
+    const uid = (prev && prev.uid) || makePqUid(); // keep a stable list key across type changes
+    const aHtml = (prev && prev.answer_html) || ""; // keep the rich answer across type changes
     if (newType === "mcq") {
       updated[index] = {
         type: "mcq",
@@ -659,13 +671,14 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
         question_html: html,
         options: Array.isArray(prev?.options) && prev.options.length ? prev.options : ["", "", "", ""],
         answer: "1",
+        uid,
       };
     } else if (newType === "blank") {
-      updated[index] = { type: "blank", question: (prev && prev.question) || "", question_html: html, answer: (prev && prev.answer) != null ? prev.answer : "" };
+      updated[index] = { type: "blank", question: (prev && prev.question) || "", question_html: html, answer: (prev && prev.answer) != null ? prev.answer : "", answer_html: aHtml, uid };
     } else if (newType === "truefalse") {
-      updated[index] = { type: "truefalse", question: (prev && prev.question) || "", question_html: html, answer: (prev && prev.answer) === "false" ? "false" : "true" };
+      updated[index] = { type: "truefalse", question: (prev && prev.question) || "", question_html: html, answer: (prev && prev.answer) === "false" ? "false" : "true", uid };
     } else {
-      updated[index] = { type: "short", question: (prev && prev.question) || "", question_html: html, answer: (prev && prev.answer) != null ? prev.answer : "" };
+      updated[index] = { type: "short", question: (prev && prev.question) || "", question_html: html, answer: (prev && prev.answer) != null ? prev.answer : "", answer_html: aHtml, uid };
     }
     setPassageQuestions(updated);
   };
@@ -1228,7 +1241,7 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
                   <p className="text-sm text-red-600 mb-2">{errors.passageQuestions}</p>
                 )}
                 {passageQuestions.map((pq, index) => (
-                  <div key={index} className="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                  <div key={pq.uid || index} className="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
                     <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
                       <span className="font-medium text-gray-700">Sub-question {index + 1}</span>
                       <div className="flex items-center gap-2">
