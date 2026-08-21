@@ -60,7 +60,7 @@ const PAGE_DIMENSIONS = {
   HEIGHT: 1123,
   WIDTH: 748,
   MARGIN: 24,
-  SAFETY_BUFFER: 24, // Small safety margin; real container padding is handled by CONTENT_PADDING
+  SAFETY_BUFFER: 50, // Bottom-of-page slack; absorbs small estimate drift so section headers/questions don't overflow the fixed page and get clipped
   CONTENT_PADDING: 64, // p-8 on the page container = 32px top + 32px bottom
 };
 
@@ -670,7 +670,7 @@ const CustomPaper = () => {
     const title = getSectionTitle(type, effectiveHeaderForChapter?.subject) || "";
     // ~610px of title width (page minus padding minus the marks label) at 16px.
     const lines = Math.max(1, Math.ceil(String(title).length / 58));
-    return lines * 26 + 20;
+    return lines * 28 + 34;
   };
   const rawSubjectTitleId =
     effectiveHeaderForChapter?.subjectTitle ??

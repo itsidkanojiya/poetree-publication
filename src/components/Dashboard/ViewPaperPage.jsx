@@ -44,7 +44,7 @@ const PAGE_WIDTH = 748;
 const HEADER_HEIGHT = 230;
 const CONTENT_PADDING = 64; // p-8 on the page container = 32px top + 32px bottom
 const MARGIN = 24;
-const SAFETY_BUFFER = 24;
+const SAFETY_BUFFER = 50; // Bottom-of-page slack; absorbs small estimate drift so section headers/questions don't overflow the fixed page and get clipped
 
 // Tuned to the ACTUAL rendered heights so pages fill properly instead of
 // breaking early. Kept in sync with CustomPaper.jsx.
@@ -67,7 +67,7 @@ const sectionHeaderHeight = (type, subjectName) => {
   const title = getSectionTitle(type, subjectName) || "";
   // ~610px of title width (page minus padding minus the marks label) at 16px.
   const lines = Math.max(1, Math.ceil(String(title).length / 58));
-  return lines * 26 + 20;
+  return lines * 28 + 34;
 };
 
 const toOptionsArray = (options) => {
