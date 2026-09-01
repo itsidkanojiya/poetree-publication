@@ -200,6 +200,32 @@ const getMcqOptionsHeight = (options) => {
 };
 
 // Estimate height for passage question (passage text + sub-questions; MCQ sub-questions add option lines)
+// Splitting a passage across a page break: "lead" = intro text + image (no
+// sub-questions); "subs" = the sub-questions only.
+const getPassageLeadHeight = (question) => {
+  let h = COMPONENT_HEIGHTS.QUESTION;
+  const passageText = question.question || "";
+  h += Math.max(1, Math.ceil(passageText.length / 55)) * COMPONENT_HEIGHTS.PASSAGE_LINE;
+  h += estimateImageBlockHeight(question);
+  return h;
+};
+const getPassageSubsHeight = (question) => {
+  let h = 0;
+  try {
+    const arr = typeof question.options === "string" ? JSON.parse(question.options) : question.options;
+    if (Array.isArray(arr)) {
+      arr.forEach((pq) => {
+        h += COMPONENT_HEIGHTS.PASSAGE_SUB_Q;
+        if (pq && pq.type === "mcq" && Array.isArray(pq.options)) {
+          const opts = pq.options.filter((o) => o != null && String(o).trim() !== "");
+          h += Math.max(0, opts.length * COMPONENT_HEIGHTS.OPTION);
+        }
+      });
+    }
+  } catch (_) {}
+  return h;
+};
+
 const getPassageQuestionHeight = (question) => {
   let h = COMPONENT_HEIGHTS.QUESTION;
   const passageText = question.question || "";
@@ -1785,6 +1811,36 @@ const CustomPaper = () => {
         // double-counting it. Only a small drift buffer is needed now that heights are
         // measured — lets a short question fill the last bit instead of dropping down.
         const availableHeight = currentHeight - (PAGE_DIMENSIONS.SAFETY_BUFFER || 0);
+
+        // Passage that doesn't fit whole: keep its lead (intro + image) on this page
+        // and continue the sub-questions on the next, instead of dropping the whole
+        // block and leaving a big blank.
+        if (question.type === "passage" && questionHeight > availableHeight && hasQuestionsOnPage) {
+          let subs = [];
+          try { subs = typeof question.options === "string" ? JSON.parse(question.options) : question.options; } catch (_) { subs = []; }
+          const overhead = printTitle
+            ? sectionHeaderHeight(question.type) + (currentPage.length > 0 ? SECTION_GAP : 0)
+            : COMPONENT_HEIGHTS.SPACING;
+          const leadTotal = getPassageLeadHeight(question) + overhead;
+          if (Array.isArray(subs) && subs.length >= 1 && leadTotal <= availableHeight) {
+            const typeKey = normalizeQuestionType(question.type);
+            if (!(typeKey in questionCounters)) questionCounters[typeKey] = 1;
+            const num = questionCounters[typeKey]++;
+            const leadSlice = { ...question, _pslice: "lead", questionNumber: num };
+            const existing = currentPage.find((s) => s.type === question.type);
+            if (existing) existing.selectedQuestions.push(leadSlice);
+            else currentPage.push({ type: question.type, selectedQuestions: [leadSlice] });
+            pages.push([...currentPage]);
+            currentPage = [];
+            isFirstPage = false;
+            const contSlice = { ...question, _pslice: "cont", marks: 0, questionNumber: num };
+            currentPage.push({ type: question.type, selectedQuestions: [contSlice] });
+            currentHeight = PAGE_DIMENSIONS.HEIGHT - PAGE_DIMENSIONS.CONTENT_PADDING - getPassageSubsHeight(question);
+            if (currentHeight < 0) currentHeight = 0;
+            reservedTitleTypes.add(question.type);
+            return; // handled this passage as a split
+          }
+        }
 
         if (questionHeight > availableHeight) {
           // Save current page if it has content
@@ -3738,9 +3794,16 @@ const CustomPaper = () => {
                             {getType(section.type)?.layout !== "row" &&
                               section.selectedQuestions.map(
                               (question, qIndex) => {
+                                // Passage split across pages: "lead" = intro + image
+                                // (no sub-questions); "cont" = sub-questions only.
+                                const isCont = question._pslice === "cont";
+                                const isLead = question._pslice === "lead";
+                                const showLead = !isCont;
+                                const showSubs = !isLead;
                                 return (
                                 <div key={qIndex} className="mb-4">
-                                  <QuestionImageBlock question={question} slot="top" />
+                                  {showLead && <QuestionImageBlock question={question} slot="top" />}
+                                  {showLead && (
                                   <div
                                     className={`flex items-start justify-between gap-4 ${(question.type === "mcq" || question.type === "true_false" || question.type === "truefalse") ? "flex-row" : ""}`}
                                     style={{ lineHeight: "1.7" }}
@@ -3775,6 +3838,7 @@ const CustomPaper = () => {
                                       />
                                     )}
                                   </div>
+                                  )}
 
                                   {question.type === "mcq" &&
                                     question.options && (
@@ -3826,7 +3890,7 @@ const CustomPaper = () => {
                                     )}
 
                                   {/* Passage: show sub-questions (short or MCQ) below the passage text */}
-                                  {question.type === "passage" &&
+                                  {showSubs && question.type === "passage" &&
                                     question.options && (() => {
                                       try {
                                         const passageQuestions =
@@ -4096,7 +4160,7 @@ const CustomPaper = () => {
                                       return null;
                                     })()}
 
-                                  <QuestionImageBlock question={question} slot="bottom" />
+                                  {showLead && <QuestionImageBlock question={question} slot="bottom" />}
                                 </div>
                                 );
                               }

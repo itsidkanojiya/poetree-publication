@@ -112,6 +112,28 @@ const getPassageQuestionHeight = (question) => {
   return h;
 };
 
+// Splitting a passage across a page break: the "lead" is the passage text + image
+// (no sub-questions); the "subs" are the sub-questions only. lead + subs ≈ the full
+// passage height (getPassageQuestionHeight + estimateImageBlockHeight).
+const getPassageLeadHeight = (question) => {
+  let h = COMPONENT_HEIGHTS.QUESTION;
+  const passageText = question.question || "";
+  h += Math.max(1, Math.ceil(passageText.length / 55)) * COMPONENT_HEIGHTS.PASSAGE_LINE;
+  h += estimateImageBlockHeight(question);
+  return h;
+};
+const getPassageSubsHeight = (question) => {
+  let h = 0;
+  toOptionsArray(question.options).forEach((pq) => {
+    h += COMPONENT_HEIGHTS.PASSAGE_SUB_Q;
+    if (pq && pq.type === "mcq" && Array.isArray(pq.options)) {
+      const opts = pq.options.filter((o) => o != null && String(o).trim() !== "");
+      h += opts.length * COMPONENT_HEIGHTS.OPTION;
+    }
+  });
+  return h;
+};
+
 const getMatchQuestionHeight = (question) => {
   let h = COMPONENT_HEIGHTS.QUESTION;
   if (question.options) {
@@ -357,6 +379,33 @@ function buildPages(sections, exportMode = "paper", measuredHeights = null, subj
       // now that heights are measured — this lets a short question fill the last bit
       // of a page instead of dropping to the next and leaving a big blank.
       const availableHeight = currentHeight - SAFETY_BUFFER;
+
+      // Passage that doesn't fit whole: if its lead (text + image) fits in the
+      // remaining space, keep the lead here and continue its sub-questions on the
+      // next page instead of dropping the whole block and leaving a big blank.
+      if (type === "passage" && exportMode === "paper" && questionHeight > availableHeight && hasQuestionsOnPage) {
+        const subs = toOptionsArray(question.options);
+        const overhead = printTitle
+          ? sectionHeaderHeight(question.type, subjectName) + SECTION_GAP
+          : COMPONENT_HEIGHTS.SPACING;
+        const leadTotal = getPassageLeadHeight(question) + overhead;
+        if (subs.length >= 1 && leadTotal <= availableHeight) {
+          const leadSlice = { ...question, _pslice: "lead" };
+          const existing = currentPage.find((s) => normalizeQuestionType(s.type) === type);
+          if (existing) existing.selectedQuestions.push(leadSlice);
+          else currentPage.push({ type: question.type, selectedQuestions: [leadSlice] });
+          pages.push(currentPage);
+          currentPage = [];
+          // Continuation page: sub-questions only. marks:0 so the passage's marks
+          // aren't counted twice in the section total.
+          const contSlice = { ...question, _pslice: "cont", marks: 0 };
+          currentPage.push({ type: question.type, selectedQuestions: [contSlice] });
+          currentHeight = PAGE_HEIGHT - CONTENT_PADDING - getPassageSubsHeight(question);
+          if (currentHeight < 0) currentHeight = 0;
+          printedTypes.add(type);
+          return; // handled this question
+        }
+      }
 
       if (questionHeight > availableHeight) {
         if (currentPage.length > 0) pages.push(currentPage);
@@ -757,10 +806,17 @@ const ViewPaperPage = () => {
 
                       {getType(sectionType)?.layout !== "row" &&
                         section.selectedQuestions.map((question, qIndex) => {
-                        const qNum = questionCounters[sectionType]++;
+                        // Passage split across pages: "lead" = intro + image (no
+                        // sub-questions); "cont" = sub-questions only (no number/image).
+                        const isCont = question._pslice === "cont";
+                        const isLead = question._pslice === "lead";
+                        const showLead = !isCont; // whole passage or its lead
+                        const showSubs = !isLead; // whole passage or its continuation
+                        const qNum = isCont ? null : questionCounters[sectionType]++;
                         return (
-                          <div key={qIndex} className="mb-4" data-measure-qid={question.question_id}>
-                            <QuestionImageBlock question={question} slot="top" />
+                          <div key={qIndex} className="mb-4" data-measure-qid={question._pslice ? undefined : question.question_id}>
+                            {showLead && <QuestionImageBlock question={question} slot="top" />}
+                            {showLead && (
                             <div
                               className={`flex items-start justify-between gap-4 ${
                                 question.type === "mcq" ||
@@ -793,6 +849,7 @@ const ViewPaperPage = () => {
                                 />
                               )}
                             </div>
+                            )}
 
                             {/* MCQ options */}
                             {question.type === "mcq" && question.options && (
@@ -825,7 +882,7 @@ const ViewPaperPage = () => {
                             )}
 
                             {/* Passage sub-questions (short answer or MCQ) */}
-                            {question.type === "passage" && question.options && (() => {
+                            {showSubs && question.type === "passage" && question.options && (() => {
                               try {
                                 const pqs = typeof question.options === "string"
                                   ? JSON.parse(question.options)
@@ -927,10 +984,10 @@ const ViewPaperPage = () => {
                             })()}
 
                             {/* Question image */}
-                            <QuestionImageBlock question={question} slot="bottom" />
+                            {showLead && <QuestionImageBlock question={question} slot="bottom" />}
 
                             {/* Answer / solution block (only in the answer-key / solution export modes) */}
-                            {exportMode !== "paper" && (
+                            {showSubs && exportMode !== "paper" && (
                               <div
                                 className="ml-6 mt-2 pl-3 py-1 border-l-4 border-emerald-400 bg-emerald-50/60 rounded-r text-gray-800"
                                 style={{ fontSize: "13px", lineHeight: "1.6" }}
