@@ -60,7 +60,7 @@ const PAGE_DIMENSIONS = {
   HEIGHT: 1123,
   WIDTH: 748,
   MARGIN: 24,
-  SAFETY_BUFFER: 20, // Bottom-of-page slack; absorbs small estimate drift. Kept modest so pages fill instead of leaving big blank gaps.
+  SAFETY_BUFFER: 12, // Bottom-of-page drift slack only (the p-8 container already reserves the bottom margin). Heights are measured post-render, so this stays small.
   CONTENT_PADDING: 64, // p-8 on the page container = 32px top + 32px bottom
 };
 
@@ -1781,8 +1781,10 @@ const CustomPaper = () => {
           questionHeight += COMPONENT_HEIGHTS.SPACING;
         }
 
-        // Check if question fits on current page (with margin + safety buffer to avoid clipping)
-        const availableHeight = currentHeight - PAGE_DIMENSIONS.MARGIN - (PAGE_DIMENSIONS.SAFETY_BUFFER || 0);
+        // The page container's p-8 already reserves the bottom margin, so MARGIN was
+        // double-counting it. Only a small drift buffer is needed now that heights are
+        // measured — lets a short question fill the last bit instead of dropping down.
+        const availableHeight = currentHeight - (PAGE_DIMENSIONS.SAFETY_BUFFER || 0);
 
         if (questionHeight > availableHeight) {
           // Save current page if it has content

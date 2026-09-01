@@ -44,7 +44,7 @@ const PAGE_WIDTH = 748;
 const HEADER_HEIGHT = 230;
 const CONTENT_PADDING = 64; // p-8 on the page container = 32px top + 32px bottom
 const MARGIN = 24;
-const SAFETY_BUFFER = 20; // Bottom-of-page slack; absorbs small estimate drift. Kept modest: real heights are measured post-render, so a big buffer just wastes space.
+const SAFETY_BUFFER = 12; // Bottom-of-page drift slack only (the p-8 container already reserves the bottom margin). Heights are measured post-render, so this stays small.
 
 // Tuned to the ACTUAL rendered heights so pages fill properly instead of
 // breaking early. Kept in sync with CustomPaper.jsx.
@@ -352,7 +352,11 @@ function buildPages(sections, exportMode = "paper", measuredHeights = null, subj
         subjectName,
       });
 
-      const availableHeight = currentHeight - MARGIN - SAFETY_BUFFER;
+      // The page container's p-8 already reserves 32px of bottom padding, so MARGIN
+      // was double-counting the bottom margin. Only a small drift buffer is needed
+      // now that heights are measured — this lets a short question fill the last bit
+      // of a page instead of dropping to the next and leaving a big blank.
+      const availableHeight = currentHeight - SAFETY_BUFFER;
 
       if (questionHeight > availableHeight) {
         if (currentPage.length > 0) pages.push(currentPage);
