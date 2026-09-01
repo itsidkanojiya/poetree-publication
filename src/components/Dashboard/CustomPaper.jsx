@@ -60,7 +60,7 @@ const PAGE_DIMENSIONS = {
   HEIGHT: 1123,
   WIDTH: 748,
   MARGIN: 24,
-  SAFETY_BUFFER: 50, // Bottom-of-page slack; absorbs small estimate drift so section headers/questions don't overflow the fixed page and get clipped
+  SAFETY_BUFFER: 20, // Bottom-of-page slack; absorbs small estimate drift. Kept modest so pages fill instead of leaving big blank gaps.
   CONTENT_PADDING: 64, // p-8 on the page container = 32px top + 32px bottom
 };
 
@@ -1750,6 +1750,10 @@ const CustomPaper = () => {
     let currentPage = [];
     const questionCounters = {};
     let isFirstPage = true;
+    // Types whose title has already been reserved/printed — mirrors the render's
+    // printedTypes so a section spanning pages reserves its header height only once
+    // (not again on each continuation page, which left large blank gaps).
+    const reservedTitleTypes = new Set();
 
     questionSections.forEach((section) => {
       // Initialize counter for this section type
@@ -1758,17 +1762,14 @@ const CustomPaper = () => {
       }
 
       section.selectedQuestions.forEach((question) => {
-        // Check if this question type already exists on current page
-        const isFirstQuestionOfType = !currentPage.some(
-          (s) => s.type === question.type
-        );
+        // The title prints only on this type's first appearance in the whole paper.
+        const printTitle = !reservedTitleTypes.has(question.type);
 
         // Calculate question height including spacing
         let questionHeight = questionBodyHeight(question);
-        if (isFirstQuestionOfType) {
+        if (printTitle) {
           // Real header height, not a flat constant: the title is 16px and long
           // Gujarati/Hindi titles wrap, and sections are separated by space-y-6.
-          // Under-counting here is what made a page overflow and scroll.
           questionHeight += sectionHeaderHeight(question.type);
           if (currentPage.length > 0) questionHeight += SECTION_GAP;
         }
@@ -1795,10 +1796,10 @@ const CustomPaper = () => {
           // Full page height for subsequent pages (no header), minus container padding
           currentHeight = PAGE_DIMENSIONS.HEIGHT - PAGE_DIMENSIONS.CONTENT_PADDING;
 
-          // Recalculate question height for new page (it's now first of its type on this page)
-          // No spacing needed for first question on new page.
+          // Recalculate question height for the fresh page. Reserve the header only
+          // if the title hasn't printed yet (a continuation prints no title).
           const newQuestionHeight =
-            questionBodyHeight(question) + sectionHeaderHeight(question.type);
+            questionBodyHeight(question) + (printTitle ? sectionHeaderHeight(question.type) : 0);
 
           // Add question to new page
           currentPage.push({
@@ -1827,6 +1828,8 @@ const CustomPaper = () => {
           }
           currentHeight -= questionHeight;
         }
+
+        reservedTitleTypes.add(question.type); // title now reserved/printed for this type
 
         // Number questions within each section (1, 2, 3...) — use normalized type so "truefalse" matches "true_false"
         const typeKey = normalizeQuestionType(question.type);

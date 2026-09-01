@@ -44,7 +44,7 @@ const PAGE_WIDTH = 748;
 const HEADER_HEIGHT = 230;
 const CONTENT_PADDING = 64; // p-8 on the page container = 32px top + 32px bottom
 const MARGIN = 24;
-const SAFETY_BUFFER = 50; // Bottom-of-page slack; absorbs small estimate drift so section headers/questions don't overflow the fixed page and get clipped
+const SAFETY_BUFFER = 20; // Bottom-of-page slack; absorbs small estimate drift. Kept modest: real heights are measured post-render, so a big buffer just wastes space.
 
 // Tuned to the ACTUAL rendered heights so pages fill properly instead of
 // breaking early. Kept in sync with CustomPaper.jsx.
@@ -287,7 +287,7 @@ function estimateAnswerBlockHeight(question, mode) {
 
 const estimateQuestionHeight = (
   question,
-  { isFirstOfType, hasQuestionsOnPage, exportMode = "paper", measuredHeights, subjectName }
+  { printTitle, hasQuestionsOnPage, exportMode = "paper", measuredHeights, subjectName }
 ) => {
   // Prefer the REAL measured height (see the measurement layer in the component);
   // the constant-based estimate is only a first-paint fallback before measurement
@@ -312,9 +312,11 @@ const estimateQuestionHeight = (
   }
 
   // Real header height, not a flat constant: the 16px title WRAPS for the long
-  // Gujarati/Hindi wordings, and sections are separated by space-y-6. Under-counting
-  // here overflows the fixed-height page, which clips content out of the PDF.
-  if (isFirstOfType) {
+  // Gujarati/Hindi wordings, and sections are separated by space-y-6. Reserve it
+  // ONLY when the title will actually print (its first appearance in the whole
+  // paper). A section that continues onto a new page prints no title, so reserving
+  // one there just pushed the break early and left a big blank gap.
+  if (printTitle) {
     h += sectionHeaderHeight(question.type, subjectName);
     if (hasQuestionsOnPage) h += SECTION_GAP;
   }
@@ -329,16 +331,18 @@ function buildPages(sections, exportMode = "paper", measuredHeights = null, subj
   let pages = [];
   let currentHeight = PAGE_HEIGHT - HEADER_HEIGHT - CONTENT_PADDING;
   let currentPage = [];
+  // Types whose title has already been printed — mirrors the render's printedTypes,
+  // so a section spanning pages reserves its header height only once (on the page
+  // it actually prints), not again on every continuation page.
+  const printedTypes = new Set();
 
   sections.forEach((section) => {
     section.selectedQuestions.forEach((question) => {
       const type = normalizeQuestionType(question.type);
-      const isFirstOfType = !currentPage.some(
-        (s) => normalizeQuestionType(s.type) === type
-      );
+      const printTitle = !printedTypes.has(type);
       const hasQuestionsOnPage = currentPage.some((s) => s.selectedQuestions.length > 0);
       const questionHeight = estimateQuestionHeight(question, {
-        isFirstOfType,
+        printTitle,
         hasQuestionsOnPage,
         exportMode,
         measuredHeights,
@@ -350,9 +354,10 @@ function buildPages(sections, exportMode = "paper", measuredHeights = null, subj
       if (questionHeight > availableHeight) {
         if (currentPage.length > 0) pages.push(currentPage);
         currentPage = [];
-        // First question of its type on the fresh page, no inter-question spacing
+        // First question on the fresh page, no inter-question spacing. The title
+        // still prints here only if it hasn't printed yet (printTitle).
         const newQuestionHeight = estimateQuestionHeight(question, {
-          isFirstOfType: true,
+          printTitle,
           hasQuestionsOnPage: false,
           exportMode,
           measuredHeights,
@@ -369,6 +374,7 @@ function buildPages(sections, exportMode = "paper", measuredHeights = null, subj
         else existing.selectedQuestions.push(question);
         currentHeight -= questionHeight;
       }
+      printedTypes.add(type); // after the first question of a type is placed, its title is printed
     });
   });
 
@@ -525,11 +531,17 @@ const ViewPaperPage = () => {
     const run = async () => {
       try { if (document.fonts?.ready) await document.fonts.ready; } catch { /* noop */ }
       const imgs = Array.from(document.querySelectorAll("[id^=pdf-content-] img"));
-      await Promise.all(
-        imgs.map((img) =>
-          img.complete ? Promise.resolve() : new Promise((res) => { img.onload = res; img.onerror = res; })
-        )
-      );
+      // Race the image loads against a timeout: a single slow/broken image must not
+      // stall the whole measurement pass (which would leave pagination on rough
+      // estimates and clip content out of the PDF).
+      await Promise.race([
+        Promise.all(
+          imgs.map((img) =>
+            img.complete ? Promise.resolve() : new Promise((res) => { img.onload = res; img.onerror = res; })
+          )
+        ),
+        new Promise((res) => setTimeout(res, 4000)),
+      ]);
       if (cancelled) return;
       const next = {};
       document.querySelectorAll("[data-measure-qid]").forEach((node) => {
