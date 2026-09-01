@@ -318,9 +318,12 @@ const estimateQuestionHeight = (
   // one there just pushed the break early and left a big blank gap.
   if (printTitle) {
     h += sectionHeaderHeight(question.type, subjectName);
+    // A section boundary uses ONE gap (space-y-6), not a section gap AND an
+    // inter-question gap — double-counting made section starts break early.
     if (hasQuestionsOnPage) h += SECTION_GAP;
+  } else if (hasQuestionsOnPage) {
+    h += COMPONENT_HEIGHTS.SPACING;
   }
-  if (hasQuestionsOnPage) h += COMPONENT_HEIGHTS.SPACING;
   return h;
 };
 

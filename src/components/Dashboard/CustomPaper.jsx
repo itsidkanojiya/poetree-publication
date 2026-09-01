@@ -1767,17 +1767,17 @@ const CustomPaper = () => {
 
         // Calculate question height including spacing
         let questionHeight = questionBodyHeight(question);
+        const hasQuestionsOnPage = currentPage.some(
+          (s) => s.selectedQuestions.length > 0
+        );
         if (printTitle) {
           // Real header height, not a flat constant: the title is 16px and long
           // Gujarati/Hindi titles wrap, and sections are separated by space-y-6.
           questionHeight += sectionHeaderHeight(question.type);
-          if (currentPage.length > 0) questionHeight += SECTION_GAP;
-        }
-        // Add spacing between questions (except for first question on page)
-        const hasQuestionsOnPage = currentPage.some(
-          (s) => s.selectedQuestions.length > 0
-        );
-        if (hasQuestionsOnPage) {
+          // Section boundary uses ONE gap (space-y-6), not a section gap AND an
+          // inter-question gap — double-counting made section starts break early.
+          if (hasQuestionsOnPage) questionHeight += SECTION_GAP;
+        } else if (hasQuestionsOnPage) {
           questionHeight += COMPONENT_HEIGHTS.SPACING;
         }
 
@@ -1899,16 +1899,22 @@ const CustomPaper = () => {
         /* not supported — measure anyway */
       }
       const imgs = Array.from(root.querySelectorAll("img"));
-      await Promise.all(
-        imgs.map((img) =>
-          img.complete
-            ? Promise.resolve()
-            : new Promise((res) => {
-                img.onload = res;
-                img.onerror = res;
-              })
-        )
-      );
+      // Race the image loads against a timeout: one slow/broken image must not stall
+      // the whole measurement (which would leave pagination on loose estimates and
+      // break pages early, wasting large blank space at the bottom of pages).
+      await Promise.race([
+        Promise.all(
+          imgs.map((img) =>
+            img.complete
+              ? Promise.resolve()
+              : new Promise((res) => {
+                  img.onload = res;
+                  img.onerror = res;
+                })
+          )
+        ),
+        new Promise((res) => setTimeout(res, 4000)),
+      ]);
       if (cancelled) return;
 
       const next = {};
