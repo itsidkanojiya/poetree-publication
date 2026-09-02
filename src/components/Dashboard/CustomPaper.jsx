@@ -61,7 +61,8 @@ const PAGE_DIMENSIONS = {
   WIDTH: 748,
   MARGIN: 24,
   SAFETY_BUFFER: 12, // Bottom-of-page drift slack only (the p-8 container already reserves the bottom margin). Heights are measured post-render, so this stays small.
-  CONTENT_PADDING: 64, // p-8 on the page container = 32px top + 32px bottom
+  CONTENT_PADDING: 64, // horizontal (px-8) + base vertical padding = 32px each
+  TOP_SPACE: 48, // extra top padding beyond the base 32px, for ~2cm breathing space at the top of every page
 };
 
 // Tuned to the ACTUAL rendered heights (14px question line, 13px options in a
@@ -1772,7 +1773,7 @@ const CustomPaper = () => {
   const renderPages = () => {
     let pages = [];
     let currentHeight =
-      PAGE_DIMENSIONS.HEIGHT - COMPONENT_HEIGHTS.HEADER - PAGE_DIMENSIONS.CONTENT_PADDING;
+      PAGE_DIMENSIONS.HEIGHT - COMPONENT_HEIGHTS.HEADER - PAGE_DIMENSIONS.CONTENT_PADDING - PAGE_DIMENSIONS.TOP_SPACE;
     let currentPage = [];
     const questionCounters = {};
     let isFirstPage = true;
@@ -1835,7 +1836,7 @@ const CustomPaper = () => {
             isFirstPage = false;
             const contSlice = { ...question, _pslice: "cont", marks: 0, questionNumber: num };
             currentPage.push({ type: question.type, selectedQuestions: [contSlice] });
-            currentHeight = PAGE_DIMENSIONS.HEIGHT - PAGE_DIMENSIONS.CONTENT_PADDING - getPassageSubsHeight(question);
+            currentHeight = PAGE_DIMENSIONS.HEIGHT - PAGE_DIMENSIONS.CONTENT_PADDING - PAGE_DIMENSIONS.TOP_SPACE - getPassageSubsHeight(question);
             if (currentHeight < 0) currentHeight = 0;
             reservedTitleTypes.add(question.type);
             return; // handled this passage as a split
@@ -1851,8 +1852,8 @@ const CustomPaper = () => {
           // Start new page
           isFirstPage = false;
           currentPage = [];
-          // Full page height for subsequent pages (no header), minus container padding
-          currentHeight = PAGE_DIMENSIONS.HEIGHT - PAGE_DIMENSIONS.CONTENT_PADDING;
+          // Full page height for subsequent pages (no header), minus container padding + top space
+          currentHeight = PAGE_DIMENSIONS.HEIGHT - PAGE_DIMENSIONS.CONTENT_PADDING - PAGE_DIMENSIONS.TOP_SPACE;
 
           // Recalculate question height for the fresh page. Reserve the header only
           // if the title hasn't printed yet (a continuation prints no title).
@@ -1865,7 +1866,7 @@ const CustomPaper = () => {
             selectedQuestions: [question],
           });
           currentHeight =
-            PAGE_DIMENSIONS.HEIGHT - PAGE_DIMENSIONS.CONTENT_PADDING - newQuestionHeight;
+            PAGE_DIMENSIONS.HEIGHT - PAGE_DIMENSIONS.CONTENT_PADDING - PAGE_DIMENSIONS.TOP_SPACE - newQuestionHeight;
 
           // Safety check: if question is too large for a single page, still add it
           if (currentHeight < 0) {
@@ -3682,7 +3683,7 @@ const CustomPaper = () => {
                 className="bg-white rounded-2xl shadow-2xl border-4 border-gray-200 overflow-hidden transform hover:scale-[1.01] transition-transform duration-300"
                 style={{ height: "1123px", width: "748px" }}
               >
-                <div className="p-8 h-full flex flex-col min-h-0">
+                <div className="pt-20 px-8 pb-8 h-full flex flex-col min-h-0">
                   {pageIndex === 0 && (
                     <div className="mb-6 pb-6 flex-shrink-0">
                       <HeaderCard

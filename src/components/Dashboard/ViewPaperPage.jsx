@@ -42,7 +42,7 @@ const getSectionTitle = (type, subjectName) =>
 const PAGE_HEIGHT = 1123;
 const PAGE_WIDTH = 748;
 const HEADER_HEIGHT = 230;
-const CONTENT_PADDING = 64; // p-8 on the page container = 32px top + 32px bottom
+const CONTENT_PADDING = 112; // page container padding: 80px top (~2cm breathing space) + 32px bottom
 const MARGIN = 24;
 const SAFETY_BUFFER = 12; // Bottom-of-page drift slack only (the p-8 container already reserves the bottom margin). Heights are measured post-render, so this stays small.
 
@@ -689,7 +689,7 @@ const ViewPaperPage = () => {
             className="bg-white rounded-2xl shadow-2xl border-4 border-gray-200 overflow-hidden"
             style={{ height: `${PAGE_HEIGHT}px`, width: `${PAGE_WIDTH}px` }}
           >
-            <div className="p-8 h-full flex flex-col min-h-0">
+            <div className="pt-20 px-8 pb-8 h-full flex flex-col min-h-0">
               {pageIndex === 0 && (
                 <div className="mb-6 pb-6 flex-shrink-0">
                   <HeaderCard

@@ -238,12 +238,12 @@ const HeaderCard = ({
                 <strong>Date:</strong>{" "}
                 {(() => {
                   const dateValue = header.date || new Date().toISOString().split("T")[0];
-                  // Convert yyyy-mm-dd to mm-dd-yyyy
+                  // Stored as yyyy-mm-dd -> show as dd/mm/yyyy
                   if (dateValue.includes("-")) {
                     const [year, month, day] = dateValue.split("-");
-                    return `${month}-${day}-${year}`;
+                    return `${day}/${month}/${year}`;
                   }
-                  // If already in mm-dd-yyyy or other format, return as is
+                  // Already in another format — show as is
                   return dateValue;
                 })()}
               </div>
