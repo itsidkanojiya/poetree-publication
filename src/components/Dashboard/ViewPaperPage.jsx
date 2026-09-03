@@ -44,7 +44,7 @@ const PAGE_WIDTH = 748;
 const HEADER_HEIGHT = 230;
 const CONTENT_PADDING = 112; // page container padding: 80px top (~2cm breathing space) + 32px bottom
 const MARGIN = 24;
-const SAFETY_BUFFER = 12; // Bottom-of-page drift slack only (the p-8 container already reserves the bottom margin). Heights are measured post-render, so this stays small.
+const SAFETY_BUFFER = 28; // Bottom-of-page slack. Enough margin that a borderline exact-fit (e.g. 3 tall passages that measure to almost the full page) breaks/splits instead of spilling a few px and clipping.
 
 // Tuned to the ACTUAL rendered heights so pages fill properly instead of
 // breaking early. Kept in sync with CustomPaper.jsx.

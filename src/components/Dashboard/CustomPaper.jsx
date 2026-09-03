@@ -60,7 +60,7 @@ const PAGE_DIMENSIONS = {
   HEIGHT: 1123,
   WIDTH: 748,
   MARGIN: 24,
-  SAFETY_BUFFER: 12, // Bottom-of-page drift slack only (the p-8 container already reserves the bottom margin). Heights are measured post-render, so this stays small.
+  SAFETY_BUFFER: 28, // Bottom-of-page slack. Enough margin that a borderline exact-fit (e.g. 3 tall passages that measure to almost the full page) breaks/splits instead of spilling a few px and clipping.
   CONTENT_PADDING: 64, // horizontal (px-8) + base vertical padding = 32px each
   TOP_SPACE: 48, // extra top padding beyond the base 32px, for ~2cm breathing space at the top of every page
 };
