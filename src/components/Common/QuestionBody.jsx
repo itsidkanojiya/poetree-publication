@@ -54,7 +54,8 @@ const sanitize = (html) =>
 /** Render one KaTeX span from its data-latex attribute. */
 const renderMath = (latex) => {
   try {
-    const html = katex.renderToString(String(latex), { throwOnError: false });
+    // × (cross) for multiplication instead of · (dot).
+    const html = katex.renderToString(String(latex).replace(/\\cdot/g, "\\times"), { throwOnError: false });
     return <span dangerouslySetInnerHTML={{ __html: html }} />;
   } catch {
     return <span>{`$${latex}$`}</span>;

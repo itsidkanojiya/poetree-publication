@@ -53,7 +53,7 @@ const MathNodeView = ({ node }) => {
   const latex = node.attrs.latex || "";
   const html = useMemo(() => {
     try {
-      return katex.renderToString(String(latex), { throwOnError: false });
+      return katex.renderToString(String(latex).replace(/\\cdot/g, "\\times"), { throwOnError: false });
     } catch {
       return `$${latex}$`;
     }

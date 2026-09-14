@@ -61,6 +61,9 @@ const MathFieldPopover = ({ onInsert, initialLatex = "", buttonClassName = "" })
     } catch {
       latex = el?.value || "";
     }
+    // Multiplication should read as × (cross), not · (dot) — clearer for students.
+    // MathLive emits \cdot for "*"; convert it so it renders as ×.
+    latex = latex.replace(/\\cdot/g, "\\times");
     if (latex && latex.trim()) onInsert(latex.trim());
     setOpen(false);
   };

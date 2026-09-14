@@ -24,7 +24,9 @@ const MathText = ({ text, className }) => {
     while ((m = MATH_REGEX.exec(str)) !== null) {
       if (m.index > lastIndex) out.push(str.slice(lastIndex, m.index));
       const isDisplay = m[1] != null;
-      const latex = (isDisplay ? m[1] : m[2]) || "";
+      // Show multiplication as × (cross), not · (dot) — clearer for students, and
+      // fixes questions already saved with \cdot.
+      const latex = ((isDisplay ? m[1] : m[2]) || "").replace(/\\cdot/g, "\\times");
       try {
         const html = katex.renderToString(latex, {
           throwOnError: false,

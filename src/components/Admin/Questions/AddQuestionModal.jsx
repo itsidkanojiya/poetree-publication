@@ -617,10 +617,13 @@ const AddQuestionModal = ({ questionType, question, onClose, onSuccess }) => {
     if (questionType === "passage") {
       if (!passageQuestions.length) newErrors.passageQuestions = "At least one sub-question is required";
       passageQuestions.forEach((pq, idx) => {
-        // In rich mode the prompt text lives in HTML; check for any non-tag content.
-        const richText = (pq.question_html || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
-        const hasPrompt = richMode ? richText.length > 0 : !!(pq.question && String(pq.question).trim());
-        if (!hasPrompt) newErrors[`passageQ${idx}`] = "Question text is required";
+        // In rich mode the prompt lives in HTML. It counts as filled if it has text
+        // OR an image/table (an image-only sub-question — e.g. a diagram — is valid).
+        const html = pq.question_html || "";
+        const richText = html.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
+        const hasBlock = /<(img|table)\b/i.test(html);
+        const hasPrompt = richMode ? (richText.length > 0 || hasBlock) : !!(pq.question && String(pq.question).trim());
+        if (!hasPrompt) newErrors[`passageQ${idx}`] = "Add question text or an image";
         if (pq.type === "mcq") {
           const opts = (pq.options || []).map((o) => (o && o.trim()) || "").filter(Boolean);
           if (opts.length === 0) newErrors[`passageMcq${idx}`] = "MCQ must have at least one option";
