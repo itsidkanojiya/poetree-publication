@@ -9,7 +9,7 @@ import HeaderCard from "../Cards/HeaderCard";
 import Loader from "../Common/loader/loader";
 import MathText from "../Common/MathText";
 import { QuestionText, QuestionImageBlock } from "../Common/QuestionImageBlock";
-import { QuestionBody, OptionBody, renderRichHtml } from "../Common/QuestionBody";
+import { QuestionBody, OptionBody, MatchItemBody, renderRichHtml } from "../Common/QuestionBody";
 import { seededMatchOrder } from "../../utils/matchShuffle";
 import { getSectionTitle as resolveSectionTitle } from "../../utils/sectionTitles";
 import { getType, getWordList, getWordAnswers, formatMarksLabel } from "../../utils/questionTypes";
@@ -56,7 +56,7 @@ const COMPONENT_HEIGHTS = {
   SPACING: 14,
   PASSAGE_LINE: 24,
   PASSAGE_SUB_Q: 30,
-  MATCH_ROW: 40,
+  MATCH_ROW: 52, // taller rows (line-height 2.4) so KaTeX fractions clear the borders
 };
 
 /** Gap between sections on a page (the content area uses space-y-6 = 24px). */
@@ -952,7 +952,7 @@ const ViewPaperPage = () => {
                                 if (leftItems.length > 0 || rightItems.length > 0) {
                                   return (
                                     <div className="ml-6 mt-3 overflow-x-auto">
-                                      <table className="w-full border-collapse" style={{ fontSize: "14px", border: "1px solid #374151" }}>
+                                      <table className="w-full border-collapse" style={{ fontSize: "14px", border: "1px solid #374151", lineHeight: "2.4" }}>
                                         <thead>
                                           <tr>
                                             <th className="px-3 py-2 text-left font-semibold text-gray-700" style={{ border: "1px solid #374151", backgroundColor: "#f3f4f6" }}>A</th>
@@ -963,11 +963,11 @@ const ViewPaperPage = () => {
                                         <tbody>
                                           {Array.from({ length: maxLength }).map((_, idx) => (
                                             <tr key={idx}>
-                                              <td className="px-3 py-2 text-gray-800" style={{ border: "1px solid #374151" }}>
-                                                {idx + 1}. {leftItems[idx] || ""}
+                                              <td className="px-3 py-2 text-gray-800" style={{ border: "1px solid #374151", verticalAlign: "middle" }}>
+                                                {idx + 1}. <MatchItemBody question={question} side="left" index={idx} value={leftItems[idx] || ""} />
                                               </td>
-                                              <td className="px-3 py-2 text-gray-800" style={{ border: "1px solid #374151" }}>
-                                                {String.fromCharCode(97 + idx)}. {rightItems[rightOrder[idx]] ?? ""}
+                                              <td className="px-3 py-2 text-gray-800" style={{ border: "1px solid #374151", verticalAlign: "middle" }}>
+                                                {String.fromCharCode(97 + idx)}. <MatchItemBody question={question} side="right" index={rightOrder[idx]} value={rightItems[rightOrder[idx]] ?? ""} />
                                               </td>
                                               <td className="px-3 py-2 text-gray-800 font-mono" style={{ border: "1px solid #374151" }}>
                                                 ({idx + 1}) (_____)

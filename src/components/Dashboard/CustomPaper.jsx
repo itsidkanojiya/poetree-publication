@@ -76,7 +76,7 @@ const COMPONENT_HEIGHTS = {
   SPACING: 14, // gap between consecutive questions
   PASSAGE_LINE: 24,
   PASSAGE_SUB_Q: 30,
-  MATCH_ROW: 40,
+  MATCH_ROW: 52, // taller rows (line-height 2.4) so KaTeX fractions clear the borders
 };
 
 /* These all derive from the shared registry (src/utils/questionTypes.js) so adding a
@@ -4068,6 +4068,10 @@ const CustomPaper = () => {
                                                 style={{
                                                   fontSize: "14px",
                                                   border: "1px solid #374151",
+                                                  // Tall line-height so KaTeX fractions get
+                                                  // vertical room and don't collide with the
+                                                  // row borders (looked like strikethrough).
+                                                  lineHeight: "2.4",
                                                 }}
                                               >
                                                 <thead>
