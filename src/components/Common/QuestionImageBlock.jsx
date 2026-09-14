@@ -156,16 +156,19 @@ export const QuestionImageBlock = ({ question, slot = "bottom", standalone = fal
     />
   );
 
-  // Floated (text wraps beside the image) — rendered in the top slot; cleared in
-  // the bottom slot so the float never escapes into the next question.
+  // Left/right placement: render as a BLOCK above the content, aligned to that
+  // side. It used to float so text wrapped beside it — but MCQ options (a grid)
+  // and passage sub-questions don't flow around a float, so the image overlapped
+  // them ("capping"). A block above the options never overlaps.
   if (placement === "left" || placement === "right") {
-    if (slot === "bottom") return <div style={{ clear: "both" }} />;
+    if (slot !== "top") return null;
     return (
       <div
+        className="ml-6"
         style={{
-          float: placement,
-          margin: placement === "left" ? "0 12px 8px 0" : "0 0 8px 12px",
-          maxWidth: "60%",
+          display: "flex",
+          justifyContent: placement === "right" ? "flex-end" : "flex-start",
+          margin: "0 0 8px 0",
         }}
       >
         {img}
