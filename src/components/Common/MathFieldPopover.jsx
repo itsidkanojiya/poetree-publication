@@ -36,21 +36,43 @@ const MathFieldPopover = ({ onInsert, initialLatex = "", buttonClassName = "" })
 
   // Seed value + focus once the editor is mounted
   useEffect(() => {
-    if (open && ready && mfRef.current) {
+    if (!(open && ready && mfRef.current)) return;
+    const mf = mfRef.current;
+    try {
+      mf.value = initialLatex || "";
+    } catch {
+      /* noop */
+    }
+    // MathLive types multiplication as \cdot (·). Rewrite it to \times (×) live so
+    // the editor shows × as you build the formula — matching the printed output.
+    const onInput = () => {
       try {
-        mfRef.current.value = initialLatex || "";
+        const v = mf.getValue ? mf.getValue("latex") : mf.value;
+        if (v && v.indexOf("\\cdot") !== -1) {
+          const next = v.replace(/\\cdot/g, "\\times");
+          if (mf.setValue) mf.setValue(next, { silenceNotifications: true });
+          else mf.value = next;
+        }
       } catch {
         /* noop */
       }
-      const t = setTimeout(() => {
-        try {
-          mfRef.current?.focus?.();
-        } catch {
-          /* noop */
-        }
-      }, 60);
-      return () => clearTimeout(t);
-    }
+    };
+    mf.addEventListener("input", onInput);
+    const t = setTimeout(() => {
+      try {
+        mf.focus?.();
+      } catch {
+        /* noop */
+      }
+    }, 60);
+    return () => {
+      clearTimeout(t);
+      try {
+        mf.removeEventListener("input", onInput);
+      } catch {
+        /* noop */
+      }
+    };
   }, [open, ready, initialLatex]);
 
   const handleInsert = () => {
