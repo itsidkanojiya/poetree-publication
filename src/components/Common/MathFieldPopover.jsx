@@ -75,6 +75,20 @@ const MathFieldPopover = ({ onInsert, initialLatex = "", buttonClassName = "" })
     };
   }, [open, ready, initialLatex]);
 
+  // Insert a symbol at the cursor. The keyboard's ÷ key builds a FRACTION, so this
+  // gives a reliable way to get the actual ÷ (and × ) division/multiplication signs.
+  const insertSymbol = (latex) => {
+    const mf = mfRef.current;
+    if (!mf) return;
+    try {
+      if (typeof mf.insert === "function") mf.insert(latex, { focus: true });
+      else if (typeof mf.executeCommand === "function") mf.executeCommand(["insert", latex]);
+      mf.focus?.();
+    } catch {
+      /* noop */
+    }
+  };
+
   const handleInsert = () => {
     const el = mfRef.current;
     let latex = "";
@@ -137,6 +151,27 @@ const MathFieldPopover = ({ onInsert, initialLatex = "", buttonClassName = "" })
             ) : (
               <div className="h-16 flex items-center justify-center text-gray-500 text-sm border-2 border-gray-200 rounded-lg">
                 Loading editor…
+              </div>
+            )}
+            {ready && (
+              <div className="flex items-center gap-2 mt-3">
+                <span className="text-xs text-gray-500">Insert sign:</span>
+                <button
+                  type="button"
+                  onClick={() => insertSymbol("\\div")}
+                  title="Division sign (÷) — the keyboard's ÷ key makes a fraction instead"
+                  className="w-9 h-9 rounded-lg border-2 border-gray-200 text-lg text-gray-700 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600 transition"
+                >
+                  ÷
+                </button>
+                <button
+                  type="button"
+                  onClick={() => insertSymbol("\\times")}
+                  title="Multiplication sign (×)"
+                  className="w-9 h-9 rounded-lg border-2 border-gray-200 text-lg text-gray-700 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600 transition"
+                >
+                  ×
+                </button>
               </div>
             )}
             <div className="flex gap-3 mt-4">
