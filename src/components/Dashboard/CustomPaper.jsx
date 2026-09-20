@@ -1483,6 +1483,17 @@ const CustomPaper = () => {
     
     // Generate and download PDF (sequential so page order is correct)
     try {
+      // Never export the rough-estimate layout: wait until the measurement pass has
+      // re-paginated with real heights (it always completes — the image wait is
+      // capped at 4s — so this waits at most a few seconds).
+      if (!measureReadyRef.current) {
+        const start = Date.now();
+        while (!measureReadyRef.current && Date.now() - start < 8000) {
+          await new Promise((r) => setTimeout(r, 100));
+        }
+        // Let the re-paginated pages commit to the DOM before screenshotting.
+        await new Promise((r) => setTimeout(r, 150));
+      }
       // Ensure KaTeX (and other) web fonts are fully loaded before screenshotting,
       // otherwise the first export can capture fallback glyphs for math.
       if (document.fonts && document.fonts.ready) {
@@ -1935,6 +1946,10 @@ const CustomPaper = () => {
   // ---------------------------------------------------------------------------
   const measureRef = useRef(null);
   const [measuredHeights, setMeasuredHeights] = useState({});
+  // True once the measurement pass has run for the CURRENT questions, so the
+  // download can wait for the accurate measured layout instead of exporting the
+  // rough-estimate one (which under-counts heights and clips content).
+  const measureReadyRef = useRef(false);
 
   const allSelectedQuestions = useMemo(
     () => questionSections.flatMap((s) => s.selectedQuestions || []),
@@ -1942,8 +1957,10 @@ const CustomPaper = () => {
   );
 
   useEffect(() => {
+    measureReadyRef.current = false; // questions changed — measured layout is stale
     const root = measureRef.current;
     if (!root || allSelectedQuestions.length === 0) {
+      measureReadyRef.current = true; // nothing to measure
       setMeasuredHeights((prev) => (Object.keys(prev).length ? {} : prev));
       return;
     }
@@ -1989,6 +2006,7 @@ const CustomPaper = () => {
           keys.every((k) => prev[k] === next[k]);
         return same ? prev : next; // guard against a re-render loop
       });
+      measureReadyRef.current = true; // measured layout now reflects current questions
     };
 
     measure();

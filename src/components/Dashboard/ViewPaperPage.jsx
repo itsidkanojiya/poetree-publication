@@ -469,6 +469,9 @@ const ViewPaperPage = () => {
     : "paper";
   const autoExport = !!location.state?.autoExport;
   const autoExportedRef = React.useRef(false);
+  // Mirror of measurePassDone readable inside runDownload's closure (so a manual
+  // download always waits for the accurate measured layout before exporting).
+  const measurePassDoneRef = React.useRef(false);
   // Real per-question heights (question_id -> px), measured off the rendered DOM so
   // pagination packs pages tightly without clipping. Estimate is only a fallback.
   const [measuredHeights, setMeasuredHeights] = useState({});
@@ -571,6 +574,15 @@ const ViewPaperPage = () => {
   };
 
   const runDownload = async () => {
+    // Never export the rough estimate layout: wait until the measurement pass has
+    // re-paginated with real heights (it always completes — the image wait is
+    // capped at 4s — so this waits at most a few seconds).
+    if (!measurePassDoneRef.current) {
+      const start = Date.now();
+      while (!measurePassDoneRef.current && Date.now() - start < 8000) {
+        await new Promise((r) => setTimeout(r, 100));
+      }
+    }
     if (document.fonts && document.fonts.ready) {
       try { await document.fonts.ready; } catch { /* noop */ }
     }
@@ -611,6 +623,7 @@ const ViewPaperPage = () => {
         const same = keys.length === Object.keys(prev).length && keys.every((k) => prev[k] === next[k]);
         return same ? prev : next;
       });
+      measurePassDoneRef.current = true;
       setMeasurePassDone(true);
     };
     run();
