@@ -146,10 +146,14 @@
     width: 100%;
   }
 
-  /* A4 with a comfortable top/side margin (~2cm) so nothing sits on the edge. */
+  /* margin:0 => the browser draws NO header/footer (date, title, URL, page number),
+     regardless of the "Headers and footers" checkbox. We recreate the paper's white
+     margins with padding on the content below. Left/right padding repeats on every
+     page; top/bottom padding lands on the first/last page (the browser trims margins
+     at forced page breaks), so a generous value keeps inner pages from looking tight. */
   @page {
     size: A4;
-    margin: 18mm 14mm 14mm 14mm;
+    margin: 0;
   }
 
   html, body {
@@ -162,9 +166,15 @@
 
   .printable-paper {
     width: 100%;
+    box-sizing: border-box;
+    padding: 16mm 14mm;
     color: #111827;
     font-family: inherit;
   }
+
+  /* Give section starts breathing room so a heading landing at a page top isn't
+     flush against the edge (margins at a page break are trimmed, padding is not). */
+  .printable-paper > section { padding-top: 2mm; }
 
   /* Keep atomic units whole; let the browser break between them. */
   .print-avoid { break-inside: avoid; page-break-inside: avoid; }
