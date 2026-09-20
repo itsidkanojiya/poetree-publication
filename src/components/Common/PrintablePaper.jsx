@@ -1,7 +1,7 @@
 import HeaderCard from "../Cards/HeaderCard";
 import MathText from "./MathText";
-import { QuestionText, QuestionImageBlock } from "./QuestionImageBlock";
-import { OptionBody, MatchItemBody, renderRichHtml } from "./QuestionBody";
+import { QuestionImageBlock } from "./QuestionImageBlock";
+import { QuestionBody, OptionBody, MatchItemBody, renderRichHtml } from "./QuestionBody";
 import { seededMatchOrder } from "../../utils/matchShuffle";
 import { getType, getWordList, getWordAnswers, formatMarksLabel } from "../../utils/questionTypes";
 import { getSectionTitle as resolveSectionTitle } from "../../utils/sectionTitles";
@@ -183,7 +183,7 @@ const PrintablePaper = ({
                         <QuestionImageBlock question={question} slot="top" />
                         <p style={{ fontSize: "14px", lineHeight: "1.7", color: "#374151" }}>
                           <span style={{ fontWeight: "bold" }}>({qNum}) </span>
-                          <QuestionText question={question} />
+                          <QuestionBody question={question} inline="lead" />
                         </p>
                         <QuestionImageBlock question={question} slot="bottom" />
                       </div>
@@ -247,7 +247,7 @@ const PrintablePaper = ({
                     <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "16px", lineHeight: "1.7" }}>
                       <p style={{ flex: 1, minWidth: 0, fontSize: "14px", color: "#374151" }}>
                         <span style={{ fontSize: "14px", fontWeight: "bold" }}>({qNum}) </span>
-                        <QuestionText question={question} />
+                        <QuestionBody question={question} inline="flow" />
                       </p>
                       {isMcq && <span style={boxStyle(28, 22)} />}
                       {isTf && <span style={boxStyle(52, 24)} />}
