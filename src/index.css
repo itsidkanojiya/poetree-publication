@@ -167,7 +167,8 @@
   .printable-paper {
     width: 100%;
     box-sizing: border-box;
-    padding: 16mm 14mm;
+    /* top sides bottom — small top gap, comfortable bottom margin at the paper's end */
+    padding: 8mm 14mm 20mm 14mm;
     color: #111827;
     font-family: inherit;
   }
