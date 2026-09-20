@@ -122,17 +122,16 @@ const getPassageLeadHeight = (question) => {
   h += estimateImageBlockHeight(question);
   return h;
 };
-const getPassageSubsHeight = (question) => {
-  let h = 0;
-  toOptionsArray(question.options).forEach((pq) => {
-    h += COMPONENT_HEIGHTS.PASSAGE_SUB_Q;
-    if (pq && pq.type === "mcq" && Array.isArray(pq.options)) {
-      const opts = pq.options.filter((o) => o != null && String(o).trim() !== "");
-      h += opts.length * COMPONENT_HEIGHTS.OPTION;
-    }
-  });
+const passageSubHeight = (pq) => {
+  let h = COMPONENT_HEIGHTS.PASSAGE_SUB_Q;
+  if (pq && pq.type === "mcq" && Array.isArray(pq.options)) {
+    const opts = pq.options.filter((o) => o != null && String(o).trim() !== "");
+    h += opts.length * COMPONENT_HEIGHTS.OPTION;
+  }
   return h;
 };
+const getPassageSubsHeight = (question) =>
+  toOptionsArray(question.options).reduce((h, pq) => h + passageSubHeight(pq), 0);
 
 const getMatchQuestionHeight = (question) => {
   let h = COMPONENT_HEIGHTS.QUESTION;
@@ -389,18 +388,30 @@ function buildPages(sections, exportMode = "paper", measuredHeights = null, subj
           ? sectionHeaderHeight(question.type, subjectName) + SECTION_GAP
           : COMPONENT_HEIGHTS.SPACING;
         const leadTotal = getPassageLeadHeight(question) + overhead;
-        if (subs.length >= 1 && leadTotal <= availableHeight) {
-          const leadSlice = { ...question, _pslice: "lead" };
+        // How many sub-questions fit ALONGSIDE the lead in the remaining space?
+        let fit = 0;
+        let used = leadTotal;
+        for (let i = 0; i < subs.length; i++) {
+          const sh = passageSubHeight(subs[i]);
+          if (used + sh <= availableHeight) { used += sh; fit++; } else break;
+        }
+        // Split only if the lead + at least one sub-question fit here, with leftovers
+        // to continue. Otherwise fall through so the WHOLE passage moves to the next
+        // page — the image is never stranded at the bottom without any questions.
+        if (leadTotal <= availableHeight && fit >= 1 && fit < subs.length) {
+          const leadSlice = { ...question, _pslice: "lead", _subEnd: fit };
           const existing = currentPage.find((s) => normalizeQuestionType(s.type) === type);
           if (existing) existing.selectedQuestions.push(leadSlice);
           else currentPage.push({ type: question.type, selectedQuestions: [leadSlice] });
           pages.push(currentPage);
           currentPage = [];
-          // Continuation page: sub-questions only. marks:0 so the passage's marks
-          // aren't counted twice in the section total.
-          const contSlice = { ...question, _pslice: "cont", marks: 0 };
+          // Continuation page: the leftover sub-questions only. marks:0 so the
+          // passage's marks aren't counted twice in the section total.
+          const contSlice = { ...question, _pslice: "cont", marks: 0, _subStart: fit };
           currentPage.push({ type: question.type, selectedQuestions: [contSlice] });
-          currentHeight = PAGE_HEIGHT - CONTENT_PADDING - getPassageSubsHeight(question);
+          let contH = 0;
+          for (let i = fit; i < subs.length; i++) contH += passageSubHeight(subs[i]);
+          currentHeight = PAGE_HEIGHT - CONTENT_PADDING - contH;
           if (currentHeight < 0) currentHeight = 0;
           printedTypes.add(type);
           return; // handled this question
@@ -895,15 +906,21 @@ const ViewPaperPage = () => {
                             )}
 
                             {/* Passage sub-questions (short answer or MCQ) */}
-                            {showSubs && question.type === "passage" && question.options && (() => {
+                            {question.type === "passage" && question.options && (() => {
                               try {
-                                const pqs = typeof question.options === "string"
+                                const allPqs = typeof question.options === "string"
                                   ? JSON.parse(question.options)
                                   : question.options;
-                                if (Array.isArray(pqs) && pqs.length > 0) {
+                                // On a split passage, the lead slice shows sub-questions
+                                // [0.._subEnd] and the continuation shows [_subStart..end].
+                                const _start = question._subStart || 0;
+                                const _end = question._subEnd != null ? question._subEnd : (Array.isArray(allPqs) ? allPqs.length : 0);
+                                const pqs = Array.isArray(allPqs) ? allPqs.slice(_start, _end) : [];
+                                if (pqs.length > 0) {
                                   return (
                                     <div className="ml-6 mt-3 space-y-3" style={{ fontSize: "14px", color: "#374151" }}>
-                                      {pqs.map((pq, pqIdx) => {
+                                      {pqs.map((pq, _i) => {
+                                        const pqIdx = _start + _i;
                                         const isMcq = pq && pq.type === "mcq";
                                         const isBlank = pq && pq.type === "blank";
                                         const isTf = pq && (pq.type === "truefalse" || pq.type === "true&false");

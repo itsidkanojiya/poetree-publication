@@ -210,22 +210,24 @@ const getPassageLeadHeight = (question) => {
   h += estimateImageBlockHeight(question);
   return h;
 };
-const getPassageSubsHeight = (question) => {
-  let h = 0;
-  try {
-    const arr = typeof question.options === "string" ? JSON.parse(question.options) : question.options;
-    if (Array.isArray(arr)) {
-      arr.forEach((pq) => {
-        h += COMPONENT_HEIGHTS.PASSAGE_SUB_Q;
-        if (pq && pq.type === "mcq" && Array.isArray(pq.options)) {
-          const opts = pq.options.filter((o) => o != null && String(o).trim() !== "");
-          h += Math.max(0, opts.length * COMPONENT_HEIGHTS.OPTION);
-        }
-      });
-    }
-  } catch (_) {}
+const passageSubHeight = (pq) => {
+  let h = COMPONENT_HEIGHTS.PASSAGE_SUB_Q;
+  if (pq && pq.type === "mcq" && Array.isArray(pq.options)) {
+    const opts = pq.options.filter((o) => o != null && String(o).trim() !== "");
+    h += Math.max(0, opts.length * COMPONENT_HEIGHTS.OPTION);
+  }
   return h;
 };
+const passageSubsArray = (question) => {
+  try {
+    const arr = typeof question.options === "string" ? JSON.parse(question.options) : question.options;
+    return Array.isArray(arr) ? arr : [];
+  } catch (_) {
+    return [];
+  }
+};
+const getPassageSubsHeight = (question) =>
+  passageSubsArray(question).reduce((h, pq) => h + passageSubHeight(pq), 0);
 
 const getPassageQuestionHeight = (question) => {
   let h = COMPONENT_HEIGHTS.QUESTION;
@@ -1828,26 +1830,37 @@ const CustomPaper = () => {
         // and continue the sub-questions on the next, instead of dropping the whole
         // block and leaving a big blank.
         if (question.type === "passage" && questionHeight > availableHeight && hasQuestionsOnPage) {
-          let subs = [];
-          try { subs = typeof question.options === "string" ? JSON.parse(question.options) : question.options; } catch (_) { subs = []; }
+          const subs = passageSubsArray(question);
           const overhead = printTitle
             ? sectionHeaderHeight(question.type) + (currentPage.length > 0 ? SECTION_GAP : 0)
             : COMPONENT_HEIGHTS.SPACING;
           const leadTotal = getPassageLeadHeight(question) + overhead;
-          if (Array.isArray(subs) && subs.length >= 1 && leadTotal <= availableHeight) {
+          // How many sub-questions fit ALONGSIDE the lead in the remaining space?
+          let fit = 0;
+          let used = leadTotal;
+          for (let i = 0; i < subs.length; i++) {
+            const sh = passageSubHeight(subs[i]);
+            if (used + sh <= availableHeight) { used += sh; fit++; } else break;
+          }
+          // Split only if the lead + at least one sub-question fit here, with leftovers.
+          // Otherwise fall through so the WHOLE passage moves to the next page — the
+          // image is never stranded at the bottom without any questions.
+          if (leadTotal <= availableHeight && fit >= 1 && fit < subs.length) {
             const typeKey = normalizeQuestionType(question.type);
             if (!(typeKey in questionCounters)) questionCounters[typeKey] = 1;
             const num = questionCounters[typeKey]++;
-            const leadSlice = { ...question, _pslice: "lead", questionNumber: num };
+            const leadSlice = { ...question, _pslice: "lead", _subEnd: fit, questionNumber: num };
             const existing = currentPage.find((s) => s.type === question.type);
             if (existing) existing.selectedQuestions.push(leadSlice);
             else currentPage.push({ type: question.type, selectedQuestions: [leadSlice] });
             pages.push([...currentPage]);
             currentPage = [];
             isFirstPage = false;
-            const contSlice = { ...question, _pslice: "cont", marks: 0, questionNumber: num };
+            const contSlice = { ...question, _pslice: "cont", _subStart: fit, marks: 0, questionNumber: num };
             currentPage.push({ type: question.type, selectedQuestions: [contSlice] });
-            currentHeight = PAGE_DIMENSIONS.HEIGHT - PAGE_DIMENSIONS.CONTENT_PADDING - PAGE_DIMENSIONS.TOP_SPACE - getPassageSubsHeight(question);
+            let contH = 0;
+            for (let i = fit; i < subs.length; i++) contH += passageSubHeight(subs[i]);
+            currentHeight = PAGE_DIMENSIONS.HEIGHT - PAGE_DIMENSIONS.CONTENT_PADDING - PAGE_DIMENSIONS.TOP_SPACE - contH;
             if (currentHeight < 0) currentHeight = 0;
             reservedTitleTypes.add(question.type);
             return; // handled this passage as a split
@@ -3816,9 +3829,7 @@ const CustomPaper = () => {
                                 // Passage split across pages: "lead" = intro + image
                                 // (no sub-questions); "cont" = sub-questions only.
                                 const isCont = question._pslice === "cont";
-                                const isLead = question._pslice === "lead";
-                                const showLead = !isCont;
-                                const showSubs = !isLead;
+                                const showLead = !isCont; // lead/whole show intro+image+number; cont shows only its sub-questions
                                 return (
                                 <div key={qIndex} className="mb-4">
                                   {showLead && <QuestionImageBlock question={question} slot="top" />}
@@ -3909,15 +3920,18 @@ const CustomPaper = () => {
                                     )}
 
                                   {/* Passage: show sub-questions (short or MCQ) below the passage text */}
-                                  {showSubs && question.type === "passage" &&
+                                  {question.type === "passage" &&
                                     question.options && (() => {
                                       try {
-                                        const passageQuestions =
+                                        const allPqs =
                                           typeof question.options === "string"
                                             ? JSON.parse(question.options)
                                             : question.options;
+                                        // Split passage: lead shows [0.._subEnd], cont shows [_subStart..end].
+                                        const _start = question._subStart || 0;
+                                        const _end = question._subEnd != null ? question._subEnd : (Array.isArray(allPqs) ? allPqs.length : 0);
+                                        const passageQuestions = Array.isArray(allPqs) ? allPqs.slice(_start, _end) : [];
                                         if (
-                                          Array.isArray(passageQuestions) &&
                                           passageQuestions.length > 0
                                         ) {
                                           return (
@@ -3930,7 +3944,8 @@ const CustomPaper = () => {
                                               }}
                                             >
                                               {passageQuestions.map(
-                                                (pq, pqIdx) => {
+                                                (pq, _i) => {
+                                                  const pqIdx = _start + _i;
                                                   const isMcq = pq && pq.type === "mcq";
                                                   const isBlank = pq && pq.type === "blank";
                                                   const isTf = pq && (pq.type === "truefalse" || pq.type === "true&false");
