@@ -144,14 +144,13 @@
     width: 100%;
   }
 
-  /* margin:0 => the browser draws NO header/footer (date, title, URL, page number),
-     regardless of the "Headers and footers" checkbox. We recreate the paper's white
-     margins with padding on the content below. Left/right padding repeats on every
-     page; top/bottom padding lands on the first/last page (the browser trims margins
-     at forced page breaks), so a generous value keeps inner pages from looking tight. */
+  /* Real page margins: TRUE uniform 15mm top/bottom + 14mm sides on EVERY page.
+     NOTE: because the margin area is non-zero, Chrome will draw its header/footer
+     (date, title, URL, page number) there UNLESS the user unchecks
+     "Headers and footers" once in the print dialog (Chrome remembers the setting). */
   @page {
     size: A4;
-    margin: 0;
+    margin: 15mm 14mm;
   }
 
   html, body {
@@ -165,15 +164,10 @@
   .printable-paper {
     width: 100%;
     box-sizing: border-box;
-    /* top sides bottom — small top gap, comfortable bottom margin at the paper's end */
-    padding: 8mm 14mm 20mm 14mm;
+    padding: 0; /* @page provides the margins now */
     color: #111827;
     font-family: inherit;
   }
-
-  /* Give section starts breathing room so a heading landing at a page top isn't
-     flush against the edge (margins at a page break are trimmed, padding is not). */
-  .printable-paper > section { padding-top: 2mm; }
 
   /* Keep atomic units whole; let the browser break between them. */
   .print-avoid { break-inside: avoid; page-break-inside: avoid; }
