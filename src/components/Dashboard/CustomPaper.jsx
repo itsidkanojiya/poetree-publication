@@ -21,6 +21,7 @@ import { savePaper } from "../../utils/savePaper";
 import { useAuth } from "../../context/AuthContext";
 import usePdfContent from "../../hooks/usePdfContent";
 import HeaderCard from "../Cards/HeaderCard";
+import PrintablePaper from "../Common/PrintablePaper";
 import apiClient from "../../services/apiClient";
 import { getPaperById, updatePaper } from "../../services/paperService";
 import {
@@ -1420,69 +1421,82 @@ const CustomPaper = () => {
     }
   };
 
-  const downloadPDF = async () => {
-    // Check if paper needs to be saved first
-    if (!isSaved && !isEditMode) {
-      // Save paper first before downloading
-      const logoFile = document.getElementById("logo-upload");
-      
-      // Check if there are any questions selected
-      const totalQuestions = questionSections.reduce(
-        (total, section) => total + section.selectedQuestions.length,
-        0
-      );
-      
-      if (totalQuestions === 0) {
-        setToast({
-          message: "Please select at least one question before downloading",
-          type: "warning",
-        });
-        return;
-      }
-      
-      try {
-        setIsSaving(true);
-        // Get all selected question IDs and chapter IDs from selected questions
-        const allQuestionIds = [];
-        questionSections.forEach((section) => {
-          section.selectedQuestions.forEach((question) => {
-            allQuestionIds.push(question.question_id);
-          });
-        });
-        const chapterIds = getChapterIdsFromSections(questionSections);
-        
-        const headerToSave = { ...(paperHeader || header), chapterId: paperChapterId || (paperHeader || header)?.chapterId || (paperHeader || header)?.chapter_id || "" };
-        if (headerToSave.chapterId === "") delete headerToSave.chapterId;
-        await savePaper(
-          user, 
-          allQuestionIds, 
-          logoFile, 
-          "custom", 
-          headerToSave,
-          effectiveMarksPerType,
-          questionSections,
-          headerToSave?.documentTitle || null,
-          chapterIds
-        );
-        setIsSaved(true);
-        setToast({
-          message: "Paper saved successfully!",
-          type: "success",
-        });
-        
-        // Don't clear questions yet — PDF generation below needs them
-      } catch (error) {
-        setIsSaving(false);
-        setToast({
-          message: "Failed to save paper. " + (error.response?.data?.message || error.message),
-          type: "error",
-        });
-        return; // Don't download if save fails
-      } finally {
-        setIsSaving(false);
-      }
+  // Save the paper before an export if it isn't saved yet. Returns true when the
+  // export may proceed, false when it should abort (no questions / save failed).
+  // Shared by the print export and the legacy image download.
+  const ensurePaperSavedBeforeExport = async () => {
+    if (isSaved || isEditMode) return true;
+    const logoFile = document.getElementById("logo-upload");
+
+    const totalQuestions = questionSections.reduce(
+      (total, section) => total + section.selectedQuestions.length,
+      0
+    );
+    if (totalQuestions === 0) {
+      setToast({
+        message: "Please select at least one question before downloading",
+        type: "warning",
+      });
+      return false;
     }
-    
+
+    try {
+      setIsSaving(true);
+      const allQuestionIds = [];
+      questionSections.forEach((section) => {
+        section.selectedQuestions.forEach((question) => {
+          allQuestionIds.push(question.question_id);
+        });
+      });
+      const chapterIds = getChapterIdsFromSections(questionSections);
+
+      const headerToSave = { ...(paperHeader || header), chapterId: paperChapterId || (paperHeader || header)?.chapterId || (paperHeader || header)?.chapter_id || "" };
+      if (headerToSave.chapterId === "") delete headerToSave.chapterId;
+      await savePaper(
+        user,
+        allQuestionIds,
+        logoFile,
+        "custom",
+        headerToSave,
+        effectiveMarksPerType,
+        questionSections,
+        headerToSave?.documentTitle || null,
+        chapterIds
+      );
+      setIsSaved(true);
+      setToast({ message: "Paper saved successfully!", type: "success" });
+      return true;
+    } catch (error) {
+      setToast({
+        message: "Failed to save paper. " + (error.response?.data?.message || error.message),
+        type: "error",
+      });
+      return false;
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // PERMANENT anti-clipping export: save (if needed) then let the BROWSER paginate
+  // the normal-flow <PrintablePaper> via window.print(). No fixed-height boxes = no
+  // clipping. The teacher chooses "Save as PDF" as the print destination.
+  const printSaveAsPdf = async () => {
+    if (!(await ensurePaperSavedBeforeExport())) return;
+    const h = paperHeader || header;
+    const base = String(h?.documentTitle || h?.paper_title || "paper").replace(/[\\/:*?"<>|]/g, "_");
+    const prevTitle = document.title;
+    document.title = base;
+    const restore = () => {
+      document.title = prevTitle;
+      window.removeEventListener("afterprint", restore);
+    };
+    window.addEventListener("afterprint", restore);
+    setTimeout(() => window.print(), 50);
+  };
+
+  const downloadPDF = async () => {
+    if (!(await ensurePaperSavedBeforeExport())) return;
+
     // Generate and download PDF (sequential so page order is correct)
     try {
       // Never export the rough-estimate layout: wait until the measurement pass has
@@ -2995,12 +3009,20 @@ const CustomPaper = () => {
               </span>
             </div>
             <button
-              onClick={downloadPDF}
+              onClick={printSaveAsPdf}
               disabled={isSaving}
               className="group flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-xl font-semibold hover:from-emerald-600 hover:to-teal-700 transition-all duration-200 shadow-lg shadow-emerald-500/30 hover:shadow-xl hover:shadow-emerald-500/40 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <FileDown size={18} className="group-hover:animate-bounce" />
               <span>{isSaving ? "Saving..." : "Download PDF"}</span>
+            </button>
+            <button
+              onClick={downloadPDF}
+              disabled={isSaving}
+              title="Legacy image-based export (may clip very tall items)"
+              className="text-xs text-gray-400 underline hover:text-gray-600 disabled:opacity-50"
+            >
+              old export
             </button>
             <button
               onClick={handleSavePaper}
@@ -3704,6 +3726,22 @@ const CustomPaper = () => {
                 <QuestionImageBlock question={q} slot="bottom" />
               </div>
             ))}
+          </div>
+
+          {/* Hidden on screen; the ONLY thing window.print() shows. The browser
+              paginates this normal-flow render, so nothing is ever clipped. */}
+          <div className="print-root" aria-hidden="true">
+            <PrintablePaper
+              header={{
+                ...(paperHeader || header),
+                totalMarks: getTotalMarks(),
+                marks: getTotalMarks(),
+              }}
+              sections={questionSections}
+              subjectName={paperSubjectName}
+              exportMode="paper"
+              sectionMarks={(type) => sectionMarksFor(normalizeQuestionType(type))}
+            />
           </div>
 
           <div ref={pagesRef} className="space-y-8 flex flex-col items-center">

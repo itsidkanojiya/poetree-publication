@@ -6,6 +6,7 @@ import downloadPDF from "../../utils/downloadPdf";
 import { getPaperById } from "../../services/paperService";
 import { getQuestionsByIds } from "../../services/adminService";
 import HeaderCard from "../Cards/HeaderCard";
+import PrintablePaper from "../Common/PrintablePaper";
 import Loader from "../Common/loader/loader";
 import MathText from "../Common/MathText";
 import { QuestionText, QuestionImageBlock } from "../Common/QuestionImageBlock";
@@ -584,6 +585,21 @@ const ViewPaperPage = () => {
     return `${base}${meta.suffix}.pdf`;
   };
 
+  // PERMANENT anti-clipping export: render the paper in normal flow (<PrintablePaper>,
+  // in the hidden .print-root) and let the BROWSER paginate via window.print().
+  // Content can never be clipped because there are no fixed-height boxes. The user
+  // picks "Save as PDF" as the destination; the filename defaults to document.title.
+  const printSaveAsPdf = () => {
+    const prevTitle = document.title;
+    document.title = buildFileName().replace(/\.pdf$/i, "");
+    const restore = () => {
+      document.title = prevTitle;
+      window.removeEventListener("afterprint", restore);
+    };
+    window.addEventListener("afterprint", restore);
+    setTimeout(() => window.print(), 50);
+  };
+
   const runDownload = async () => {
     // Never export the rough estimate layout: wait until the measurement pass has
     // re-paginated with real heights (it always completes — the image wait is
@@ -1041,12 +1057,46 @@ const ViewPaperPage = () => {
         ))}
       </div>
 
-      <div className="mt-8">
+      <div className="mt-8 flex flex-col items-center gap-3">
         <Button
           text={exportMode === "paper" ? "Download PDF" : `Download ${EXPORT_MODE_META[exportMode].label}`}
           icon={FileDown}
-          onClick={runDownload}
+          onClick={printSaveAsPdf}
           color="bg-blue-600"
+        />
+        <button
+          type="button"
+          onClick={runDownload}
+          className="text-xs text-gray-500 underline hover:text-gray-700"
+        >
+          Old image-based download (fallback)
+        </button>
+      </div>
+
+      {/* Hidden on screen; the ONLY thing window.print() shows. Browser paginates
+          this normal-flow render, so nothing is ever clipped. */}
+      <div className="print-root" aria-hidden="true">
+        <PrintablePaper
+          header={getHeader()}
+          sections={sections}
+          subjectName={paper?.subject}
+          exportMode={exportMode}
+          sectionMarks={(type) => {
+            const t = normalizeQuestionType(type);
+            return sections
+              .filter((s) => normalizeQuestionType(s.type) === t)
+              .reduce(
+                (sum, s) =>
+                  sum +
+                  (s.selectedQuestions || []).reduce((acc, q) => {
+                    const own = Number(q?.marks);
+                    return acc + (Number.isFinite(own) && own > 0 ? own : Number(marksPerType[t]) || 0);
+                  }, 0),
+                0
+              );
+          }}
+          renderAnswer={exportMode !== "paper" ? renderAnswerContent : undefined}
+          renderSolution={exportMode === "solutions" ? renderSolutionContent : undefined}
         />
       </div>
     </div>

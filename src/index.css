@@ -119,3 +119,60 @@
 }
 .ProseMirror table { position: relative; }
 .ProseMirror td, .ProseMirror th { position: relative; }
+
+/* ============================================================================
+   BROWSER-NATIVE PRINT PAGINATION  (permanent anti-clipping export)
+   ---------------------------------------------------------------------------
+   The on-screen PDF preview uses fixed 748x1123 boxes + JS height estimates and
+   can clip content that is taller than predicted. The DOWNLOAD path instead
+   renders <PrintablePaper> in normal document flow and calls window.print():
+   the browser paginates, so a block can never be cut mid-content. Every atomic
+   unit carries `.print-avoid` (break-inside: avoid) and the browser breaks
+   BETWEEN units. Choosing "Save as PDF" in the print dialog gives the PDF.
+   ============================================================================ */
+
+/* The flow-rendered paper is hidden on screen; only the print dialog shows it. */
+.print-root { display: none; }
+
+@media print {
+  /* Reveal ONLY the print paper; hide the app UI without unmounting it. */
+  body * { visibility: hidden; }
+  .print-root, .print-root * { visibility: visible; }
+  .print-root {
+    display: block !important;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+
+  /* A4 with a comfortable top/side margin (~2cm) so nothing sits on the edge. */
+  @page {
+    size: A4;
+    margin: 18mm 14mm 14mm 14mm;
+  }
+
+  html, body {
+    background: #fff !important;
+    margin: 0;
+    padding: 0;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .printable-paper {
+    width: 100%;
+    color: #111827;
+    font-family: inherit;
+  }
+
+  /* Keep atomic units whole; let the browser break between them. */
+  .print-avoid { break-inside: avoid; page-break-inside: avoid; }
+  .printable-paper table { break-inside: auto; }
+  .printable-paper tr { break-inside: avoid; page-break-inside: avoid; }
+  .printable-paper thead { display: table-header-group; } /* repeat header on split */
+  .printable-paper img { max-width: 100%; }
+
+  /* Don't leave a heading stranded at the foot of a page. */
+  .printable-paper h3 { break-after: avoid; page-break-after: avoid; }
+}
