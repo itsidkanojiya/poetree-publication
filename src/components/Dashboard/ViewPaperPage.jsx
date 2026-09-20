@@ -7,6 +7,7 @@ import { getPaperById } from "../../services/paperService";
 import { getQuestionsByIds } from "../../services/adminService";
 import HeaderCard from "../Cards/HeaderCard";
 import PrintablePaper from "../Common/PrintablePaper";
+import PrintPortal from "../Common/PrintPortal";
 import Loader from "../Common/loader/loader";
 import MathText from "../Common/MathText";
 import { QuestionText, QuestionImageBlock } from "../Common/QuestionImageBlock";
@@ -1075,7 +1076,7 @@ const ViewPaperPage = () => {
 
       {/* Hidden on screen; the ONLY thing window.print() shows. Browser paginates
           this normal-flow render, so nothing is ever clipped. */}
-      <div className="print-root" aria-hidden="true">
+      <PrintPortal>
         <PrintablePaper
           header={getHeader()}
           sections={sections}
@@ -1098,7 +1099,7 @@ const ViewPaperPage = () => {
           renderAnswer={exportMode !== "paper" ? renderAnswerContent : undefined}
           renderSolution={exportMode === "solutions" ? renderSolutionContent : undefined}
         />
-      </div>
+      </PrintPortal>
     </div>
   );
 };

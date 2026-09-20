@@ -135,14 +135,12 @@
 .print-root { display: none; }
 
 @media print {
-  /* Reveal ONLY the print paper; hide the app UI without unmounting it. */
-  body * { visibility: hidden; }
-  .print-root, .print-root * { visibility: visible; }
+  /* The print paper is portaled to <body> as `.print-root`. Hide the entire app
+     (every other body child) so ONLY the print paper is in normal flow — its
+     height alone drives the page count, so there are no blank trailing pages. */
+  body > *:not(.print-root) { display: none !important; }
   .print-root {
     display: block !important;
-    position: absolute;
-    left: 0;
-    top: 0;
     width: 100%;
   }
 

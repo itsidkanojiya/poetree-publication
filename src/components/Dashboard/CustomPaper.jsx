@@ -22,6 +22,7 @@ import { useAuth } from "../../context/AuthContext";
 import usePdfContent from "../../hooks/usePdfContent";
 import HeaderCard from "../Cards/HeaderCard";
 import PrintablePaper from "../Common/PrintablePaper";
+import PrintPortal from "../Common/PrintPortal";
 import apiClient from "../../services/apiClient";
 import { getPaperById, updatePaper } from "../../services/paperService";
 import {
@@ -3730,7 +3731,7 @@ const CustomPaper = () => {
 
           {/* Hidden on screen; the ONLY thing window.print() shows. The browser
               paginates this normal-flow render, so nothing is ever clipped. */}
-          <div className="print-root" aria-hidden="true">
+          <PrintPortal>
             <PrintablePaper
               header={{
                 ...(paperHeader || header),
@@ -3742,7 +3743,7 @@ const CustomPaper = () => {
               exportMode="paper"
               sectionMarks={(type) => sectionMarksFor(normalizeQuestionType(type))}
             />
-          </div>
+          </PrintPortal>
 
           <div ref={pagesRef} className="space-y-8 flex flex-col items-center">
             {renderPages().map((page, pageIndex) => (
