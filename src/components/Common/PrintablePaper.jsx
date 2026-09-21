@@ -121,7 +121,13 @@ const PrintablePaper = ({
         <HeaderCard header={header || {}} disableHover disableStyles />
       </div>
 
-      {sections.map((section, sIdx) => {
+      {/* Skip section types with no selected questions — the builder passes ALL
+          types (including empty ones), which would otherwise print bare headers
+          like "A) MCQ  0 marks". Filtering here also keeps the A/B/C lettering
+          sequential over only the sections that actually render. */}
+      {sections
+        .filter((section) => (section.selectedQuestions || []).length > 0)
+        .map((section, sIdx) => {
         const type = normalizeType(section.type);
         const printTitle = !printedTypes.has(type);
         const letter = printTitle ? String.fromCharCode(65 + printedTypes.size) : "";
