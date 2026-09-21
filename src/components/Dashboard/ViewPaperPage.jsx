@@ -659,12 +659,13 @@ const ViewPaperPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, exportMode, sections]);
 
-  // When opened from a card's Export menu, wait for the measurement pass (so pages are
-  // final) then auto-download once.
+  // When opened from a card's Export menu, wait until the paper is loaded (so images
+  // and fonts are ready) then open the print dialog once — same permanent print-based
+  // export as the Download PDF button, for all three modes (paper / answers / solutions).
   useEffect(() => {
     if (!autoExport || loading || !measurePassDone || autoExportedRef.current) return;
     autoExportedRef.current = true;
-    const t = setTimeout(() => { runDownload(); }, 300); // let re-paginated pages settle
+    const t = setTimeout(() => { printSaveAsPdf(); }, 300);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoExport, loading, measurePassDone]);
