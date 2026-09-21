@@ -144,14 +144,13 @@
     width: 100%;
   }
 
-  /* margin:0 => Chrome draws NO header/footer (date, title, URL, page number) BY
-     DEFAULT — no reliance on the "Headers and footers" checkbox. Margins are
-     recreated with padding below: sides repeat on every page; the top/bottom
-     padding lands on the first/last page, and each block carries a little top
-     padding (below) so a block at a page top never sits flush to the edge. */
+  /* Real page margins: TRUE uniform 15mm top/bottom + 14mm sides on EVERY page.
+     NOTE: because the margin area is non-zero, Chrome draws its header/footer
+     (date, title, URL, page number) there UNLESS the user unchecks
+     "Headers and footers" once in the print dialog (Chrome remembers the setting). */
   @page {
     size: A4;
-    margin: 0;
+    margin: 15mm 14mm;
   }
 
   html, body {
@@ -165,16 +164,13 @@
   .printable-paper {
     width: 100%;
     box-sizing: border-box;
-    padding: 12mm 14mm 16mm 14mm;
+    padding: 0; /* @page provides the margins now */
     color: #111827;
     font-family: inherit;
   }
 
-  /* Keep atomic units whole; let the browser break between them. Padding (not
-     margin) survives page breaks, so this also gives a block landing at a page
-     top a small, consistent gap from the edge on inner pages. */
-  .print-avoid { break-inside: avoid; page-break-inside: avoid; padding-top: 2mm; }
-  .printable-paper > section { padding-top: 3mm; }
+  /* Keep atomic units whole; let the browser break between them. */
+  .print-avoid { break-inside: avoid; page-break-inside: avoid; }
   .printable-paper table { break-inside: auto; }
   .printable-paper tr { break-inside: avoid; page-break-inside: avoid; }
   .printable-paper thead { display: table-header-group; } /* repeat header on split */
