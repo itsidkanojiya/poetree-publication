@@ -3018,14 +3018,6 @@ const CustomPaper = () => {
               <span>{isSaving ? "Saving..." : "Download PDF"}</span>
             </button>
             <button
-              onClick={downloadPDF}
-              disabled={isSaving}
-              title="Legacy image-based export (may clip very tall items)"
-              className="text-xs text-gray-400 underline hover:text-gray-600 disabled:opacity-50"
-            >
-              old export
-            </button>
-            <button
               onClick={handleSavePaper}
               disabled={loadingPaper || isSaving || isSaved}
               className="group flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-violet-500 to-purple-600 text-white rounded-xl font-semibold hover:from-violet-600 hover:to-purple-700 transition-all duration-200 shadow-lg shadow-violet-500/30 hover:shadow-xl hover:shadow-violet-500/40 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"

@@ -1065,13 +1065,6 @@ const ViewPaperPage = () => {
           onClick={printSaveAsPdf}
           color="bg-blue-600"
         />
-        <button
-          type="button"
-          onClick={runDownload}
-          className="text-xs text-gray-500 underline hover:text-gray-700"
-        >
-          Old image-based download (fallback)
-        </button>
       </div>
 
       {/* Hidden on screen; the ONLY thing window.print() shows. Browser paginates
